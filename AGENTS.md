@@ -7,11 +7,15 @@
   modification. Utiliser les pilotes simulés et une racine de test distincte.
 - Suivre [la politique de versionnement](docs/versioning.md).
 - Pour chaque modification livrée qui change l'application, incrémenter `z`
-  une fois avec `scripts/version.py bump patch --summary "Résumé du changement"`.
+  de sa propre initiative, sans demander confirmation, une fois avec
+  `scripts/version.py bump patch --summary "Résumé du changement"`.
   Une livraison peut comprendre plusieurs fichiers et commits ; ne pas compter
   chaque fichier, étape de travail ou test comme une nouvelle version.
-- Pour un ensemble important de changements, incrémenter `y` et remettre `z` à
-  zéro avec `bump minor`. Décrire ce choix dans le journal des changements.
+- Pour un ensemble important de changements, proposer une incrémentation de `y`
+  et attendre l'accord explicite de l'utilisateur avant de l'effectuer.
+  Après cet accord uniquement, employer `bump minor --minor-approved`, remettre
+  `z` à zéro et décrire ce choix dans le journal des changements. Le commit doit
+  porter le trailer `Glareshield-Minor-Approved: true`, qui déclare cet accord.
 - Ne jamais incrémenter `x` sans demande explicite de l'utilisateur. Ne pas
   passer automatiquement à une version majeure pour une stabilisation ou une
   incompatibilité. `bump major` exige `--major-requested` et le commit doit

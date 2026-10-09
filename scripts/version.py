@@ -27,13 +27,15 @@ def current(text):
     return value
 
 
-def next_version(value,level,major_requested=False):
+def next_version(value,level,major_requested=False,minor_approved=False):
     x,y,z=parse(value)
     if level=='major':
         if not major_requested:
             raise ValueError('Une version majeure exige une demande explicite : --major-requested.')
         return f'{x+1}.0.0'
     if level=='minor':
+        if not minor_approved:
+            raise ValueError('Une version mineure exige un accord explicite : --minor-approved.')
         return f'{x}.{y+1}.0'
     if level=='patch':
         return f'{x}.{y}.{z+1}'
@@ -69,7 +71,7 @@ def release_notes(text,version):
     return match.group(1).strip()+'\n'
 
 
-def transition(old,new,changed,major_requested=False):
+def transition(old,new,changed,major_requested=False,minor_approved=False):
     previous,following=parse(old),parse(new)
     if following<previous:
         raise ValueError('La version ne peut pas reculer.')
@@ -77,9 +79,11 @@ def transition(old,new,changed,major_requested=False):
         raise ValueError('Modification de l’application : incrémenter z ou y avant publication.')
     if following[0]>previous[0] and not major_requested:
         raise ValueError('Version majeure sans trailer Glareshield-Major-Requested: true.')
+    if following[0]==previous[0] and following[1]>previous[1] and not minor_approved:
+        raise ValueError('Version mineure sans trailer Glareshield-Minor-Approved: true.')
 
 
-def check(base='HEAD',root=ROOT,working=True,major_requested=False,no_app_change=None):
+def check(base='HEAD',root=ROOT,working=True,major_requested=False,no_app_change=None,minor_approved=False):
     base=git('rev-parse','--verify','--end-of-options',base+'^{commit}',root=root)
     old=project_at(base,root)
     new=(root/'pyproject.toml').read_text(encoding='utf-8') if working else project_at('HEAD',root)
@@ -88,6 +92,7 @@ def check(base='HEAD',root=ROOT,working=True,major_requested=False,no_app_change
         paths+=git('ls-files','--others','--exclude-standard',root=root).splitlines()
     changed=app_changed(paths,old,new)
     major=major_requested if working else False
+    minor=minor_approved if working else False
     if working and no_app_change:
         changed=False
     if not working:
@@ -96,13 +101,14 @@ def check(base='HEAD',root=ROOT,working=True,major_requested=False,no_app_change
         for commit in commits:
             message=git('show','-s','--format=%B',commit,root=root)
             major|=bool(re.search(r'^Glareshield-Major-Requested: true\s*$',message,re.M))
+            minor|=bool(re.search(r'^Glareshield-Minor-Approved: true\s*$',message,re.M))
             parent=git('rev-parse',commit+'^',root=root)
             touched=git('diff','--name-only',parent,commit,root=root).splitlines()
             if app_changed(touched,project_at(parent,root),project_at(commit,root)):
                 significant.append(not bool(re.search(r'^Glareshield-No-App-Change: \S[^\n]*$',message,re.M)))
         if changed and significant and not any(significant):
             changed=False
-    transition(current(old),current(new),changed,major)
+    transition(current(old),current(new),changed,major,minor)
     if current(old)!=current(new):
         release_notes((root/'CHANGELOG.md').read_text(encoding='utf-8'),current(new))
     return current(new),changed
@@ -127,11 +133,11 @@ def check_tag(tag,root=ROOT):
     return value
 
 
-def bump(root,level,summary,major_requested=False):
+def bump(root,level,summary,major_requested=False,minor_approved=False):
     path=root/'pyproject.toml'
     text=path.read_text(encoding='utf-8')
     old=current(text)
-    value=next_version(old,level,major_requested)
+    value=next_version(old,level,major_requested,minor_approved)
     journal=root/'CHANGELOG.md'
     log=journal.read_text(encoding='utf-8')
     if re.search(r'^## \['+re.escape(value)+r'\]',log,re.M):
@@ -144,6 +150,8 @@ def bump(root,level,summary,major_requested=False):
         raise ValueError('Déclaration de version non reconnue ; aucun fichier modifié.')
     date=datetime.now(timezone.utc).date().isoformat()
     entry=f'## [{value}] - {date}\n\n- {summary.strip()}\n\n'
+    if minor_approved and level=='minor':
+        entry+='Version mineure approuvée explicitement par l’utilisateur.\n\n'
     if major_requested and level=='major':
         entry+='Version majeure explicitement demandée par l’utilisateur.\n\n'
     position=log.find('## [')
@@ -163,11 +171,13 @@ def main():
     validation.add_argument('--base')
     validation.add_argument('--tag')
     validation.add_argument('--major-requested',action='store_true')
+    validation.add_argument('--minor-approved',action='store_true')
     validation.add_argument('--no-app-change',help='Justification locale à reprendre dans le trailer du commit')
     change=commands.add_parser('bump')
     change.add_argument('level',choices=['patch','minor','major'])
     change.add_argument('--summary',required=True)
     change.add_argument('--major-requested',action='store_true')
+    change.add_argument('--minor-approved',action='store_true')
     args=parser.parse_args()
     try:
         if args.command=='current':
@@ -175,14 +185,15 @@ def main():
         elif args.command=='notes':
             print(release_notes((ROOT/'CHANGELOG.md').read_text(encoding='utf-8'),current((ROOT/'pyproject.toml').read_text(encoding='utf-8'))),end='')
         elif args.command=='bump':
-            print(bump(ROOT,args.level,args.summary,args.major_requested))
+            print(bump(ROOT,args.level,args.summary,args.major_requested,args.minor_approved))
         elif args.tag:
             print('Tag valide : '+check_tag(args.tag))
         else:
-            if args.base and (args.major_requested or args.no_app_change):
+            if args.base and (args.major_requested or args.minor_approved or args.no_app_change):
                 raise ValueError('Les exceptions locales ne remplacent pas les trailers des commits en CI.')
             value,changed=check(args.base or 'HEAD',working=args.base is None,
-                                major_requested=args.major_requested,no_app_change=args.no_app_change)
+                                major_requested=args.major_requested,no_app_change=args.no_app_change,
+                                minor_approved=args.minor_approved)
             print(f'Version valide : {value} ; modification application : {changed}.')
     except (ValueError,KeyError,subprocess.CalledProcessError) as error:
         parser.exit(1,str(error)+'\n')

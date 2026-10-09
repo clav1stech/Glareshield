@@ -6,7 +6,7 @@ La version est `x.y.z`, avec des entiers sans zéro initial. Sa source unique es
 | Modification livrée | Incrémentation | Exemple |
 | --- | --- | --- |
 | Changement du comportement ou de l'interface, ajout, correction fonctionnelle | `z + 1` | `0.1.0` → `0.1.1` |
-| Ensemble important de changements | `y + 1`, `z = 0` | `0.1.4` → `0.2.0` |
+| Ensemble important de changements, après accord explicite de l'utilisateur | `y + 1`, `z = 0` | `0.1.4` → `0.2.0` |
 | Version majeure demandée explicitement par l'utilisateur | `x + 1`, `y = z = 0` | `0.2.3` → `1.0.0` |
 | Documentation, orthographe, commentaires, tests seuls ou maintenance sans effet sur l'application | Aucune | `0.1.4` → `0.1.4` |
 
@@ -15,9 +15,12 @@ ou commits. Des modifications distinctes livrées successivement ont chacune
 leur incrémentation. Une configuration personnelle dans `local/` ne constitue
 pas une version du code et reste privée.
 
-Le passage à une version majeure n'est jamais automatique. Le choix d'une
-version mineure s'applique à un ensemble important et est décrit dans le
-journal. Cette politique suit la demande du propriétaire ; elle ne suppose
+L'incrémentation de `z` est autonome et ne demande pas de confirmation.
+Une incrémentation de `y` peut être suggérée pour un ensemble important, mais
+elle attend l'accord explicite de l'utilisateur avant toute modification de version.
+Le passage à une version majeure nécessite sa demande explicite.
+Le choix d'une version mineure ou majeure est décrit dans le journal.
+Cette politique suit la demande du propriétaire ; elle ne suppose
 pas qu'une incompatibilité impose à elle seule un changement de `x`.
 
 ## Préparer une livraison
@@ -26,7 +29,6 @@ Après les modifications de l'application, avant de les publier :
 
 ```powershell
 local/.venv/Scripts/python.exe scripts/version.py bump patch --summary "Résumé de la modification"
-# Pour un ensemble important : remplacer patch par minor.
 local/.venv/Scripts/python.exe scripts/version.py check
 ```
 
@@ -56,6 +58,13 @@ Pour vérifier une telle exception avant commit, utiliser
 `scripts/version.py check --no-app-change "Correction d'orthographe seule"` ;
 le trailer reste nécessaire au contrôle GitHub.
 
+Pour une version mineure, suggérer le passage à `y + 1` et attendre l'accord
+explicite de l'utilisateur. Après cet accord uniquement, employer
+`bump minor --minor-approved --summary "Résumé"` et ajouter au commit le trailer
+`Glareshield-Minor-Approved: true`.
+Avant ce commit, la vérification locale utilise `check --minor-approved`.
+L'option et le trailer déclarent un accord reçu ; ils ne le remplacent pas.
+
 Pour une version majeure explicitement demandée, employer
 `bump major --major-requested --summary "Résumé"` et ajouter au commit le trailer
 `Glareshield-Major-Requested: true`.
@@ -66,7 +75,8 @@ Avant ce commit, la vérification locale utilise `check --major-requested`.
 GitHub Actions vérifie les push sur `main`, les pull requests et les tags de
 version. Il refuse un changement d'application non justifié sans augmentation
 de version, une version qui recule, un tag qui ne correspond pas au projet,
-une version majeure sans déclaration de demande explicite et un journal de
+une version mineure sans déclaration d'accord explicite, une version majeure
+sans déclaration de demande explicite et un journal de
 changements manquant. Les versions et contrôles de publication emploient
 uniquement les fichiers publics ; aucun relevé de l'installation n'est envoyé.
 

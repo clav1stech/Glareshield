@@ -14,7 +14,7 @@ LOG='# Changes\n\n## [0.1.0] - 2026-10-09\n\nInitial fixture.\n'
 class VersionTests(unittest.TestCase):
     def test_patch_minor_and_major_reset(self):
         self.assertEqual(next_version('0.2.4','patch'),'0.2.5')
-        self.assertEqual(next_version('0.2.4','minor'),'0.3.0')
+        self.assertEqual(next_version('0.2.4','minor',minor_approved=True),'0.3.0')
         self.assertEqual(next_version('0.2.4','major',True),'1.0.0')
 
     def test_major_needs_explicit_request(self):
@@ -23,6 +23,14 @@ class VersionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             transition('0.2.4','1.0.0',True)
         transition('0.2.4','1.0.0',True,True)
+
+    def test_minor_needs_explicit_approval_even_without_app_changes(self):
+        with self.assertRaises(ValueError):
+            next_version('0.2.4','minor')
+        for changed in (False,True):
+            with self.assertRaises(ValueError):
+                transition('0.2.4','0.3.0',changed)
+            transition('0.2.4','0.3.0',changed,minor_approved=True)
 
     def test_version_syntax_and_regression(self):
         for value in ('1.2','01.2.3','1.02.3','1.2.3-beta','v1.2.3'):
@@ -89,6 +97,43 @@ class VersionTests(unittest.TestCase):
                 check(base,root,working=False)
             git('commit','--amend','-m','Fixture spelling correction\n\nGlareshield-No-App-Change: spelling only')
             self.assertEqual(check(base,root,working=False),('0.1.0',False))
+
+    def test_minor_bump_without_approval_leaves_files_untouched(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/'pyproject.toml').write_text(PROJECT,encoding='utf-8')
+            (root/'CHANGELOG.md').write_text(LOG,encoding='utf-8')
+            with self.assertRaises(ValueError):
+                bump(root,'minor','Bundle')
+            self.assertEqual((root/'pyproject.toml').read_text(encoding='utf-8'),PROJECT)
+            self.assertEqual((root/'CHANGELOG.md').read_text(encoding='utf-8'),LOG)
+            self.assertEqual(bump(root,'minor','Bundle',minor_approved=True),'0.2.0')
+            self.assertIn('Version mineure approuvée',release_notes(
+                (root/'CHANGELOG.md').read_text(encoding='utf-8'),'0.2.0'))
+
+    def test_committed_minor_requires_approval_trailer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git',*args],cwd=root,encoding='utf-8',stderr=subprocess.PIPE).strip()
+            git('init','-b','main')
+            git('config','user.name','Fixture')
+            git('config','user.email','fixture@example.invalid')
+            (root/'pyproject.toml').write_text(PROJECT,encoding='utf-8')
+            (root/'CHANGELOG.md').write_text(LOG,encoding='utf-8')
+            git('add','.')
+            git('commit','-m','Initial fixture')
+            base=git('rev-parse','HEAD')
+            bump(root,'minor','Approved bundle',minor_approved=True)
+            with self.assertRaises(ValueError):
+                check(root=root)
+            self.assertEqual(check(root=root,minor_approved=True),('0.2.0',False))
+            git('add','.')
+            git('commit','-m','Bundle')
+            with self.assertRaises(ValueError):
+                check(base,root,working=False)
+            git('commit','--amend','-m','Bundle\n\nGlareshield-Minor-Approved: true')
+            self.assertEqual(check(base,root,working=False),('0.2.0',False))
 
 
 if __name__=='__main__':
