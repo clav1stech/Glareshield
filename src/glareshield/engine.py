@@ -63,7 +63,7 @@ class Engine:
             # Error messages and request URLs may contain credentials.
             self.errors[device] = type(error).__name__
             self.failures[device] = self.failures.get(device,0)+1
-            self.next_retry[device] = self.clock()+min(60,2**min(6,self.failures[device]-1))
+            self.next_retry[device] = self.clock()+min(self.config.settings.retry_max_s,self.config.settings.retry_initial_s*2**min(16,self.failures[device]-1))
             return False,None
 
     async def restore_one(self,identifier):
@@ -73,7 +73,7 @@ class Engine:
         if driver is None:
             self.errors[identifier] = "Pilote indisponible"
             return
-        success,_ = await self.call(identifier,lambda:driver.restore(identifier,device,entry["state"]),timeout=60)
+        success,_ = await self.call(identifier,lambda:driver.restore(identifier,device,entry["state"]),timeout=self.config.settings.restore_timeout_s)
         if success:
             self.snapshots.pop(identifier,None)
             self.last.pop(identifier,None)
@@ -83,7 +83,7 @@ class Engine:
             except OSError as error:
                 self.snapshots[identifier] = entry
                 self.errors[identifier] = type(error).__name__
-                self.next_retry[identifier] = self.clock()+1
+                self.next_retry[identifier] = self.clock()+self.config.settings.retry_initial_s
 
     async def recover(self):
         async with self.lock:
@@ -113,7 +113,7 @@ class Engine:
             except OSError as error:
                 self.snapshots.pop(identifier,None)
                 self.errors[identifier] = type(error).__name__
-                self.next_retry[identifier] = self.clock()+1
+                self.next_retry[identifier] = self.clock()+self.config.settings.retry_initial_s
                 return False
         return True
 
@@ -144,7 +144,7 @@ class Engine:
             if identifier in failures:
                 self.errors[identifier] = failures[identifier]
                 self.failures[identifier] = self.failures.get(identifier,0)+1
-                self.next_retry[identifier] = self.clock()+min(60,2**min(6,self.failures[identifier]-1))
+                self.next_retry[identifier] = self.clock()+min(self.config.settings.retry_max_s,self.config.settings.retry_initial_s*2**min(16,self.failures[identifier]-1))
             else:
                 self.errors.pop(identifier,None)
                 self.next_retry.pop(identifier,None)
@@ -154,7 +154,7 @@ class Engine:
                 self.winners[identifier] = items[identifier][0].id
 
     async def play_one(self,identifier,device,effect,key):
-        success,_ = await self.call(identifier,lambda:self.drivers[device.driver].play(identifier,device,effect),timeout=30)
+        success,_ = await self.call(identifier,lambda:self.drivers[device.driver].play(identifier,device,effect),timeout=self.config.settings.sound_timeout_s)
         if not success:
             self.sound_sent.pop(key,None)
 

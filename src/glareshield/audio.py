@@ -43,6 +43,7 @@ class AudioSource:
         from pycaw.api.audiopolicy import IAudioSessionControl2
         from pycaw.api.endpointvolume import IAudioMeterInformation
         detectors={key:AudioDetector(source) for key,source in self.sources.items()}
+        due={key:0 for key in self.sources}
         process_names={name.casefold() for source in self.sources.values() for name in source.process_names}
         meters=[]
         refresh=0
@@ -78,12 +79,16 @@ class AudioSource:
                 values={}
                 levels={}
                 for key,source in self.sources.items():
+                    if now<due[key]:
+                        continue
+                    due[key]=now+source.poll_ms/1000
                     peak=max((peaks.get(name.casefold(),0) for name in source.process_names),default=0)
                     levels[key]=peak
                     values[key]=detectors[key].sample(peak,now)
-                self.levels=levels
-                loop.call_soon_threadsafe(self.update,values)
-                self.stopping.wait(.05)
+                self.levels.update(levels)
+                if values:
+                    loop.call_soon_threadsafe(self.update,values)
+                self.stopping.wait(min(source.poll_ms for source in self.sources.values())/1000)
         finally:
             comtypes.CoUninitialize()
             loop.call_soon_threadsafe(self.update,{key:False for key in self.sources})

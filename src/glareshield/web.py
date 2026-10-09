@@ -83,7 +83,7 @@ def create_app(runtime):
     async def source_test(payload:dict):
         identifier=payload.get('source')
         value=payload.get('value')
-        duration=payload.get('seconds',5)
+        duration=payload.get('seconds',runtime.config.settings.test_duration_s)
         if identifier not in runtime.config.sources or not isinstance(value,(bool,int,float)) or not isinstance(duration,(int,float)) or not 1<=duration<=30:
             raise HTTPException(400,'Source ou durée invalide.')
         runtime.manual[identifier]=(value,time.monotonic()+duration)
@@ -154,7 +154,7 @@ def create_app(runtime):
             raise HTTPException(400,'Appareil ou effet sonore invalide.')
         if identifier not in runtime.config.select(['scope:active']):
             raise HTTPException(409,'Cette sortie est hors de la portée active.')
-        success,_=await runtime.engine.call(identifier,lambda:runtime.engine.drivers[device.driver].play(identifier,device,effect),timeout=30)
+        success,_=await runtime.engine.call(identifier,lambda:runtime.engine.drivers[device.driver].play(identifier,device,effect),timeout=runtime.config.settings.sound_timeout_s)
         if not success:
             raise HTTPException(503,'Diffusion indisponible.')
         return {'ok':True}

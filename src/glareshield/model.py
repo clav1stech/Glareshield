@@ -122,12 +122,13 @@ Effect = Annotated[StaticEffect | BlinkEffect | LevelMapEffect | SoundEffect, Fi
 
 class Rule(StrictModel):
     id: str
+    name: str | None = None
     enabled: bool = True
     priority: int = 0
     source: str | None = None
     condition: Condition = Field(default_factory=Condition)
     effect: str
-    targets: list[str] = Field(min_length=1)
+    targets: list[str] = Field(default_factory=list)
     sound: str | None = None
     requires_simulator: bool = True
     suspend_when_paused: bool = False
@@ -139,9 +140,18 @@ class Settings(StrictModel):
     brightness_threshold: float = Field(default=3, ge=0, le=100)
     driver_rates: dict[str, float] = Field(default_factory=lambda: {"mock": 100})
     timeout_s: float = Field(default=5, gt=0, le=60)
+    restore_timeout_s: float = Field(default=60, gt=0, le=120)
+    sound_timeout_s: float = Field(default=30, gt=0, le=120)
+    retry_initial_s: float = Field(default=1, gt=0, le=60)
+    retry_max_s: float = Field(default=60, gt=0, le=300)
+    discovery_interval_s: float = Field(default=60, ge=5, le=3600)
+    ui_refresh_ms: int = Field(default=1500, ge=250, le=60000)
+    test_duration_s: float = Field(default=5, ge=1, le=30)
 
     @model_validator(mode="after")
     def rates_valid(self):
+        if self.retry_initial_s > self.retry_max_s:
+            raise ValueError("Le délai initial de reprise dépasse le délai maximal.")
         if any(rate <= 0 for rate in self.driver_rates.values()):
             raise ValueError("Les cadences des pilotes doivent être positives.")
         return self

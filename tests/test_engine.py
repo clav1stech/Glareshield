@@ -14,6 +14,50 @@ from glareshield.model import Condition, LightState
 ROOT = Path(__file__).resolve().parents[1]
 
 
+async def test_per_device_layering_with_independent_assignments(tmp_path):
+    config=load(ROOT/'examples/demo.yaml')
+    config.rules[0].targets=['device:light_a','device:light_b']
+    next(r for r in config.rules if r.id=='caution').targets=['device:light_b']
+    next(r for r in config.rules if r.id=='contact').targets=['device:light_b']
+    next(r for r in config.rules if r.id=='dome').targets=['device:light_a']
+    driver=MockDriver(config.devices)
+    clock=[0.0]
+    engine=Engine(config,{'mock':driver},tmp_path/'snapshots.json',clock=lambda:clock[0])
+    engine.connected=True
+    engine.values.update(warning=1,caution=1,contact=True,dome=2)
+    await engine.step()
+    assert engine.winners=={'light_a':'warning','light_b':'warning'}
+    clock[0]=.3
+    await engine.step()
+    assert driver.states['light_a']['kelvin']==3000
+    assert driver.states['light_b']['color']==[0,200,255]
+    engine.values['warning']=0
+    await engine.step()
+    assert engine.winners=={'light_a':'dome','light_b':'caution'}
+    await engine.shutdown()
+
+
+async def test_retry_delays_follow_settings(setup):
+    config,driver,engine,clock=setup
+    config.settings.retry_initial_s=2
+    config.settings.retry_max_s=3
+    async def fail():
+        raise OSError()
+    await engine.call('light_a',fail)
+    assert engine.next_retry['light_a']==2
+    clock[0]=2
+    await engine.call('light_a',fail)
+    assert engine.next_retry['light_a']==5
+
+
+def test_settings_validate_limits_and_retry_order():
+    from glareshield.model import Settings
+    for values in ({'ui_refresh_ms':0},{'test_duration_s':31},
+                   {'retry_initial_s':10,'retry_max_s':5}, {'discovery_interval_s':0}):
+        with pytest.raises(ValidationError):
+            Settings(**values)
+
+
 @pytest.fixture
 def setup(tmp_path):
     config = load(ROOT/'examples/demo.yaml')

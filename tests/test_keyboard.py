@@ -20,3 +20,13 @@ async def test_only_configured_key_is_read_and_release_is_reported():
     assert set(calls)=={65}
     assert any(m['ptt'] for m in messages)
     assert messages[-1]=={'ptt':False}
+
+
+async def test_long_poll_interval_remains_interruptible():
+    messages=[]
+    source=KeyboardSource({'ptt':Source(type='keyboard',key_code=65,poll_ms=60000)},messages.append,lambda code:0)
+    task=asyncio.create_task(source.run())
+    await asyncio.sleep(.01)
+    source.stop()
+    await asyncio.wait_for(task,.2)
+    assert messages==[{'ptt':False},{'ptt':False}]

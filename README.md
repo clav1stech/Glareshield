@@ -44,6 +44,21 @@ Python 3.13, l’environnement, les relevés, les fichiers audio et les journaux
 
 Les onglets permettent de gérer appareils, contrôleurs, groupes, portées, sources, effets, règles et paramètres. Les modifications sont validées puis appliquées sans relancer l’application. Le tableau de bord affiche connexions, pause, variables, niveaux audio, règles actives et erreurs. Les tests de source sont temporaires et ne modifient aucune commande du simulateur.
 
+Dans **Affectations**, chaque fonction dispose de sa propre sélection : choisir des appareils individuellement, ou combiner groupes, portée active et exclusions. L’aperçu affiche les appareils réellement concernés. Une sélection individuelle reste indépendante de la portée active ; un groupe suit les changements de ses membres. La copie reprend les appareils actuellement sélectionnés par une autre fonction. Une sélection vide ne pilote aucun appareil. Désactiver une fonction conserve ses affectations pour la réactiver ensuite.
+
+Les priorités s’appliquent séparément sur chaque lampe. Une lampe affectée aux alertes et au DOME reçoit le fond DOME entre les flashes ; une autre affectée aux alertes et à l’ATC reçoit le fond ATC. Les appareils retirés d’une fonction sont restaurés si aucune autre fonction ne les utilise. Modifier affectations, groupes, portées, règles, effets ou réglages conserve les connexions des sources. Modifier appareils, contrôleurs ou sources redémarre les composants de Glareshield après restauration des lampes.
+
+Les paramètres modifiables sont répartis ainsi :
+
+| Onglet | Paramètres |
+| --- | --- |
+| Règles | Nom de fonction, activation, priorité, conditions ET/OU, source, effet, son, dépendance au simulateur et à la pause |
+| Effets | Couleurs, températures, luminosités, transitions, période et fraction haute des flashes, nombre de cycles, paliers DOME, fichiers et volumes sonores |
+| Sources | Variables, touche PTT, intervalle de lecture, processus audio, seuil, durée minimale, maintien et délai entre contacts |
+| Réglages | Cadence moteur, plafond des flashes, seuil de changement de luminosité, cadences des pilotes, délais de commande/restauration/son, reprises après erreur, actualisation des adresses et de l’interface, durée des tests |
+
+L’intervalle de lecture s’applique aussi aux sources clavier et audio. La cadence Hue règle également le limiteur de commandes du pont. Les limites sont validées avant enregistrement ; une configuration invalide conserve la configuration précédente. Les clés et constantes internes des protocoles restent gérées par les pilotes.
+
 Dans « Contrôleurs », découvrir, appairer puis importer les appareils. Hue nécessite le bouton du pont ; Nanoleaf nécessite la fenêtre API du constructeur. Les clés sont conservées dans `local/secrets/`. Affecter ensuite les appareils aux groupes et portées souhaités. Les adresses Hue et Nanoleaf sont résolues par identifiant stable et réactualisées ; un cache privé sert de repli. Une adresse manuelle reste possible.
 
 Relever les noms de variables dans les fichiers du constructeur ou une liste vérifiée, puis vérifier leur sens réel au parking. Une variable acceptée par SimConnect ne prouve pas qu’elle représente la fonction attendue.

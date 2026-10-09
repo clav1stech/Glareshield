@@ -70,7 +70,8 @@ class Runtime:
                 if controller.type=='hue':
                     keys=json.loads((self.root/'local/secrets/hue.json').read_text(encoding='utf-8'))
                     driver=HueDriver(host,keys[controller.stable_id]['username'],
-                        self.root/'local/secrets'/f'hue-{controller.stable_id}.pem')
+                        self.root/'local/secrets'/f'hue-{controller.stable_id}.pem',
+                        rate=self.config.settings.driver_rates.get('hue',10))
                 elif controller.type=='nanoleaf':
                     keys=json.loads((self.root/'local/secrets/nanoleaf.json').read_text(encoding='utf-8'))
                     driver=NanoleafDriver(host,keys[controller.stable_id]['auth_token'],controller.port or endpoint.get('port',16021))
@@ -146,7 +147,8 @@ class Runtime:
 
     async def resolve_loop(self):
         while not self.stopping:
-            for _ in range(600):
+            last_resolution=time.monotonic()
+            while time.monotonic()-last_resolution<self.config.settings.discovery_interval_s:
                 if self.stopping:
                     return
                 await asyncio.sleep(.1)
@@ -204,6 +206,23 @@ class Runtime:
             self.log('Portée modifiée',scope)
 
     async def configure_locked(self,configuration):
+        configuration=Configuration.model_validate(configuration.model_dump(mode='json'))
+        if all(getattr(configuration,key)==getattr(self.config,key)
+               for key in ('devices','controllers','sources')):
+            async with self.engine.lock:
+                previous=self.config
+                self.config=save(self.path,configuration)
+                self.engine.config=self.config
+                if previous.settings.driver_rates!=self.config.settings.driver_rates:
+                    self.engine.buckets={name:Bucket(self.config.settings.driver_rates.get(name,10),time.monotonic())
+                                         for name in self.engine.drivers}
+                    for key,driver in self.controllers.items():
+                        if hasattr(driver,'rate'):
+                            driver.rate=self.config.settings.driver_rates.get(self.config.controllers[key].type,10)
+            if not self.suspended:
+                await self.engine.step()
+            self.log('Configuration appliquée sans reconnexion')
+            return
         await self.stop()
         if self.engine.snapshots:
             await self.start()
