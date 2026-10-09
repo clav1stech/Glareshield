@@ -11,8 +11,16 @@ from fastapi.responses import HTMLResponse,JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import Configuration
-from .model import LightState
+from .model import LightState,StrictModel
 from .setup import command,import_devices
+
+
+class PreviewRequest(StrictModel):
+    configuration: dict | None = None
+    rule: str
+    targets: list[str] | None = None
+    effect: str | None = None
+    value: float | bool = 1
 
 
 def create_app(runtime):
@@ -64,6 +72,22 @@ def create_app(runtime):
     @app.post('/api/suspend')
     async def suspend(payload:dict):
         runtime.suspended=bool(payload.get('suspended'))
+        if runtime.suspended:
+            await runtime.stop_tests()
+        return {'ok':True}
+
+    @app.post('/api/test/preview')
+    async def preview(payload:PreviewRequest):
+        try:
+            candidate=Configuration.model_validate(payload.configuration) if payload.configuration is not None else runtime.config
+            await runtime.start_preview(candidate,payload.rule,payload.targets,payload.effect,payload.value)
+            return {'ok':True,'seconds':3}
+        except ValueError as error:
+            raise HTTPException(400,str(error) if not hasattr(error,'errors') else 'Réglages invalides : vérifier les valeurs et les cibles.') from None
+
+    @app.post('/api/test/stop')
+    async def stop_preview():
+        await runtime.stop_tests()
         return {'ok':True}
 
     @app.post('/api/scope')
@@ -86,7 +110,7 @@ def create_app(runtime):
         duration=payload.get('seconds',runtime.config.settings.test_duration_s)
         if identifier not in runtime.config.sources or not isinstance(value,(bool,int,float)) or not isinstance(duration,(int,float)) or not 1<=duration<=30:
             raise HTTPException(400,'Source ou durée invalide.')
-        runtime.manual[identifier]=(value,time.monotonic()+duration)
+        await runtime.test_source(identifier,value,duration)
         return {'ok':True}
 
     @app.post('/api/identify/{identifier}')

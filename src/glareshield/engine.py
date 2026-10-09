@@ -46,6 +46,7 @@ class Engine:
         self.failures = {}
         self.sound_sent = {}
         self.sound_tasks: dict[str,asyncio.Task] = {}
+        self.sound_owners: dict[str,str] = {}
         self.buckets = {name:Bucket(configuration.settings.driver_rates.get(name,10),clock()) for name in drivers}
         self.lock = asyncio.Lock()
 
@@ -231,6 +232,9 @@ class Engine:
                     operations.append(self.apply_group(name,items))
             if operations:
                 await asyncio.gather(*operations)
+            for identifier,task in self.sound_tasks.items():
+                if not task.done() and (identifier not in sounds or self.sound_owners.get(identifier)!=sounds[identifier][0].id):
+                    task.cancel()
             for identifier,(rule,effect,start) in sounds.items():
                 key = (rule.id,identifier,start)
                 last = self.sound_sent.get(key)
@@ -241,6 +245,7 @@ class Engine:
                 if device.driver not in self.drivers or (pending and not pending.done()) or now < self.next_retry.get(identifier,0):
                     continue
                 self.sound_sent[key] = now
+                self.sound_owners[identifier] = rule.id
                 self.sound_tasks[identifier] = asyncio.create_task(self.play_one(identifier,device,effect,key))
 
     async def shutdown(self):

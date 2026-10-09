@@ -58,6 +58,28 @@ def test_settings_validate_limits_and_retry_order():
             Settings(**values)
 
 
+async def test_running_sound_stops_when_its_rule_ends(setup):
+    config,driver,engine,_=setup
+    config.active_scope='extended'
+    engine.connected=True
+    started=asyncio.Event()
+    cancelled=asyncio.Event()
+    async def play(identifier,device,effect):
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+    driver.play=play
+    engine.values['warning']=1
+    await engine.step()
+    await asyncio.wait_for(started.wait(),1)
+    engine.values['warning']=0
+    await engine.step()
+    await asyncio.wait_for(cancelled.wait(),1)
+    await engine.shutdown()
+
+
 @pytest.fixture
 def setup(tmp_path):
     config = load(ROOT/'examples/demo.yaml')

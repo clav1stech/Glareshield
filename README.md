@@ -59,6 +59,12 @@ Les paramètres modifiables sont répartis ainsi :
 
 L’intervalle de lecture s’applique aussi aux sources clavier et audio. La cadence Hue règle également le limiteur de commandes du pont. Les limites sont validées avant enregistrement ; une configuration invalide conserve la configuration précédente. Les clés et constantes internes des protocoles restent gérées par les pilotes.
 
+Les cartes d’effets décrivent le résultat en français : couleur, flashes par seconde, luminosité, durée des phases et paliers. L’éditeur utilise des Hz et des pourcentages ; chaque réglage possède une explication. Une fréquence de 2 Hz avec une phase haute de 50 % signifie 250 ms en phase haute puis 250 ms en phase basse. Une pulsation fait varier progressivement la luminosité sur le cycle.
+
+**Tester 3 s** est disponible sur toutes les pages de configuration, sur les cartes et dans les éditeurs. Choisir la fonction, les lampes et, pour DOME, le palier. Les effets, règles, affectations, groupes, portées et réglages en cours d’édition peuvent être essayés sans être enregistrés. Les autres fonctions conservent leurs priorités ; un test DOME peut donc être recouvert par une alerte réelle. Le test revient automatiquement à l’état courant des règles, même avec une cadence moteur basse. **Arrêter le test** interrompt immédiatement l’aperçu ou la simulation de source. Suspendre les règles arrête également les tests.
+
+Les tests de source simulent sa valeur pendant trois secondes et utilisent les affectations enregistrées. Ils n’écrivent aucune variable dans le simulateur ; les seuils audio et les touches se vérifient avec le moniteur réel. Les tests d’appareil et de contrôleur utilisent la connexion enregistrée : enregistrer une nouvelle adresse ou ressource avant de la tester. Le test d’un son exige une sortie audio configurée ; aucune sortie n’est activée automatiquement.
+
 Dans « Contrôleurs », découvrir, appairer puis importer les appareils. Hue nécessite le bouton du pont ; Nanoleaf nécessite la fenêtre API du constructeur. Les clés sont conservées dans `local/secrets/`. Affecter ensuite les appareils aux groupes et portées souhaités. Les adresses Hue et Nanoleaf sont résolues par identifiant stable et réactualisées ; un cache privé sert de repli. Une adresse manuelle reste possible.
 
 Relever les noms de variables dans les fichiers du constructeur ou une liste vérifiée, puis vérifier leur sens réel au parking. Une variable acceptée par SimConnect ne prouve pas qu’elle représente la fonction attendue.
