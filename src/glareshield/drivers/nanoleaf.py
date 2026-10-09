@@ -56,18 +56,19 @@ class NanoleafDriver:
         return max(bounds.get('min',0),min(bounds.get('max',value),value))
 
     async def apply(self,identifier,device,state:LightState):
+        # Essentials firmware can turn back on when brightness/colour accompany
+        # on:false. Power-off must be a standalone command.
+        if not state.on or state.color==[0,0,0]:
+            await self.request('PUT','state',{'on':{'value':False}})
+            return
         body={'on':{'value':state.on},'brightness':{'value':self.bound('brightness',round(state.brightness))}}
         if state.color is not None:
-            if state.color==[0,0,0]:
-                body['on']['value']=False
-            else:
-                hue,saturation=rgb_to_hs(state.color)
-                body['hue']={'value':hue}
-                body['sat']={'value':saturation}
+            hue,saturation=rgb_to_hs(state.color)
+            body['hue']={'value':hue}
+            body['sat']={'value':saturation}
         elif state.kelvin is not None:
             body['ct']={'value':self.bound('ct',state.kelvin)}
         await self.request('PUT','state',body)
-
     async def restore(self,identifier,device,snapshot):
         state=snapshot['state']
         body={key:{'value':state[key]['value']} for key in ('on','brightness')}
@@ -77,6 +78,9 @@ class NanoleafDriver:
             keys=('ct',) if state['colorMode']=='ct' else ('hue','sat')
             body.update({key:{'value':state[key]['value']} for key in keys})
         await self.request('PUT','state',body)
+
+        if not state['on']['value']:
+            await self.request('PUT','state',{'on':{'value':False}})
 
     async def identify(self,identifier,device):
         original=await self.snapshot(identifier,device)
