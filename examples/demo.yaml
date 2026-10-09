@@ -1,0 +1,60 @@
+version: 1
+devices:
+  light_a:
+    name: Lumière de démonstration A
+    driver: mock
+    initial_state: {on: true, brightness: 42, kelvin: 4000}
+  light_b:
+    name: Lumière de démonstration B
+    driver: mock
+    initial_state: {on: false, brightness: 25, color: [50, 100, 150]}
+  sound_a:
+    name: Sortie sonore de démonstration
+    driver: mock
+    kind: audio
+groups:
+  primary: [light_a]
+  extended: ["group:primary", light_b, sound_a]
+scopes:
+  primary: [primary]
+  extended: [extended]
+active_scope: primary
+sources:
+  warning: {type: mock}
+  caution: {type: mock}
+  contact: {type: mock}
+  dome: {type: mock}
+effects:
+  warning_light: {type: blink, color: [255, 0, 0], period_s: 0.5, high: 100, low: 15}
+  caution_light: {type: blink, color: [255, 140, 0], period_s: 0.5, high: 100, low: 15}
+  contact_light: {type: static, state: {color: [0, 200, 255], brightness: 100}}
+  dome_light:
+    type: level_map
+    map:
+      "0": {on: false}
+      "1": {on: true, brightness: 15, kelvin: 2700}
+      "2": {on: true, brightness: 80, kelvin: 3000}
+  warning_audio: {type: sound, file: warning.wav, volume: 0.5, repeat_s: 10}
+rules:
+  - id: warning
+    priority: 100
+    condition: {source: warning, op: eq, value: 1}
+    effect: warning_light
+    sound: warning_audio
+    targets: ["scope:active"]
+  - id: caution
+    priority: 80
+    condition: {source: caution, op: eq, value: 1}
+    effect: caution_light
+    targets: ["scope:active"]
+  - id: contact
+    priority: 50
+    condition: {source: contact, op: active}
+    effect: contact_light
+    targets: ["scope:active"]
+  - id: dome
+    priority: 10
+    source: dome
+    suspend_when_paused: true
+    effect: dome_light
+    targets: ["device:light_a"]

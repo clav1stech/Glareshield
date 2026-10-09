@@ -12,14 +12,14 @@ Toutes les données d’une installation restent sous `local/` :
 local/
   planning/       # plan original et notes privées
   discovery/     # relevés du matériel et résultats de tests
-  config/        # appareils, groupes, portées et règles personnels
+  config.yaml    # appareils, groupes, portées et règles personnels
   secrets/       # clés et jetons d’appairage
   state/         # snapshots et cache de découverte
   logs/          # journaux d’exécution
   sounds/        # fichiers audio personnels
 ```
 
-Ces dossiers sont locaux ; leur contenu ne doit pas être copié dans la documentation publique. Les futurs composants de persistance devront respecter cette séparation. Un dépôt privé ne remplace pas cette règle.
+Ces données sont locales ; leur contenu ne doit pas être copié dans la documentation publique. Tous les composants de persistance respectent cette séparation. Un dépôt privé ne remplace pas cette règle.
 
 ## Suivi Git
 

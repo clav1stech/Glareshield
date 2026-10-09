@@ -1,0 +1,1 @@
+"""Configurable local simulator lighting."""
