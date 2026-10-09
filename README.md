@@ -1,5 +1,11 @@
 # Glareshield
 
+Version courante : [dernière release GitHub](https://github.com/clav1stech/Glareshield/releases/latest). Voir le [journal des changements](CHANGELOG.md)
+et la [politique de versionnement](docs/versioning.md) : `z` pour chaque
+modification de l'application, `y` pour un ensemble important, `x` uniquement
+sur demande explicite. Les modifications sans effet sur l'application ne
+changent pas la version. Les releases GitHub sont publiées depuis les tags.
+
 Application Windows reliant un simulateur de vol à des éclairages connectés. Interface en français, page web locale et icône dans la barre système. Toute la configuration personnelle reste sous `local/`.
 
 ## Fonctionnement

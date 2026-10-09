@@ -4,6 +4,13 @@
 !/README.md
 !/requirements.txt
 !/pyproject.toml
+!/AGENTS.md
+!/CHANGELOG.md
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/version.yml
 !/src/
 /src/*
 !/src/glareshield/
@@ -47,6 +54,7 @@
 !/scripts/probe_simulator.py
 !/scripts/setup.cmd
 !/scripts/check_public.py
+!/scripts/version.py
 !/scripts/test_hue.py
 !/scripts/test_nanoleaf.py
 !/scripts/start.cmd
@@ -61,10 +69,12 @@
 !/tests/test_keyboard.py
 !/tests/test_web.py
 !/tests/test_runtime.py
+!/tests/test_version.py
 !/docs/
 /docs/*
 !/docs/architecture.md
 !/docs/privacy.md
+!/docs/versioning.md
 !/docs/discovery.md
 
 # Private installation data must never enter Git.

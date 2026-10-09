@@ -8,6 +8,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED = {'.gitignore','README.md','requirements.txt',
+           'AGENTS.md','CHANGELOG.md','docs/versioning.md','scripts/version.py',
+           'tests/test_version.py','.github/workflows/version.yml',
            'docs/architecture.md','docs/privacy.md','docs/discovery.md',
            'scripts/discover.py','scripts/pair_lights.py','scripts/probe_audio.py',
            'scripts/probe_simulator.py','scripts/setup.cmd','scripts/check_public.py',
