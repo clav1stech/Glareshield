@@ -1,0 +1,21 @@
+# Deny by default. Only reviewed public paths are allowed.
+/*
+!/.gitignore
+!/README.md
+!/docs/
+/docs/*
+!/docs/architecture.md
+!/docs/privacy.md
+!/docs/discovery.md
+
+# Private installation data must never enter Git.
+/local/
+/**/.env
+/**/.env.*
+/**/secrets.*
+/**/config.yaml
+/**/config.yml
+/**/snapshots.json
+/**/*.log
+/**/*.pem
+/**/*.key
