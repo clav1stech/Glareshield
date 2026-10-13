@@ -91,12 +91,17 @@ local/.venv/Scripts/python.exe scripts/pair_lights.py hue
 local/.venv/Scripts/python.exe scripts/pair_lights.py nanoleaf --model MODELE
 local/.venv/Scripts/python.exe scripts/probe_audio.py --seconds 30
 local/.venv/Scripts/python.exe scripts/probe_simulator.py --seconds 30
+local/.venv/Scripts/python.exe scripts/find_lvars.py --name fnx-aircraft-320 --filter "FCU"
 $env:PYTHONPATH='src'
 local/.venv/Scripts/python.exe -m glareshield.cli demo
 local/.venv/Scripts/python.exe -m pytest -q
 ```
 
-La sonde simulateur lit `local/discovery/probe-variables.json`, liste de noms de LVars. Les bancs `scripts/test_hue.py` et `scripts/test_nanoleaf.py` modifient les éclairages puis restaurent leurs états ; les utiliser lorsque cette modification est souhaitée. Les rapports et checkpoints restent privés.
+La sonde simulateur lit `local/discovery/probe-variables.json`, liste de noms de LVars, et
+`local/discovery/probe-simvars.json`, liste de paires `["NOM", "unité"]` de SimVars standard.
+`find_lvars.py` relève les LVars déclarées dans le paquet d'un avion et peut préparer la liste
+de la sonde (`--write-probe`). Les variables connues du Fenix A320 sont décrites dans
+[docs/fenix-a320.md](docs/fenix-a320.md), avec l'exemple `examples/fenix-a320.yaml`. Les bancs `scripts/test_hue.py` et `scripts/test_nanoleaf.py` modifient les éclairages puis restaurent leurs états ; les utiliser lorsque cette modification est souhaitée. Les rapports et checkpoints restent privés.
 
 ## Confidentialité et publication
 

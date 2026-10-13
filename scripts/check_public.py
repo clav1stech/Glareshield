@@ -31,7 +31,8 @@ ALLOWED = {'.gitignore','README.md','requirements.txt',
            'src/glareshield/aibridge/__init__.py','src/glareshield/aibridge/catalog.py','src/glareshield/aibridge/config.py','src/glareshield/aibridge/context.py','src/glareshield/aibridge/scenario.py',
            'src/glareshield/aibridge/service.py','src/glareshield/aibridge/simbrief.py','src/glareshield/aibridge/telemetry.py','src/glareshield/aibridge/web.py','src/glareshield/aibridge/demo_ofp.json',
            'src/glareshield/static/app.css','src/glareshield/static/app.js','src/glareshield/static/ai.js',
-           'tests/test_aibridge.py','tests/test_aibridge_web.py','tests/test_telemetry_source.py','docs/ai-bridge.md','docs/SKILL.md'}
+           'tests/test_aibridge.py','tests/test_aibridge_web.py','tests/test_telemetry_source.py','docs/ai-bridge.md','docs/SKILL.md',
+           'src/glareshield/aibridge/presets.py','scripts/find_lvars.py','examples/fenix-a320.yaml','docs/fenix-a320.md','tests/test_fenix.py'}
 
 
 def identifiers(value, sensitive=False):

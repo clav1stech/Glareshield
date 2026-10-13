@@ -56,7 +56,9 @@ moteurs, frein de parc notamment) peut ne pas refléter son cockpit. Ces variabl
 donc exportées avec `verification: msfs_sdk` tant que l'utilisateur ne les a pas
 déclarées « validées localement » dans l'onglet **Variables IA**.
 
-Aucune LVar Fenix n'est présumée. L'utilisateur peut en ajouter dans **Variables IA**
+Aucune LVar Fenix n'est présumée. Le préréglage **Fenix A320** ajoute les variables
+observées et décrites dans [fenix-a320.md](fenix-a320.md), toutes non vérifiées tant que
+l'utilisateur ne les a pas confirmées. L'utilisateur peut aussi en ajouter dans **Variables IA**
 (nom, libellé, unité, cadence, signification des valeurs), après relevé dans une liste
 vérifiée ou avec `scripts/probe_simulator.py`. Elles sont exportées avec
 `verification: configured_unverified` jusqu'à confirmation de leur sens.

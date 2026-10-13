@@ -2,6 +2,19 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.0.1] - 2026-10-13
+
+Publication des connaissances génériques sur le Fenix A320 acquises pendant les essais ;
+aucune donnée de l'installation personnelle n'est incluse.
+
+- Préréglage Fenix A320 dans Variables IA : ajoute les LVars observées, toutes à valider
+  par l'utilisateur, et retire de l'export les SimVars standard qui ne suivent pas le Fenix.
+- `docs/fenix-a320.md` : variables d'éclairage et d'AI Bridge avec leur statut, variables
+  inutilisables, emplacement des noms dans le paquet et limites connues.
+- `examples/fenix-a320.yaml` : configuration d'exemple avec les sources Fenix et IVAO.
+- `scripts/find_lvars.py` relève les LVars déclarées dans le paquet d'un avion ; la sonde
+  simulateur lit aussi des SimVars standard.
+
 ## [1.0.0] - 2026-10-13
 
 Version majeure explicitement demandée par l'utilisateur. Première version stable
