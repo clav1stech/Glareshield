@@ -7,12 +7,16 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI,HTTPException,Request
-from fastapi.responses import HTMLResponse,JSONResponse
+from fastapi.responses import FileResponse,HTMLResponse,JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import Configuration
 from .model import LightState,StrictModel
 from .setup import command,import_devices
+from .aibridge.web import create_router
+
+STATIC=Path(__file__).parent/'static'
+ASSETS={'app.css':'text/css','app.js':'text/javascript','ai.js':'text/javascript'}
 
 
 class PreviewRequest(StrictModel):
@@ -37,7 +41,8 @@ def create_app(runtime):
 
     @app.middleware('http')
     async def local_mutations(request:Request,call_next):
-        if request.method not in ('GET','HEAD','OPTIONS'):
+        # Flight data is read with the session token too, not only mutations.
+        if request.method not in ('GET','HEAD','OPTIONS') or request.url.path.startswith('/api/ai/'):
             if not secrets.compare_digest(request.headers.get('x-glareshield-token',''),token):
                 return JSONResponse({'detail':'Session locale invalide.'},status_code=403)
         response=await call_next(request)
@@ -47,7 +52,18 @@ def create_app(runtime):
 
     @app.get('/',response_class=HTMLResponse)
     async def index():
-        return (Path(__file__).parent/'static/index.html').read_text(encoding='utf-8').replace('__TOKEN__',token)
+        return (STATIC/'index.html').read_text(encoding='utf-8').replace('__TOKEN__',token)
+
+    @app.get('/static/{name}')
+    async def asset(name:str):
+        if name not in ASSETS:
+            raise HTTPException(404,'Ressource inconnue.')
+        return FileResponse(STATIC/name,media_type=ASSETS[name])
+
+    async def ai_changed():
+        async with runtime.configuration_lock:
+            await runtime.ai_settings_changed()
+    app.include_router(create_router(lambda:runtime.ai,ai_changed))
 
     @app.get('/api/status')
     async def status():

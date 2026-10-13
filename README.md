@@ -6,7 +6,7 @@ modification de l'application, `y` pour un ensemble important après accord expl
 de l'utilisateur, `x` uniquement sur sa demande explicite. Les modifications sans effet sur l'application ne
 changent pas la version. Les releases GitHub sont publiées depuis les tags.
 
-Application Windows reliant un simulateur de vol à des éclairages connectés. Interface en français, page web locale et icône dans la barre système. Toute la configuration personnelle reste sous `local/`.
+Application Windows reliant un simulateur de vol à des éclairages connectés et, avec le module AI Bridge, à une assistance conversationnelle. Interface en français, page web locale et icône dans la barre système. Toute la configuration personnelle reste sous `local/`.
 
 ## Fonctionnement
 
@@ -21,6 +21,10 @@ Application Windows reliant un simulateur de vol à des éclairages connectés. 
 L’exemple vise 2 Hz pour les alertes, avec un plafond de 2 Hz. La cadence physique dépend du pont, des commandes nécessaires et du réseau. La luminosité basse sert de repli lorsqu’aucun fond fixe n’est actif.
 
 AirPlay est un pilote optionnel expérimental. Il reste inactif sans sortie et son associés aux règles. Aucune sortie sonore PC n’est prévue. La réception et le comportement des paires d’enceintes doivent être vérifiés avant activation.
+
+## AI Bridge
+
+Le module **Assistant IA** constitue un état de vol qualifié (valeur, unité, âge, statut observé, périmé, indisponible ou simulé), y adjoint le dernier OFP SimBrief importé manuellement et produit un export JSON à copier dans ChatGPT, Claude ou un autre assistant. Il utilise la connexion SimConnect existante, n'écrit rien dans le cockpit, n'appelle aucun modèle d'IA et reste désactivé tant qu'il n'est pas activé dans **Variables IA**. Un scénario de démonstration et un OFP fictif permettent de l'éprouver sans simulateur. Voir [la documentation d'AI Bridge](docs/ai-bridge.md).
 
 ## Installation et lancement
 
@@ -107,4 +111,4 @@ git diff --cached --check
 
 L’audit refuse les chemins non autorisés, les adresses de réseau privé, les chemins utilisateur et les identifiants ou secrets connus présents dans l’index. Une relecture reste nécessaire. Ne jamais ajouter `local/`, même à un dépôt privé.
 
-Voir [l’architecture](docs/architecture.md), [la découverte](docs/discovery.md) et [la séparation des données](docs/privacy.md).
+Voir [l’architecture](docs/architecture.md), [AI Bridge](docs/ai-bridge.md), [la découverte](docs/discovery.md) et [la séparation des données](docs/privacy.md).

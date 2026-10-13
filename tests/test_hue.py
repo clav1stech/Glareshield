@@ -133,3 +133,31 @@ async def test_dynamic_background_can_be_captured_when_other_members_are_owned(t
         assert snapshot['__dynamic_scene']['id']=='fixture-scene'
     finally:
         await driver.close()
+
+
+async def test_dynamic_scene_inactive_after_recall_is_identified_by_latest_recall(tmp_path):
+    a,b=light('fixture-a'),light('fixture-b')
+    for item in (a,b):
+        item['dynamics']={'status':'dynamic_palette'}
+    actions=[{'target':{'rid':key,'rtype':'light'}} for key in ('fixture-a','fixture-b')]
+    palette={'color':[{'color':{'xy':{'x':.3,'y':.3}}}]}
+    older={'id':'fixture-older','status':{'active':'inactive','last_recall':'2026-01-01T10:00:00.000Z'},
+        'palette':palette,'actions':actions}
+    latest={'id':'fixture-latest','status':{'active':'inactive','last_recall':'2026-01-02T10:00:00.000Z'},
+        'palette':palette,'actions':actions}
+    static={'id':'fixture-static','status':{'active':'inactive','last_recall':'2026-01-03T10:00:00.000Z'},
+        'palette':{'color':[]},'actions':actions}
+    def handler(request):
+        path=request.url.path
+        data=[older,static,latest] if path.endswith('/scene') else [a] if path.endswith('/fixture-a') else [a,b]
+        return httpx.Response(200,json={'data':data,'errors':[]})
+    driver=HueDriver('fixture.invalid','fixture-key',tmp_path/'unused.pem',transport=httpx.MockTransport(handler),rate=1000)
+    try:
+        snapshot=await driver.snapshot('a',Device(name='A',resource_id='fixture-a'))
+        assert snapshot['__dynamic_scene']=={'id':'fixture-latest','members':['fixture-a','fixture-b']}
+        b['dynamics']['status']='none'
+        driver.captured_scenes.clear()
+        with pytest.raises(HueError,match='non identifiée'):
+            await driver.snapshot('a',Device(name='A',resource_id='fixture-a'))
+    finally:
+        await driver.close()

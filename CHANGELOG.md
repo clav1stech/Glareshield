@@ -2,6 +2,69 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.0.0] - 2026-10-13
+
+Version majeure explicitement demandée par l'utilisateur. Première version stable
+de Glareshield avec AI Bridge, validée sur un vol réel de près de deux heures sans
+déconnexion SimConnect ni perturbation de l'éclairage.
+
+- Éclairage et AI Bridge partagent une connexion SimConnect unique, en lecture seule.
+- Consignes pour assistants IA dans `docs/SKILL.md` : lecture des exports, attentes
+  selon la phase de vol, checklists, phraséologie ATC ou UNICOM, questions limitées
+  au nécessaire.
+- Limites connues : le Fenix n'expose ni les valeurs du FCU, ni les modes FMA, ni le
+  MCDU ou l'ECAM ; volets et armement des aérofreins restent sans variable fiable.
+
+## [0.1.4] - 2026-10-13
+
+Exports organisés par phase de vol, après un premier vol complet avec AI Bridge.
+
+- Trois modes remplacent essentiel et détaillé : briefing au sol, point en vol et
+  complet, avec choix automatique selon que l'appareil est au sol ou en l'air.
+- Avancement sur la route prévue : prochains points, distance restante et carburant
+  comparé au plan, présentés comme valeurs calculées.
+- Notes pilote incluses dans les exports pour ce que le simulateur ne fournit pas
+  (saisies MCDU, valeurs FCU, clairances, ATIS).
+
+## [0.1.3] - 2026-10-13
+
+Import SimBrief vérifié avec un OFP réel.
+
+- Format `json=v2` pris en charge (horaires ISO 8601, durées `HH:MM:SS`, points de
+  route en liste) ; l'ancien format reste accepté.
+- SID et STAR ajoutées au résumé du plan.
+
+## [0.1.2] - 2026-10-13
+
+Corrections issues des premiers essais réels au parking sur MSFS 2024 et Fenix A320.
+
+- Variables AI Bridge lues dans la boucle SimConnect, après les LVars d'éclairage et
+  au plus une par tour : supprime les arrêts du processus observés avec un fil de
+  lecture parallèle. Cadences réduites à environ 10 lectures par seconde.
+- Hue : une scène dynamique rappelée par Glareshield, que le pont déclare ensuite
+  inactive, est de nouveau identifiée ; les lampes concernées ne restent plus en erreur.
+- Armement des aérofreins ajouté au catalogue ; route magnétique déclarée
+  indisponible sous 5 kt de vitesse sol.
+
+## [0.1.1] - 2026-10-13
+
+Module AI Bridge et refonte de l'interface, développés et éprouvés avec des pilotes
+et données simulés uniquement.
+
+- AI Bridge : SimVars standard lues par la connexion SimConnect existante ; LVars Fenix
+  configurables localement.
+- Valeurs qualifiées par unité, âge et statut (observée, périmée, indisponible,
+  simulée, calculée) ; les valeurs de test de l'éclairage ne sont jamais exportées.
+- Import manuel du dernier OFP SimBrief, résumé planifié, conservation du dernier
+  plan valide et avertissements d'ancienneté ou d'incohérence.
+- Export JSON versionné, essentiel ou détaillé, à copier pour un assistant IA,
+  télécharger ou enregistrer dans `local/exports`.
+- Scénario de vol et OFP fictifs pour éprouver le module sans simulateur.
+- Module désactivé par défaut ; réglages séparés dans `local/ai-bridge.yaml`,
+  appliqués sans redémarrer les éclairages ; routes protégées par le jeton de session.
+- Interface refondue : navigation latérale par module, tableau de bord synthétique,
+  messages non bloquants, thèmes sombre et clair, affichage mobile.
+
 ## [0.1.0] - 2026-10-09
 
 Première publication de l'application existante et point de départ du versionnement.

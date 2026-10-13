@@ -103,6 +103,20 @@ class HueDriver:
                         self.resources.get(member,{}).get('dynamics',{}).get('status')=='dynamic_palette'
                         or member in self.controlled for member in scene['members'])),None)
             if dynamic_scene is None:
+                # The bridge marks a scene inactive after an API recall although its palette keeps running:
+                # fall back to the most recently recalled palette scene whose members all still play it.
+                candidates=[]
+                for scene in self.scenes:
+                    members=[a['target']['rid'] for a in scene.get('actions',[]) if a['target']['rtype']=='light']
+                    if (device.resource_id in members and scene.get('palette',{}).get('color')
+                            and scene.get('status',{}).get('last_recall')):
+                        candidates.append((scene['status']['last_recall'],scene['id'],members))
+                if candidates:
+                    _,scene_id,members=max(candidates)
+                    if all(self.resources.get(member,{}).get('dynamics',{}).get('status')=='dynamic_palette'
+                           or member in self.controlled for member in members):
+                        dynamic_scene={'id':scene_id,'members':members}
+            if dynamic_scene is None:
                 raise HueError('Scène dynamique active non identifiée.')
         if raw.get('timed_effects',{}).get('status','no_effect') != 'no_effect':
             raise HueError('Effet temporisé actif : capture exacte indisponible.')

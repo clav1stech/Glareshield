@@ -1,0 +1,195 @@
+{
+ "fetch": {
+  "userid": "000000",
+  "static_id": {},
+  "status": "Success"
+ },
+ "params": {
+  "request_id": "00000001",
+  "user_id": "000000",
+  "time_generated": "1791874800",
+  "airac": "2610",
+  "units": "kgs"
+ },
+ "general": {
+  "icao_airline": "GSH",
+  "flight_number": "123",
+  "initial_altitude": "35000",
+  "costindex": "30",
+  "cruise_profile": "CI 30",
+  "route": "DEMOA UM000 DEMOH",
+  "route_distance": "372",
+  "air_distance": "381"
+ },
+ "origin": {
+  "icao_code": "XXPO",
+  "iata_code": {},
+  "name": "DEMO ORIGIN",
+  "elevation": "291",
+  "pos_lat": "48.7233",
+  "pos_long": "2.3794",
+  "plan_rwy": "24",
+  "metar": "XXPO 130900Z 26008KT CAVOK 15/08 Q1016"
+ },
+ "destination": {
+  "icao_code": "XXNC",
+  "iata_code": {},
+  "name": "DEMO DESTINATION",
+  "elevation": "13",
+  "pos_lat": "43.6584",
+  "pos_long": "7.2159",
+  "plan_rwy": "04R",
+  "metar": "XXNC 130900Z 09006KT 9999 FEW030 20/12 Q1015"
+ },
+ "alternate": {
+  "icao_code": "XXMA",
+  "name": "DEMO ALTERNATE",
+  "elevation": "69",
+  "pos_lat": "43.4367",
+  "pos_long": "5.2150",
+  "plan_rwy": "31R"
+ },
+ "aircraft": {
+  "icaocode": "A320",
+  "name": "A320-200 DEMO",
+  "reg": "F-XDEM"
+ },
+ "atc": {
+  "callsign": "GSH123"
+ },
+ "fuel": {
+  "taxi": "200",
+  "enroute_burn": "3400",
+  "contingency": "170",
+  "alternate_burn": "1100",
+  "reserve": "1150",
+  "extra": "180",
+  "min_takeoff": "5820",
+  "plan_takeoff": "6000",
+  "plan_ramp": "6200",
+  "plan_landing": "2600"
+ },
+ "times": {
+  "est_time_enroute": "4380",
+  "est_block": "5100",
+  "sched_out": "1791878400",
+  "sched_in": "1791883500"
+ },
+ "weights": {
+  "est_zfw": "60300",
+  "est_tow": "66300",
+  "est_ldw": "62900"
+ },
+ "navlog": {
+  "fix": [
+   {
+    "ident": "DEMOA",
+    "name": "DEMO FIX 1",
+    "type": "wpt",
+    "via_airway": "DCT",
+    "stage": "CLB",
+    "altitude_feet": "12000",
+    "pos_lat": "48.160533",
+    "pos_long": "2.916789",
+    "is_sid_star": "1",
+    "fuel_plan_onboard": "5444"
+   },
+   {
+    "ident": "DEMOB",
+    "name": "DEMO FIX 2",
+    "type": "wpt",
+    "via_airway": "UM000",
+    "stage": "CLB",
+    "altitude_feet": "28000",
+    "pos_lat": "47.597767",
+    "pos_long": "3.454178",
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "5089"
+   },
+   {
+    "ident": "DEMOC",
+    "name": "DEMO FIX 3",
+    "type": "wpt",
+    "via_airway": "UM000",
+    "stage": "CRZ",
+    "altitude_feet": "35000",
+    "pos_lat": "47.035000",
+    "pos_long": "3.991567",
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "4733"
+   },
+   {
+    "ident": "DEMOD",
+    "name": "DEMO FIX 4",
+    "type": "wpt",
+    "via_airway": "UM000",
+    "stage": "CRZ",
+    "altitude_feet": "35000",
+    "pos_lat": "46.472233",
+    "pos_long": "4.528956",
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "4378"
+   },
+   {
+    "ident": "DEMOE",
+    "name": "DEMO FIX 5",
+    "type": "wpt",
+    "via_airway": "UM000",
+    "stage": "CRZ",
+    "altitude_feet": "35000",
+    "pos_lat": "45.909467",
+    "pos_long": "5.066344",
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "4022"
+   },
+   {
+    "ident": "DEMOF",
+    "name": "DEMO FIX 6",
+    "type": "wpt",
+    "via_airway": "UM000",
+    "stage": "DSC",
+    "altitude_feet": "24000",
+    "pos_lat": "45.346700",
+    "pos_long": "5.603733",
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "3667"
+   },
+   {
+    "ident": "DEMOG",
+    "name": "DEMO FIX 7",
+    "type": "wpt",
+    "via_airway": "UM000",
+    "stage": "DSC",
+    "altitude_feet": "11000",
+    "pos_lat": "44.783933",
+    "pos_long": "6.141122",
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "3311"
+   },
+   {
+    "ident": "DEMOH",
+    "name": "DEMO FIX 8",
+    "type": "wpt",
+    "via_airway": "DCT",
+    "stage": "DSC",
+    "altitude_feet": "5000",
+    "pos_lat": "44.221167",
+    "pos_long": "6.678511",
+    "is_sid_star": "1",
+    "fuel_plan_onboard": "2956"
+   },
+   {
+    "ident": "XXNC",
+    "name": "DEMO DESTINATION",
+    "type": "apt",
+    "via_airway": "DCT",
+    "stage": "DSC",
+    "altitude_feet": "13",
+    "pos_lat": "43.6584",
+    "pos_long": "7.2159",
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "2600"
+   }
+  ]
+ }
+}
