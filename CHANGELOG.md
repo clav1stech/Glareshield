@@ -2,6 +2,19 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.0.0] - 2026-10-13
+
+Version majeure explicitement demandée par l'utilisateur. Première version stable
+de Glareshield avec AI Bridge, validée sur un vol réel de près de deux heures sans
+déconnexion SimConnect ni perturbation de l'éclairage.
+
+- Éclairage et AI Bridge partagent une connexion SimConnect unique, en lecture seule.
+- Consignes pour assistants IA dans `docs/SKILL.md` : lecture des exports, attentes
+  selon la phase de vol, checklists, phraséologie ATC ou UNICOM, questions limitées
+  au nécessaire.
+- Limites connues : le Fenix n'expose ni les valeurs du FCU, ni les modes FMA, ni le
+  MCDU ou l'ECAM ; volets et armement des aérofreins restent sans variable fiable.
+
 ## [0.1.4] - 2026-10-13
 
 Exports organisés par phase de vol, après un premier vol complet avec AI Bridge.
