@@ -83,6 +83,10 @@ def test_settings_scenario_plan_and_export_flow(tmp_path):
         assert client.put('/api/ai/notes', json={'text': 'x'*2001}, headers=headers).status_code == 400
         assert client.get('/api/ai/notes').status_code == 403
         assert client.get('/api/ai/context', headers=headers).json()['level'] == 'flight'
+        assert client.get('/api/ai/presets', headers=headers).json()[0]['id'] == 'fenix-a320'
+        assert client.post('/api/ai/presets/fenix-a320', json={}, headers=headers).json()['added'] == 12
+        assert client.post('/api/ai/presets/fenix-a320', json={}, headers=headers).json()['added'] == 0
+        assert client.post('/api/ai/presets/unknown', json={}, headers=headers).status_code == 400
         assert client.post('/api/ai/simbrief/clear', json={}, headers=headers).status_code == 200
         assert client.get('/api/ai/plan', headers=headers).json()['plan'] is None
 

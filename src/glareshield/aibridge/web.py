@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from ..model import StrictModel
 from .config import AIBridgeSettings
 from .context import chat_text
+from .presets import PRESETS, apply_preset
 from .scenario import PHASES
 from .simbrief import OFPError
 
@@ -82,6 +83,22 @@ def create_router(bridge, changed=None) -> APIRouter:
         if changed:
             await changed()
         return {'ok': True}
+
+    @router.get('/presets')
+    async def presets():
+        return [{'id': key, 'label': preset['label'], 'lvars': len(preset['lvars']), 'disable': preset['disable']}
+                for key, preset in PRESETS.items()]
+
+    @router.post('/presets/{preset_id}')
+    async def add_preset(preset_id: str):
+        try:
+            settings, added = apply_preset(bridge().settings, preset_id)
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from None
+        bridge().save(settings)
+        if changed:
+            await changed()
+        return {'ok': True, 'added': added}
 
     @router.post('/simbrief/refresh')
     async def refresh():

@@ -1,0 +1,70 @@
+# Exemple de configuration pour le Fenix A320 (MSFS 2024), avec des lampes simulées.
+# Les sources utilisent les LVars du Fenix décrites dans docs/fenix-a320.md ; remplacer les
+# appareils simulés par les vôtres et vérifier chaque variable au parking.
+version: 1
+devices:
+  light_a:
+    name: Lampe simulée A
+    driver: mock
+    initial_state: {on: true, brightness: 40, kelvin: 3000}
+  light_b:
+    name: Lampe simulée B
+    driver: mock
+    initial_state: {on: false, brightness: 30, kelvin: 2700}
+groups:
+  cockpit: [light_a, light_b]
+scopes:
+  cockpit: [cockpit]
+active_scope: cockpit
+sources:
+  # Voyants MASTER WARNING et MASTER CAUTION du commandant : 0 éteint, 1 allumé.
+  warning: {type: lvar, name: I_MIP_MASTER_WARNING_CAPT, poll_ms: 100}
+  caution: {type: lvar, name: I_MIP_MASTER_CAUTION_CAPT, poll_ms: 100}
+  # Sélecteur DOME du plafonnier : 0 OFF, 1 DIM, 2 BRT.
+  dome: {type: lvar, name: S_OH_INT_LT_DOME, poll_ms: 250}
+  paused: {type: simulator_state, name: paused}
+  # Réception ATC : activité audio du client pilote IVAO (pilot_core_msfs.exe).
+  contact: {type: audio_process, process_names: [pilot_core_msfs.exe], threshold: 0.02, min_ms: 300, hold_s: 5, cooldown_s: 2}
+  # Émission : touche d'alternat lue sans interception (163 = Ctrl droit, à adapter).
+  ptt: {type: keyboard, key_code: 163, poll_ms: 50}
+effects:
+  warning_light: {type: blink, color: [255, 0, 0], period_s: 0.5, high: 100, low: 15}
+  caution_light: {type: blink, color: [255, 140, 0], period_s: 0.5, high: 100, low: 15}
+  atc_light: {type: static, state: {color: [0, 200, 255], brightness: 60}}
+  dome_light:
+    type: level_map
+    map:
+      "0": {on: false}
+      "1": {on: true, brightness: 15, kelvin: 2700}
+      "2": {on: true, brightness: 80, kelvin: 3000}
+rules:
+  - id: warning
+    name: Master Warning
+    priority: 100
+    condition: {source: warning, op: eq, value: 1}
+    effect: warning_light
+    targets: ["scope:active"]
+  - id: caution
+    name: Master Caution
+    priority: 80
+    condition: {source: caution, op: eq, value: 1}
+    effect: caution_light
+    targets: ["scope:active"]
+  - id: atc
+    name: ATC
+    priority: 50
+    condition:
+      op: any
+      conditions:
+        - {source: contact, op: active}
+        - {source: ptt, op: active}
+    effect: atc_light
+    requires_simulator: false
+    targets: ["scope:active"]
+  - id: dome
+    name: DOME
+    priority: 10
+    source: dome
+    suspend_when_paused: true
+    effect: dome_light
+    targets: ["scope:active"]

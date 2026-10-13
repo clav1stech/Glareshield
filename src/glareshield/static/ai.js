@@ -490,7 +490,15 @@ function variablesView(view) {
   help(catalog, 'Cocher « Validée » uniquement après avoir vérifié au parking et en vol que la valeur correspond au cockpit du Fenix.');
 
   let lvars = card(view, 'LVars Fenix', 'Variables relevées dans une liste vérifiée ou avec scripts/probe_simulator.py ; leur sens doit être confirmé dans votre installation');
-  if (!settings.lvars?.length) lvars.append(el('p', 'Aucune LVar configurée. Glareshield n’en présume aucune.'));
+  if (!settings.lvars?.length) lvars.append(el('p', 'Aucune LVar configurée. Le préréglage ajoute les variables connues du Fenix A320, à valider ensuite dans votre cockpit.'));
+  let presetBar = el('div', null, { className: 'row' });
+  lvars.append(presetBar);
+  action('Ajouter le préréglage Fenix A320', async () => {
+    let result = await api('ai/presets/fenix-a320', 'POST', {});
+    message(result.added ? result.added + ' variable(s) ajoutée(s) ; volets et armement des aérofreins standard retirés de l’export.' : 'Préréglage déjà présent.');
+    await reloadAI();
+  }, presetBar, 'small');
+  presetBar.append(el('small', 'Les variables existantes ne sont pas modifiées. Voir docs/fenix-a320.md.', { className: 'hint' }));
   for (let [index, lvar] of (settings.lvars || []).entries()) {
     let row = el('div', null, { className: 'row' });
     row.append(el('strong', lvar.label), el('span', 'L:' + lvar.name.replace(/^L:/, ''), { className: 'mono muted' }), badge(lvar.validated ? 'Validée' : 'Non vérifiée', lvar.validated ? 'ok' : 'warn'));

@@ -48,6 +48,7 @@
 !/src/glareshield/aibridge/simbrief.py
 !/src/glareshield/aibridge/telemetry.py
 !/src/glareshield/aibridge/web.py
+!/src/glareshield/aibridge/presets.py
 !/src/glareshield/aibridge/demo_ofp.json
 !/src/glareshield/drivers/
 /src/glareshield/drivers/*
@@ -61,6 +62,7 @@
 !/examples/
 /examples/*
 !/examples/demo.yaml
+!/examples/fenix-a320.yaml
 !/scripts/
 /scripts/*
 !/scripts/discover.py
@@ -70,6 +72,7 @@
 !/scripts/setup.cmd
 !/scripts/check_public.py
 !/scripts/version.py
+!/scripts/find_lvars.py
 !/scripts/test_hue.py
 !/scripts/test_nanoleaf.py
 !/scripts/start.cmd
@@ -88,6 +91,7 @@
 !/tests/test_aibridge.py
 !/tests/test_aibridge_web.py
 !/tests/test_telemetry_source.py
+!/tests/test_fenix.py
 !/docs/
 /docs/*
 !/docs/architecture.md
@@ -96,6 +100,7 @@
 !/docs/discovery.md
 !/docs/ai-bridge.md
 !/docs/SKILL.md
+!/docs/fenix-a320.md
 
 # Private installation data must never enter Git.
 /local/
