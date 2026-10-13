@@ -95,6 +95,7 @@
 !/docs/versioning.md
 !/docs/discovery.md
 !/docs/ai-bridge.md
+!/docs/SKILL.md
 
 # Private installation data must never enter Git.
 /local/

@@ -123,6 +123,13 @@ source, la vérification et les notes de chaque variable. Les tailles sont plafo
 (30 000, 8 000 et 60 000 caractères) ; un raccourcissement des points de route ou des
 notes est signalé par `waypoints_truncated` ou `truncated`.
 
+## Consignes pour l'assistant
+
+`docs/SKILL.md` décrit à un assistant (compétence Claude, instructions personnalisées
+ChatGPT ou équivalent) comment lire les exports et ce que le pilote attend selon la phase
+de vol : tâches MCDU, checklists, messages ATC en voix ou annonces UNICOM en texte.
+L'ajouter une fois à l'assistant évite de répéter ces consignes à chaque vol.
+
 ## Démonstration sans simulateur
 
 Le scénario de démonstration rejoue un vol fictif d'A320 (parking, roulage, décollage,
