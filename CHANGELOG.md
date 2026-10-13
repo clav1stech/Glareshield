@@ -2,6 +2,14 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [0.1.3] - 2026-10-13
+
+Import SimBrief vérifié avec un OFP réel.
+
+- Format `json=v2` pris en charge (horaires ISO 8601, durées `HH:MM:SS`, points de
+  route en liste) ; l'ancien format reste accepté.
+- SID et STAR ajoutées au résumé du plan.
+
 ## [0.1.2] - 2026-10-13
 
 Corrections issues des premiers essais réels au parking sur MSFS 2024 et Fenix A320.

@@ -130,7 +130,11 @@ Constats d'une session au parking (Fenix A320 CFM) :
   et masse correspondent au cockpit ;
 - `FLAPS HANDLE INDEX` ne suit pas le levier du Fenix (cran 1 et FULL lus 2) : ne pas
   l'exporter tant qu'une LVar Fenix vérifiée ne le remplace pas ;
-- l'armement des aérofreins reste à confirmer ;
+- `SPOILERS ARMED` reste faux avec les aérofreins armés : même conclusion que pour
+  les volets ;
+- l'import SimBrief réel (`json=v2`) fournit l'heure de génération et les horaires en
+  ISO 8601, les durées en `HH:MM:SS` et les points de route en liste directe ;
+  le parseur accepte ce format et l'ancien (`json=1`) ;
 - après passage à la lecture séquentielle, aucune déconnexion n'a été observée.
 
 ## Validation restant à réaliser sur MSFS 2024 et Fenix
@@ -143,5 +147,5 @@ Constats d'une session au parking (Fenix A320 CFM) :
    Fenix, puis cocher « Validée » ou décocher « Exporter ».
 4. Relever et ajouter les LVars Fenix utiles (FCU, FMA, ECAM) après vérification de
    leur sens.
-5. Importer un OFP réel et confirmer les chemins de champs SimBrief.
+5. Remplacer volets et armement des aérofreins par des LVars Fenix vérifiées.
 6. Coller un export dans un assistant et ajuster le contenu essentiel si nécessaire.

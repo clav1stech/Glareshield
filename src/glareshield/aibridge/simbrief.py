@@ -52,16 +52,36 @@ def items(value) -> list:
 
 
 def utc(value) -> str | None:
-    stamp = number(value, True)
-    if stamp is None or stamp <= 0:
+    """Accept ISO 8601 (json=v2) or Unix seconds (json=1)."""
+    raw = text(value)
+    if raw is None:
         return None
     try:
+        if not raw.lstrip('-').isdigit():
+            moment = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+            if moment.tzinfo is None:
+                return None
+            return moment.astimezone(UTC).isoformat(timespec='seconds').replace('+00:00', 'Z')
+        stamp = int(raw)
+        if stamp <= 0:
+            return None
         return datetime.fromtimestamp(stamp, UTC).isoformat(timespec='seconds').replace('+00:00', 'Z')
     except (OverflowError, OSError, ValueError):
         return None
 
 
 def minutes(value):
+    """Accept HH:MM[:SS] (json=v2) or a number of seconds (json=1)."""
+    raw = text(value)
+    if raw is not None and ':' in raw:
+        try:
+            parts = [int(part) for part in raw.split(':')]
+        except ValueError:
+            return None
+        if len(parts) not in (2, 3) or any(part < 0 for part in parts):
+            return None
+        seconds = parts[0]*3600+parts[1]*60+(parts[2] if len(parts) == 3 else 0)
+        return int(round(seconds/60))
     seconds = number(value)
     return None if seconds is None else int(round(seconds/60))
 
@@ -102,7 +122,9 @@ def parse_ofp(data) -> dict:
     aircraft, atc = section(data, 'aircraft'), section(data, 'atc')
     alternates = [airport(item) for item in items(data.get('alternate'))]
     waypoints = []
-    for fix in items(section(data, 'navlog').get('fix')):
+    navlog = data.get('navlog')
+    # json=v2 returns the fixes as a list, json=1 nests them under navlog.fix.
+    for fix in items(navlog if isinstance(navlog, list) else section(data, 'navlog').get('fix')):
         ident = text(fix.get('ident'))
         if not ident:
             continue
@@ -125,6 +147,7 @@ def parse_ofp(data) -> dict:
         'cruise': {'initial_altitude_ft': number(general.get('initial_altitude'), True),
                    'cost_index': text(general.get('costindex')), 'profile': text(general.get('cruise_profile'))},
         'route': text(general.get('route')),
+        'sid': text(general.get('sid_ident')), 'star': text(general.get('star_ident')),
         'distance_nm': number(general.get('route_distance'), True) or number(general.get('air_distance'), True),
         'times': {'enroute_min': minutes(times.get('est_time_enroute')), 'block_min': minutes(times.get('est_block')),
                   'scheduled_out_utc': utc(times.get('sched_out')), 'scheduled_in_utc': utc(times.get('sched_in'))},

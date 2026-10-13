@@ -245,3 +245,22 @@ def test_track_is_unavailable_when_aircraft_is_stationary():
     assert field['value'] is None and field['status'] == 'unavailable' and '5 kt' in field['reason']
     store.update({'connected': True, 'telemetry': {'ground_speed': (12.0, clock.now)}})
     assert qualify(track, store)['value'] == 347
+
+
+def test_ofp_json_v2_shape_is_parsed():
+    data = json.loads(DEMO.read_text(encoding='utf-8'))
+    data['params']['time_generated'] = '2026-10-13T16:59:50Z'
+    data['times'] = {'est_time_enroute': '01:05:23', 'est_block': '01:33:23',
+                     'sched_out': '2026-10-13T17:30:00Z', 'sched_in': '2026-10-13T19:00:00Z'}
+    data['general'].update(sid_ident='DEMO1A', star_ident='DEMO2B')
+    data['navlog'] = data['navlog']['fix']
+    plan = parse_ofp(data)
+    assert plan['generated_utc'] == '2026-10-13T16:59:50Z'
+    assert plan['times'] == {'enroute_min': 65, 'block_min': 93, 'scheduled_out_utc': '2026-10-13T17:30:00Z',
+                             'scheduled_in_utc': '2026-10-13T19:00:00Z'}
+    assert plan['sid'] == 'DEMO1A' and plan['star'] == 'DEMO2B'
+    assert plan['waypoints_total'] == 9
+    data['times']['est_block'] = '1:xx'
+    data['params']['time_generated'] = '2026-10-13T16:59:50'
+    plan = parse_ofp(data)
+    assert 'block_min' not in plan['times'] and 'generated_utc' not in plan
