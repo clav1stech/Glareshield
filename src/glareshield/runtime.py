@@ -25,6 +25,7 @@ from .audio import AudioSource
 from .keyboard import KeyboardSource
 from .model import Condition,Source
 from .effects import render
+from .aibridge.service import AIBridge
 
 
 class Runtime:
@@ -47,6 +48,9 @@ class Runtime:
         self.preview=None
         self.test_tasks=set()
         self.render_wake=asyncio.Event()
+        self.simulator=None
+        self.lighting_simulator=False
+        self.ai=AIBridge(root)
         log_path=self.root/'local/logs/glareshield.log'
         log_path.parent.mkdir(parents=True,exist_ok=True)
         self.logger=logging.getLogger('glareshield.'+str(id(self)))
@@ -98,9 +102,33 @@ class Runtime:
         return result
 
     def simulator_update(self,message):
-        self.engine.connected=message['connected']
-        self.engine.paused=message['paused']
-        self.live_values.update(message['values'])
+        if self.lighting_simulator:
+            self.engine.connected=message['connected']
+            self.engine.paused=message['paused']
+            self.live_values.update(message['values'])
+        self.ai.on_simulator_message(message)
+
+    def start_simulator(self):
+        self.simulator=SimulatorSource(self.config.sources,self.simulator_update,telemetry=self.ai.definitions())
+        self.sources.append(self.simulator)
+        task=asyncio.create_task(self.simulator.run())
+        self.simulator.task=task
+        self.tasks.append(task)
+
+    async def ai_settings_changed(self):
+        """Apply AI Bridge requests on the existing connection; lighting is never restarted."""
+        definitions=self.ai.definitions()
+        if self.simulator is not None:
+            if definitions or self.lighting_simulator:
+                self.simulator.set_telemetry(definitions)
+                return
+            simulator,self.simulator=self.simulator,None
+            simulator.stop()
+            await simulator.task
+            self.sources.remove(simulator)
+            self.tasks.remove(simulator.task)
+        elif definitions and not self.stopping and self.engine is not None:
+            self.start_simulator()
 
     async def start(self):
         self.stopping=False
@@ -110,11 +138,10 @@ class Runtime:
         drivers=await self.make_drivers()
         self.engine=Engine(self.config,drivers,self.root/'local/state/snapshots.json')
         await self.engine.recover()
-        if any(source.type in ('lvar','simulator_state') for source in self.config.sources.values()):
-            source=SimulatorSource(self.config.sources,self.simulator_update)
-            self.sources.append(source)
-            self.tasks.append(asyncio.create_task(source.run()))
-        else:
+        self.lighting_simulator=any(source.type in ('lvar','simulator_state') for source in self.config.sources.values())
+        if self.lighting_simulator or self.ai.definitions():
+            self.start_simulator()
+        if not self.lighting_simulator:
             self.engine.connected=True
         if any(source.type=='audio_process' for source in self.config.sources.values()):
             self.audio_source=AudioSource(self.config.sources,self.live_values.update)
@@ -309,6 +336,7 @@ class Runtime:
             await asyncio.gather(*self.tasks,return_exceptions=True)
         self.tasks=[]
         self.sources=[]
+        self.simulator=None
         if self.engine:
             await self.engine.shutdown()
             for driver in self.engine.drivers.values():

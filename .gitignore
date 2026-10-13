@@ -34,6 +34,21 @@
 !/src/glareshield/static/
 /src/glareshield/static/*
 !/src/glareshield/static/index.html
+!/src/glareshield/static/app.css
+!/src/glareshield/static/app.js
+!/src/glareshield/static/ai.js
+!/src/glareshield/aibridge/
+/src/glareshield/aibridge/*
+!/src/glareshield/aibridge/__init__.py
+!/src/glareshield/aibridge/catalog.py
+!/src/glareshield/aibridge/config.py
+!/src/glareshield/aibridge/context.py
+!/src/glareshield/aibridge/scenario.py
+!/src/glareshield/aibridge/service.py
+!/src/glareshield/aibridge/simbrief.py
+!/src/glareshield/aibridge/telemetry.py
+!/src/glareshield/aibridge/web.py
+!/src/glareshield/aibridge/demo_ofp.json
 !/src/glareshield/drivers/
 /src/glareshield/drivers/*
 !/src/glareshield/drivers/__init__.py
@@ -70,12 +85,16 @@
 !/tests/test_web.py
 !/tests/test_runtime.py
 !/tests/test_version.py
+!/tests/test_aibridge.py
+!/tests/test_aibridge_web.py
+!/tests/test_telemetry_source.py
 !/docs/
 /docs/*
 !/docs/architecture.md
 !/docs/privacy.md
 !/docs/versioning.md
 !/docs/discovery.md
+!/docs/ai-bridge.md
 
 # Private installation data must never enter Git.
 /local/

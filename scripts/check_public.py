@@ -27,7 +27,11 @@ ALLOWED = {'.gitignore','README.md','requirements.txt',
            'src/glareshield/audio.py','src/glareshield/keyboard.py','src/glareshield/sounds.py',
            'scripts/start.cmd','scripts/test_nanoleaf.py','tests/test_nanoleaf.py',
            'tests/test_simulator.py','tests/test_audio.py','tests/test_keyboard.py',
-           'tests/test_web.py','tests/test_runtime.py'}
+           'tests/test_web.py','tests/test_runtime.py',
+           'src/glareshield/aibridge/__init__.py','src/glareshield/aibridge/catalog.py','src/glareshield/aibridge/config.py','src/glareshield/aibridge/context.py','src/glareshield/aibridge/scenario.py',
+           'src/glareshield/aibridge/service.py','src/glareshield/aibridge/simbrief.py','src/glareshield/aibridge/telemetry.py','src/glareshield/aibridge/web.py','src/glareshield/aibridge/demo_ofp.json',
+           'src/glareshield/static/app.css','src/glareshield/static/app.js','src/glareshield/static/ai.js',
+           'tests/test_aibridge.py','tests/test_aibridge_web.py','tests/test_telemetry_source.py','docs/ai-bridge.md'}
 
 
 def identifiers(value, sensitive=False):
