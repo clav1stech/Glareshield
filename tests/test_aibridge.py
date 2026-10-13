@@ -64,7 +64,7 @@ def test_invalid_or_missing_values_are_never_zero():
 
 def test_lvar_meaning_and_verification_are_exported():
     settings = AIBridgeSettings(enabled=True, lvars=[LVarEntry(key='demo_switch', name='DEMO_SWITCH',
-                                label='Interrupteur fictif', values={'1': 'ON'})], validated=['ias'])
+                                label='Commande fictive', values={'1': 'ON'})], validated=['ias'])
     lvar = settings.lvars[0].entry()
     assert lvar.definition() == {'name': 'L:DEMO_SWITCH', 'unit': 'Number', 'interval_ms': 1000,
                                  'kind': 'number', 'origin': 'lvar'}
@@ -234,3 +234,14 @@ def test_invalid_private_settings_disable_module_without_raising(tmp_path):
     (tmp_path/'local/ai-bridge.yaml').write_text('enabled: true\nunknown: 1\n', encoding='utf-8')
     bridge = AIBridge(tmp_path, Clock())
     assert bridge.definitions() == {} and bridge.status()['settings_error']
+
+
+def test_track_is_unavailable_when_aircraft_is_stationary():
+    clock = Clock()
+    store = TelemetryStore('simconnect', clock)
+    track = entry('track_magnetic')
+    store.update({'connected': True, 'telemetry': {'track_magnetic': (347.0, clock.now), 'ground_speed': (0.0, clock.now)}})
+    field = qualify(track, store)
+    assert field['value'] is None and field['status'] == 'unavailable' and '5 kt' in field['reason']
+    store.update({'connected': True, 'telemetry': {'ground_speed': (12.0, clock.now)}})
+    assert qualify(track, store)['value'] == 347

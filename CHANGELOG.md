@@ -2,6 +2,18 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [0.1.2] - 2026-10-13
+
+Corrections issues des premiers essais réels au parking sur MSFS 2024 et Fenix A320.
+
+- Variables AI Bridge lues dans la boucle SimConnect, après les LVars d'éclairage et
+  au plus une par tour : supprime les arrêts du processus observés avec un fil de
+  lecture parallèle. Cadences réduites à environ 10 lectures par seconde.
+- Hue : une scène dynamique rappelée par Glareshield, que le pont déclare ensuite
+  inactive, est de nouveau identifiée ; les lampes concernées ne restent plus en erreur.
+- Armement des aérofreins ajouté au catalogue ; route magnétique déclarée
+  indisponible sous 5 kt de vitesse sol.
+
 ## [0.1.1] - 2026-10-13
 
 Module AI Bridge et refonte de l'interface, développés et éprouvés avec des pilotes

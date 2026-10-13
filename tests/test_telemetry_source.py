@@ -24,15 +24,18 @@ class FakeRequest:
         return self.values.get(self.definition[0])
 
 
-def test_poller_respects_intervals_records_errors_and_reconfigures():
+def test_poller_reads_one_variable_per_cycle_and_respects_intervals():
     calls = []
     values = {'PLANE ALTITUDE': 1000.0, 'TITLE': b'Demo\0'}
-    poller = TelemetryPoller(lambda name, unit: FakeRequest(name, unit, values, calls), lock=__import__('threading').Lock())
+    poller = TelemetryPoller(lambda name, unit: FakeRequest(name, unit, values, calls))
     poller.configure({'alt': {'name': 'PLANE ALTITUDE', 'unit': 'feet', 'interval_ms': 60000},
                       'title': {'name': 'TITLE', 'unit': 'String', 'interval_ms': 60000},
                       'missing': {'name': 'UNKNOWN VAR', 'unit': 'number', 'interval_ms': 60000}})
     poller.poll_once()
-    poller.poll_once()
+    # Lighting reads come first; telemetry adds a single read per cycle.
+    assert len(calls) == 1
+    for _ in range(4):
+        poller.poll_once()
     assert sorted(calls) == ['PLANE ALTITUDE', 'TITLE', 'UNKNOWN VAR']
     results, errors = poller.drain()
     assert results['alt'][0] == 1000.0 and results['title'][0] == 'Demo'

@@ -9,7 +9,12 @@ API.
 ## Principes
 
 - **Connexion unique.** Les variables AI Bridge sont lues par le processus SimConnect
-  existant, dans un fil dédié qui ne retarde pas la lecture des LVars d'éclairage.
+  existant, dans sa boucle de lecture : à chaque tour, les LVars d'éclairage sont lues
+  d'abord, puis au plus une variable AI Bridge arrivée à échéance. Les appels à la DLL
+  restent séquentiels ; un fil de lecture parallèle provoquait des arrêts du processus
+  SimConnect lors des essais réels. L'ensemble représente environ 10 lectures par
+  seconde : 2 s pour la trajectoire et la configuration, 5 s pour les moteurs, 15 s pour
+  le carburant, les masses et la météo, 30 s pour l'identité et l'heure.
   Une LVar déjà lue pour l'éclairage est réutilisée au lieu d'être demandée deux fois.
 - **Indépendance fonctionnelle.** Le module est désactivé par défaut. Désactivé, il ne
   demande aucune variable et ne modifie ni le démarrage, ni la cadence, ni la
@@ -38,10 +43,11 @@ API.
 
 ## Catalogue
 
-Le catalogue standard comprend 29 SimVars documentées par le SDK MSFS : identité de
+Le catalogue standard comprend 30 SimVars documentées par le SDK MSFS : identité de
 l'appareil, position et altitudes, vitesses, cap et route, configuration (train,
 volets, aérofreins, frein de parc), moteurs, carburant et masse, vent, température,
-pression et heure UTC. Les noms et unités figurent dans
+pression et heure UTC. La route magnétique est déclarée indisponible sous 5 kt de vitesse
+sol, où elle n'a pas de signification. Les noms et unités figurent dans
 `src/glareshield/aibridge/catalog.py`, avec leur cadence de lecture et leur âge
 maximal. Chaque variable est rattachée au niveau d'export essentiel ou détaillé.
 
@@ -116,12 +122,23 @@ futur serveur MCP appellent les mêmes méthodes, qui correspondent aux outils e
 | `flight_plan()` | `get_flight_plan` |
 | `available_variables()` | `get_available_variables` |
 
+## Premiers essais sur MSFS 2024 et Fenix
+
+Constats d'une session au parking (Fenix A320 CFM) :
+
+- les 30 variables sont reçues ; position, heure, frein de parc, moteurs, carburant
+  et masse correspondent au cockpit ;
+- `FLAPS HANDLE INDEX` ne suit pas le levier du Fenix (cran 1 et FULL lus 2) : ne pas
+  l'exporter tant qu'une LVar Fenix vérifiée ne le remplace pas ;
+- l'armement des aérofreins reste à confirmer ;
+- après passage à la lecture séquentielle, aucune déconnexion n'a été observée.
+
 ## Validation restant à réaliser sur MSFS 2024 et Fenix
 
 1. Activer AI Bridge avec la configuration personnelle et vérifier que les éclairages
    conservent cadence, reconnexion et comportement en pause.
-2. Vérifier l'usage concurrent de la connexion SimConnect par le fil AI Bridge et la
-   boucle d'éclairage (absence d'erreur, de blocage et de latence perceptible).
+2. Vérifier sur une session longue l'absence de déconnexion SimConnect et de latence
+   perceptible de l'éclairage avec AI Bridge actif.
 3. Contrôler au parking puis en vol chaque SimVar du catalogue face au cockpit du
    Fenix, puis cocher « Validée » ou décocher « Exporter ».
 4. Relever et ajouter les LVars Fenix utiles (FCU, FMA, ECAM) après vérification de

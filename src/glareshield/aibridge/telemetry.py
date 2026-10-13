@@ -84,6 +84,11 @@ def qualify(entry: Entry, store: TelemetryStore, now: float | None = None) -> di
                 'reason': store.errors.get(entry.key) or ('Simulateur déconnecté' if not store.connected
                                                            else 'Aucune donnée reçue')}
     value = convert(entry, sample.value)
+    if entry.min_ground_speed_kt is not None:
+        speed = store.samples.get('ground_speed')
+        if speed is None or not isinstance(speed.value, float) or speed.value < entry.min_ground_speed_kt:
+            return {**field, 'value': None, 'unit': entry.unit, 'status': 'unavailable',
+                    'reason': f'Sans signification sous {entry.min_ground_speed_kt:g} kt de vitesse sol'}
     age = max(0.0, now-sample.observed_at)
     if value is None:
         return {**field, 'value': None, 'unit': entry.unit, 'status': 'unavailable', 'reason': 'Valeur invalide'}

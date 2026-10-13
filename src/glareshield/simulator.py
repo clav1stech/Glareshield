@@ -3,74 +3,56 @@ from __future__ import annotations
 
 import asyncio
 import multiprocessing as mp
-import threading
 import time
 
 
-class TelemetryPoller(threading.Thread):
-    """Poll AI Bridge variables on the shared connection without delaying lighting reads."""
+class TelemetryPoller:
+    """Poll AI Bridge variables between lighting reads, on the worker thread itself.
 
-    def __init__(self,request_factory,lock,clock=time.time):
-        super().__init__(daemon=True)
+    The SimConnect DLL is not called from a second thread: concurrent requests on the
+    same handle crashed the worker on a real installation.
+    """
+
+    def __init__(self,request_factory,clock=time.time,per_cycle=1):
         self.request_factory=request_factory
-        self.lock=lock
         self.clock=clock
-        self.halt=threading.Event()
+        self.per_cycle=per_cycle
         self.definitions={}
         self.requests={}
         self.due={}
         self.results={}
         self.errors={}
-        self.guard=threading.Lock()
 
     def configure(self,definitions):
-        with self.guard:
-            self.definitions=dict(definitions)
-            self.due={key:self.due.get(key,0) for key in self.definitions}
+        self.definitions=dict(definitions)
+        self.due={key:self.due.get(key,0) for key in self.definitions}
 
-    def poll_once(self):
-        with self.guard:
-            pending=[(key,value) for key,value in self.definitions.items() if self.due.get(key,0)<=time.monotonic()]
-        for key,definition in pending:
-            if self.halt.is_set():
-                return
+    def poll_once(self,limit=None):
+        now=time.monotonic()
+        pending=sorted((self.due.get(key,0),key) for key in self.definitions if self.due.get(key,0)<=now)
+        for _,key in pending[:self.per_cycle if limit is None else limit]:
+            definition=self.definitions[key]
             request=self.requests.get(key)
             if request is None or request.definition!=(definition['name'],definition['unit']):
-                with self.lock:
-                    request=self.request_factory(definition['name'],definition['unit'])
+                request=self.request_factory(definition['name'],definition['unit'])
                 self.requests[key]=request
             value=request.get()
-            with self.guard:
-                if key not in self.definitions:
-                    continue
-                self.due[key]=time.monotonic()+definition['interval_ms']/1000
-                if value is None:
-                    self.errors[key]='Aucune donnée reçue'
-                else:
-                    if isinstance(value,bytes):
-                        value=value.decode('utf-8','replace').rstrip('\0')
-                    self.results[key]=(value,self.clock())
-                    self.errors.pop(key,None)
-
-    def run(self):
-        while not self.halt.is_set():
-            try:
-                self.poll_once()
-            except Exception as error:
-                with self.guard:
-                    self.errors['_poller']=type(error).__name__
-                self.halt.wait(1)
-            self.halt.wait(.02)
+            self.due[key]=time.monotonic()+definition['interval_ms']/1000
+            if value is None:
+                self.errors[key]='Aucune donnée reçue'
+            else:
+                if isinstance(value,bytes):
+                    value=value.decode('utf-8','replace').rstrip('\0')
+                self.results[key]=(value,self.clock())
+                self.errors.pop(key,None)
 
     def drain(self):
-        with self.guard:
-            results,self.results=self.results,{}
-            return results,dict(self.errors)
+        results,self.results=self.results,{}
+        return results,dict(self.errors)
 
 
 def worker(sources,pipe,stop):
     connection=None
-    poller=None
     try:
         from SimConnect import SimConnect,Request
         class ObservedSimConnect(SimConnect):
@@ -89,21 +71,14 @@ def worker(sources,pipe,stop):
         requests={key:Request((('L:'+source['name'].removeprefix('L:')).encode('ascii'),b'Number'),
             connection,_time=source['poll_ms']) for key,source in sources.items() if source['type']=='lvar'}
         lighting={'L:'+source['name'].removeprefix('L:'):key for key,source in sources.items() if source['type']=='lvar'}
-        definitions={}
         shared={}
-        lock=threading.Lock()
         def request_factory(name,unit):
             request=Request((name.encode('ascii'),unit.encode('ascii')),connection,_time=0)
             request.definition=(name,unit)
-            # Allocate definition identifiers while the lighting loop cannot.
-            request._deff_test()
             return request
+        poller=TelemetryPoller(request_factory)
         while not stop.is_set() and not connection.quit:
-            if all(request.defined for request in requests.values()):
-                values={key:request.get() for key,request in requests.items()}
-            else:
-                with lock:
-                    values={key:request.get() for key,request in requests.items()}
+            values={key:request.get() for key,request in requests.items()}
             for key,source in sources.items():
                 if source['type']=='simulator_state':
                     values[key]=connection.paused if source['name']=='paused' else connection.running
@@ -116,12 +91,10 @@ def worker(sources,pipe,stop):
                     # Reuse lighting reads of the same LVar instead of a second request.
                     shared={key:lighting[d['name']] for key,d in definitions.items()
                             if d['origin']=='lvar' and d['name'] in lighting}
-                    if poller is None and definitions:
-                        poller=TelemetryPoller(request_factory,lock)
-                        poller.start()
-                    if poller:
-                        poller.configure({key:d for key,d in definitions.items() if key not in shared})
-            if poller:
+                    poller.configure({key:d for key,d in definitions.items() if key not in shared})
+            if poller.definitions or shared:
+                # Lighting values above are read first; telemetry adds at most one read per cycle.
+                poller.poll_once()
                 telemetry,errors=poller.drain()
                 now=time.time()
                 for key,source in shared.items():
@@ -139,13 +112,9 @@ def worker(sources,pipe,stop):
         except (OSError,EOFError):
             pass
     finally:
-        if poller:
-            poller.halt.set()
-            poller.join(1)
         if connection:
             connection.exit()
         pipe.close()
-
 
 class SimulatorSource:
     def __init__(self,sources,update,*,worker_target=worker,heartbeat_s=15,telemetry=None):
