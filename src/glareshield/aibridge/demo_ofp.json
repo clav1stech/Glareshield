@@ -91,7 +91,8 @@
     "altitude_feet": "12000",
     "pos_lat": "48.160533",
     "pos_long": "2.916789",
-    "is_sid_star": "1"
+    "is_sid_star": "1",
+    "fuel_plan_onboard": "5444"
    },
    {
     "ident": "DEMOB",
@@ -102,7 +103,8 @@
     "altitude_feet": "28000",
     "pos_lat": "47.597767",
     "pos_long": "3.454178",
-    "is_sid_star": "0"
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "5089"
    },
    {
     "ident": "DEMOC",
@@ -113,7 +115,8 @@
     "altitude_feet": "35000",
     "pos_lat": "47.035000",
     "pos_long": "3.991567",
-    "is_sid_star": "0"
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "4733"
    },
    {
     "ident": "DEMOD",
@@ -124,7 +127,8 @@
     "altitude_feet": "35000",
     "pos_lat": "46.472233",
     "pos_long": "4.528956",
-    "is_sid_star": "0"
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "4378"
    },
    {
     "ident": "DEMOE",
@@ -135,7 +139,8 @@
     "altitude_feet": "35000",
     "pos_lat": "45.909467",
     "pos_long": "5.066344",
-    "is_sid_star": "0"
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "4022"
    },
    {
     "ident": "DEMOF",
@@ -146,7 +151,8 @@
     "altitude_feet": "24000",
     "pos_lat": "45.346700",
     "pos_long": "5.603733",
-    "is_sid_star": "0"
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "3667"
    },
    {
     "ident": "DEMOG",
@@ -157,7 +163,8 @@
     "altitude_feet": "11000",
     "pos_lat": "44.783933",
     "pos_long": "6.141122",
-    "is_sid_star": "0"
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "3311"
    },
    {
     "ident": "DEMOH",
@@ -168,7 +175,8 @@
     "altitude_feet": "5000",
     "pos_lat": "44.221167",
     "pos_long": "6.678511",
-    "is_sid_star": "1"
+    "is_sid_star": "1",
+    "fuel_plan_onboard": "2956"
    },
    {
     "ident": "XXNC",
@@ -179,7 +187,8 @@
     "altitude_feet": "13",
     "pos_lat": "43.6584",
     "pos_long": "7.2159",
-    "is_sid_star": "0"
+    "is_sid_star": "0",
+    "fuel_plan_onboard": "2600"
    }
   ]
  }

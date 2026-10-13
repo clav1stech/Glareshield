@@ -71,7 +71,7 @@ def test_lvar_meaning_and_verification_are_exported():
     clock = Clock()
     store = TelemetryStore('simconnect', clock)
     store.update({'connected': True, 'telemetry': {'demo_switch': (1.0, clock.now)}})
-    document = build_context('detailed', [lvar], store, None, {}, clock.now)
+    document = build_context('full', [lvar], store, None, {}, clock.now)
     field = document['telemetry']['fenix']['demo_switch']
     assert field['meaning'] == 'ON' and field['verification'] == 'configured_unverified'
     assert field['source'] == 'LVar DEMO_SWITCH'
@@ -164,28 +164,38 @@ async def test_simbrief_refresh_failures_keep_previous_plan_flagged(tmp_path):
     assert reloaded.plan == store.plan
 
 
-def test_context_levels_differ_and_stay_within_limits(tmp_path):
+def test_briefing_flight_and_full_levels_serve_distinct_purposes(tmp_path):
     clock = Clock()
     bridge = AIBridge(tmp_path, clock)
     bridge.set_scenario(True)
     bridge.scenario.started -= 800
     bridge.load_demo_plan()
-    essential, detailed = bridge.snapshot('essential'), bridge.snapshot('detailed')
-    assert essential['data_origin'] == 'simulation_scenario'
-    assert all(field['status'] == 'simulated' for group in essential['telemetry'].values() for field in group.values())
-    assert 'waypoints' not in essential['flight_plan'] and detailed['flight_plan']['waypoints']
-    assert 'tas' in detailed['telemetry']['speed'] and 'tas' not in essential['telemetry']['speed']
-    assert len(serialize(essential)) < len(serialize(detailed)) <= LIMITS['detailed']
-    assert essential['derived']['direct_distance_to_destination']['status'] == 'derived'
-    text = chat_text(essential)
-    assert text.count('```') == 2 and json.loads(text.split('```json\n')[1].split('\n```')[0]) == essential
+    briefing, flight, full = (bridge.snapshot(level) for level in ('briefing', 'flight', 'full'))
+    assert briefing['data_origin'] == 'simulation_scenario'
+    assert all(field['status'] == 'simulated' for group in flight['telemetry'].values() for field in group.values())
+    # Briefing: whole plan without coordinates, no progress computation.
+    assert briefing['flight_plan']['waypoints'] and 'latitude' not in briefing['flight_plan']['waypoints'][0]
+    assert briefing['flight_plan']['route'] and 'route_progress' not in briefing.get('derived', {})
+    # Flight update: compact plan, progress along the route.
+    assert 'waypoints' not in flight['flight_plan'] and 'route' not in flight['flight_plan']
+    assert flight['flight_plan']['destination']['icao'] == 'XXNC'
+    assert flight['derived']['route_progress']['upcoming']
+    # Full diagnostics: everything, with sources.
+    assert 'latitude' in full['flight_plan']['waypoints'][0] and 'tas' in full['telemetry']['speed']
+    assert 'tas' not in flight['telemetry']['speed']
+    assert len(serialize(flight)) <= LIMITS['flight'] < len(serialize(full)) <= LIMITS['full']
+    assert len(serialize(briefing)) <= LIMITS['briefing']
+    for document in (briefing, flight, full):
+        text = chat_text(document)
+        assert text.count('```') == 2 and json.loads(text.split('```json\n')[1].split('\n```')[0]) == document
+    assert 'briefing' in chat_text(flight)
 
 
 def test_waypoints_are_truncated_explicitly(tmp_path):
     clock = Clock()
     plan = parse_ofp(json.loads(DEMO.read_text(encoding='utf-8')))
     plan['waypoints'] = plan['waypoints']*20
-    document = build_context('detailed', list(STANDARD), TelemetryStore('simconnect', clock), plan, {}, clock.now)
+    document = build_context('full', list(STANDARD), TelemetryStore('simconnect', clock), plan, {}, clock.now)
     from glareshield.aibridge import context
     trimmed = context.limit(document, 4000)
     assert trimmed['flight_plan']['waypoints_truncated'] is True
@@ -193,7 +203,7 @@ def test_waypoints_are_truncated_explicitly(tmp_path):
 
 def test_disconnected_snapshot_has_no_fake_telemetry(tmp_path):
     bridge = AIBridge(tmp_path, Clock())
-    document = bridge.snapshot('essential')
+    document = bridge.snapshot('briefing')
     assert document['telemetry'] == {} and document['simulator']['connected'] is False
     assert set(document['unavailable']) == {item.key for item in STANDARD if item.level == 'essential'}
     assert document['flight_plan'] is None
@@ -224,9 +234,9 @@ def test_plan_mismatch_on_ground_is_reported(tmp_path):
 def test_export_file_stays_under_local(tmp_path):
     bridge = AIBridge(tmp_path, Clock())
     bridge.set_scenario(True)
-    path = bridge.export('detailed')
-    assert path.parent == tmp_path/'local/exports' and path.name.endswith('-detailed-simulation.json')
-    assert json.loads(path.read_text(encoding='utf-8'))['level'] == 'detailed'
+    path = bridge.export('full')
+    assert path.parent == tmp_path/'local/exports' and path.name.endswith('-full-simulation.json')
+    assert json.loads(path.read_text(encoding='utf-8'))['level'] == 'full'
 
 
 def test_invalid_private_settings_disable_module_without_raising(tmp_path):
@@ -264,3 +274,39 @@ def test_ofp_json_v2_shape_is_parsed():
     data['params']['time_generated'] = '2026-10-13T16:59:50'
     plan = parse_ofp(data)
     assert 'block_min' not in plan['times'] and 'generated_utc' not in plan
+
+
+def test_route_progress_locates_next_waypoint_and_compares_fuel(tmp_path):
+    clock = Clock()
+    bridge = AIBridge(tmp_path, clock)
+    bridge.settings = AIBridgeSettings(enabled=True)
+    plan = bridge.load_demo_plan()
+    third, fourth = plan['waypoints'][2], plan['waypoints'][3]
+    # Three quarters of the way from the third to the fourth waypoint.
+    lat = third['latitude']+(fourth['latitude']-third['latitude'])*.75
+    lon = third['longitude']+(fourth['longitude']-third['longitude'])*.75
+    expected = third['planned_fuel']+(fourth['planned_fuel']-third['planned_fuel'])*.75
+    bridge.on_simulator_message({'connected': True, 'telemetry': {
+        'latitude': (lat, clock.now), 'longitude': (lon, clock.now), 'on_ground': (0.0, clock.now),
+        'fuel_total': (expected-150, clock.now)}})
+    assert bridge.suggested_level() == 'flight'
+    progress = bridge.snapshot()['derived']['route_progress']
+    assert progress['status'] == 'derived' and progress['next_waypoint'] == fourth['ident']
+    assert [item['ident'] for item in progress['upcoming']][:2] == [fourth['ident'], plan['waypoints'][4]['ident']]
+    assert abs(progress['fuel_vs_plan']['difference_kg']+150) <= 15
+    assert progress['remaining_along_route_nm'] > progress['upcoming'][0]['distance_nm']
+
+
+def test_pilot_notes_are_declared_bounded_and_persisted(tmp_path):
+    clock = Clock()
+    bridge = AIBridge(tmp_path, clock)
+    assert bridge.suggested_level() == 'briefing' and 'pilot_notes' not in bridge.snapshot()
+    bridge.set_notes('  STAR DEMO2B via DEMOF, piste 04R  ')
+    notes = bridge.snapshot('flight')['pilot_notes']
+    assert notes == {'nature': 'declared_by_pilot', 'text': 'STAR DEMO2B via DEMOF, piste 04R',
+                     'updated_utc': notes['updated_utc']}
+    assert AIBridge(tmp_path, clock).notes['text'] == 'STAR DEMO2B via DEMOF, piste 04R'
+    with pytest.raises(ValueError):
+        bridge.set_notes('x'*2001)
+    bridge.set_notes('')
+    assert 'pilot_notes' not in bridge.snapshot('full')

@@ -87,6 +87,29 @@ connu lors du développement ; ils doivent être confirmés sur un OFP réel.
 
 ## Export
 
+Trois modes répondent à trois usages, dans une même conversation avec l'assistant :
+
+| Mode | Quand | Contenu |
+| --- | --- | --- |
+| **Briefing** | une fois, au sol | plan complet (route, SID, STAR, points de route avec altitude et carburant prévus, carburant, masses, METAR, horaires) et état de l'avion |
+| **Point en vol** | aussi souvent que nécessaire | trajectoire, configuration, LVars configurées, destination et STAR prévues, avancement sur la route ; complète le briefing déjà transmis |
+| **Complet** | diagnostic | toutes les variables avec leur source et leur vérification, plan intégral avec coordonnées |
+
+Le mode automatique choisit le briefing au sol ou sans donnée, le point en vol une fois
+l'appareil en l'air. Briefing et point en vol n'exportent que les variables marquées
+« briefing et vol » ; les autres ne figurent que dans l'export complet.
+
+L'avancement (`derived.route_progress`) situe la position observée par rapport aux
+points de route de l'OFP : prochain point, cinq points suivants, distance restante le
+long de la route et, si l'OFP le fournit, écart entre le carburant observé et le
+carburant prévu à bord interpolé à la position. C'est un calcul géométrique sur la
+route prévue, qui ne reflète pas une modification faite au MCDU.
+
+Les **notes pilote** (2 000 caractères, `local/state/pilot-notes.json`) transmettent ce
+que le simulateur ne fournit pas : STAR et VIA saisis au MCDU, piste, ATIS, clairance,
+messages. Elles figurent dans chaque export sous `pilot_notes`, qualifiées de
+déclarations du pilote.
+
 L'onglet **Export IA** propose :
 
 - **Copier pour un chat IA** : courte consigne invitant l'assistant à s'en tenir aux
@@ -94,12 +117,11 @@ L'onglet **Export IA** propose :
 - **Copier le JSON seul**, **Télécharger le fichier JSON** (emplacement choisi dans le
   navigateur) et **Enregistrer dans local/exports**.
 
-Le schéma est identifié par `schema: glareshield.flight_context/1`. Le niveau
-essentiel liste les champs indisponibles par leur seul nom et résume le plan ; le
-niveau détaillé ajoute la source, la vérification et les notes de chaque variable,
-ainsi que les points de route. Les tailles sont plafonnées (12 000 et 48 000
-caractères) ; un raccourcissement des points de route est signalé par
-`waypoints_truncated`.
+Le schéma est identifié par `schema: glareshield.flight_context/2`. Briefing et point
+en vol listent les champs indisponibles par leur seul nom ; le mode complet ajoute la
+source, la vérification et les notes de chaque variable. Les tailles sont plafonnées
+(30 000, 8 000 et 60 000 caractères) ; un raccourcissement des points de route ou des
+notes est signalé par `waypoints_truncated` ou `truncated`.
 
 ## Démonstration sans simulateur
 
@@ -135,7 +157,14 @@ Constats d'une session au parking (Fenix A320 CFM) :
 - l'import SimBrief réel (`json=v2`) fournit l'heure de génération et les horaires en
   ISO 8601, les durées en `HH:MM:SS` et les points de route en liste directe ;
   le parseur accepte ce format et l'ancien (`json=1`) ;
-- après passage à la lecture séquentielle, aucune déconnexion n'a été observée.
+- après passage à la lecture séquentielle, aucune déconnexion n'a été observée,
+  y compris sur un vol complet de près de deux heures ;
+- les noms de LVars figurent dans les fichiers de comportement du paquet Fenix ;
+  les voyants du FCU et de l'EFIS se lisent, mais les valeurs sélectionnées (vitesse,
+  cap, altitude, vitesse verticale) et les modes FMA ne sont pas exposés : les molettes
+  ne donnent qu'un compteur de crans ; les relevés restent dans `local/discovery/` ;
+- les pages et messages du MCDU et les alertes ECAM ne sont pas accessibles ;
+  l'interface locale de l'EFB Fenix n'est pas documentée et n'est pas utilisée.
 
 ## Validation restant à réaliser sur MSFS 2024 et Fenix
 
@@ -145,7 +174,6 @@ Constats d'une session au parking (Fenix A320 CFM) :
    perceptible de l'éclairage avec AI Bridge actif.
 3. Contrôler au parking puis en vol chaque SimVar du catalogue face au cockpit du
    Fenix, puis cocher « Validée » ou décocher « Exporter ».
-4. Relever et ajouter les LVars Fenix utiles (FCU, FMA, ECAM) après vérification de
-   leur sens.
-5. Remplacer volets et armement des aérofreins par des LVars Fenix vérifiées.
+4. Confirmer en vol les voyants AP, A/THR, LOC et APPR configurés localement.
+5. Trouver une source fiable pour le levier de volets et l'armement des aérofreins.
 6. Coller un export dans un assistant et ajuster le contenu essentiel si nécessaire.

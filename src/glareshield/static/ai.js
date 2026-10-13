@@ -24,7 +24,14 @@ const GROUP_LABELS = {
   time: 'Heure',
   fenix: 'Variables Fenix configurées',
 };
-let ai = { status: null, context: null, settings: null, variables: null, level: 'essential', preview: null };
+let ai = { status: null, context: null, settings: null, variables: null, level: 'auto', preview: null };
+const LEVELS = {
+  auto: ['Automatique', 'Briefing au sol, point en vol une fois en l’air.'],
+  briefing: ['Briefing', 'À envoyer une fois, au sol : plan complet (route, SID, STAR, points de route, carburant, masses, METAR, horaires) et état de l’avion.'],
+  flight: ['Point en vol', 'À envoyer aussi souvent que nécessaire : trajectoire, configuration, autopilote, prochains points, distance restante et carburant comparé au plan. Complète le briefing déjà transmis.'],
+  full: ['Complet', 'Diagnostic : toutes les variables avec leur source et leur vérification, et le plan intégral.'],
+};
+const ENTRY_LEVELS = { essential: 'briefing et vol', detailed: 'complet seulement' };
 
 function statusBadge(status) {
   return badge(STATUS_LABELS[status] || status, status);
@@ -56,12 +63,12 @@ async function copyText(text) {
 async function copyForChat(level = ai.level) {
   let result = await api('ai/chat?level=' + level);
   await copyText(result.text);
-  let simulated = result.text.includes('"data_origin":"simulation_scenario"');
-  message('Contexte ' + (level === 'essential' ? 'essentiel' : 'détaillé') + ' copié (' + result.chars.toLocaleString('fr-FR') + ' caractères)' + (simulated ? ' — données simulées.' : '.'));
+  let simulated = result.data_origin !== 'simconnect';
+  message(LEVELS[result.level][0] + ' copié (' + result.chars.toLocaleString('fr-FR') + ' caractères)' + (simulated ? ' — données simulées.' : '.'));
 }
 async function loadAI(full = false) {
   ai.status = await api('ai/status');
-  if (tab === 'Vol en cours') ai.context = await api('ai/context?level=detailed');
+  if (tab === 'Vol en cours') ai.context = await api('ai/context?level=full');
   if (full || !ai.settings) ai.settings = await api('ai/settings');
   if (tab === 'Variables IA' && (full || !ai.variables || !isEditing())) ai.variables = await api('ai/variables');
   if (tab === 'Export IA' && !isEditing()) ai.preview = await api('ai/context?level=' + ai.level);
@@ -169,13 +176,9 @@ function liveView(view) {
     for (let [key, field] of Object.entries(fields)) metric(grid, key, field);
     c.append(grid);
   }
-  if (doc.derived) {
-    let c = card(right, 'Valeurs calculées', 'Déduites des observations et du plan, avec leur méthode'),
-      grid = el('div', null, { className: 'metrics' });
-    for (let [key, field] of Object.entries(doc.derived)) metric(grid, key, { ...field, label: 'Distance directe à destination', note: field.method });
-    c.append(grid);
-  }
+  if (doc.derived) progressCard(right, doc.derived, doc.flight_plan);
   planSummary(right, doc.flight_plan);
+  notesCard(right);
   let info = card(right, 'Lecture des statuts', 'Le liseré de chaque mesure reprend la couleur de son statut');
   for (let [status, text] of [
     ['observed', 'Mesure récente du simulateur, dans le délai propre à la variable.'],
@@ -188,6 +191,50 @@ function liveView(view) {
     row.append(statusBadge(status), el('span', text, { className: 'muted' }));
     info.append(row);
   }
+}
+function progressCard(parent, derived, plan) {
+  let c = card(parent, 'Avancement sur la route', 'Calculé à partir des points de route de l’OFP ; route prévue, pas la route active du MCDU'),
+    grid = el('div', null, { className: 'metrics' }),
+    progress = derived.route_progress;
+  c.append(grid);
+  if (derived.direct_distance_to_destination)
+    metric(grid, 'direct', { ...derived.direct_distance_to_destination, label: 'Distance directe à destination', note: derived.direct_distance_to_destination.method });
+  if (progress) {
+    metric(grid, 'remaining', { value: progress.remaining_along_route_nm, unit: 'NM', status: 'derived', label: 'Restant le long de la route', note: progress.method });
+    let fuel = progress.fuel_vs_plan;
+    if (fuel) metric(grid, 'fuel', { value: (fuel.difference_kg > 0 ? '+' : '') + fuel.difference_kg.toLocaleString('fr-FR'), unit: 'kg', status: 'derived', label: 'Carburant par rapport au plan', note: fuel.method + ' Prévu : ' + fuel.planned_kg + ' kg, observé : ' + fuel.observed_kg + ' kg.' });
+    let wrap = el('div', null, { className: 'table-wrap' }),
+      table = el('table', null),
+      tbody = el('tbody', null);
+    table.innerHTML = '<thead><tr><th>Prochains points</th><th>Distance</th><th>Altitude prévue</th></tr></thead>';
+    for (let fix of progress.upcoming) {
+      let tr = el('tr', null);
+      tr.append(el('td', fix.ident, { className: 'mono' }), el('td', fix.distance_nm + ' NM', { className: 'value' }), el('td', fix.altitude_ft !== undefined ? fix.altitude_ft.toLocaleString('fr-FR') + ' ft' : '—', { className: 'value' }));
+      tbody.append(tr);
+    }
+    table.append(tbody);
+    wrap.append(table);
+    c.append(wrap);
+  } else if (plan) c.append(el('p', 'Avancement indisponible : position non observée ou points de route sans coordonnées.'));
+}
+function notesCard(parent) {
+  let notes = ai.status?.notes || { text: '' },
+    c = card(parent, 'Notes pilote', 'Ce que le simulateur ne fournit pas : STAR et VIA saisis au MCDU, piste, ATIS, clairance, messages. Incluses dans chaque export comme déclarations du pilote.'),
+    area = el('textarea', null, { value: notes.text || '', maxLength: 2000, rows: 5, placeholder: 'Ex. : STAR LERG1D via ELRUN, ILS 31R, ATIS K, QNH 1022, clairance FL340' }),
+    counter = el('small', null, { className: 'hint' });
+  area.setAttribute('aria-label', 'Notes pilote');
+  let count = () => (counter.textContent = area.value.length + ' / 2000' + (notes.updated_utc ? ' · mises à jour ' + notes.updated_utc.replace('T', ' ').replace('Z', ' UTC') : ''));
+  area.oninput = count;
+  count();
+  c.append(area, counter);
+  let bar = cardActions(c);
+  action('Enregistrer les notes', async () => {
+    let saved = await api('ai/notes', 'PUT', { text: area.value });
+    ai.status = { ...ai.status, notes: saved };
+    message(saved.text ? 'Notes enregistrées.' : 'Notes effacées.');
+    area.blur();
+    await reloadAI();
+  }, bar, 'small primary');
 }
 function planSummary(parent, plan) {
   let c = card(parent, 'Plan de vol prévu', 'SimBrief — ne reflète pas nécessairement la route active du MCDU');
@@ -215,7 +262,7 @@ function dashboardSummary(parent) {
   let c = card(parent, 'Assistant IA', s.mode === 'scenario' ? 'Démonstration en cours' : s.enabled ? 'Lecture active sur la connexion SimConnect' : 'Lecture désactivée', badge(s.mode === 'scenario' ? 'Simulé' : s.enabled ? 'Actif' : 'Inactif', s.mode === 'scenario' ? 'sim' : s.enabled ? 'ok' : ''));
   c.append(el('p', (s.counts.observed + s.counts.simulated) + ' mesure(s) exploitable(s), ' + s.counts.stale + ' périmée(s), ' + s.counts.unavailable + ' indisponible(s). Plan : ' + (s.plan.available ? 'chargé' : 'aucun') + '.'));
   let bar = cardActions(c);
-  action('Copier pour l’IA', () => copyForChat('essential'), bar, 'small primary', 'copy');
+  action('Copier pour l’IA', () => copyForChat('auto'), bar, 'small primary', 'copy');
   action('Vol en cours', () => { tab = 'Vol en cours'; render(); }, bar, 'small ghost');
 }
 
@@ -326,10 +373,10 @@ function planDetails(view, plan) {
 function exportView(view) {
   modeBanner(view);
   let doc = ai.preview,
-    controls = card(view, 'Contenu de l’export', 'Le niveau essentiel couvre vol, configuration et plan résumé ; le niveau détaillé ajoute sources, vérifications et points de route'),
+    controls = card(view, 'Mode d’export', 'Envoyer le briefing une fois au sol, puis des points en vol au fil du vol dans la même conversation'),
     row = el('div', null, { className: 'row' }),
     seg = el('div', null, { className: 'segmented' });
-  for (let [level, label] of [['essential', 'Essentiel'], ['detailed', 'Détaillé']]) {
+  for (let [level, [label]] of Object.entries(LEVELS)) {
     let b = el('button', label, { type: 'button', className: ai.level === level ? 'active' : '' });
     b.onclick = async () => {
       ai.level = level;
@@ -339,6 +386,10 @@ function exportView(view) {
     seg.append(b);
   }
   row.append(seg);
+  controls.append(row);
+  row = el('div', null, { className: 'row' });
+  let resolved = doc?.level || (ai.level === 'auto' ? ai.status?.suggested_level : ai.level);
+  if (resolved) controls.append(el('p', (ai.level === 'auto' ? 'Mode retenu : ' + LEVELS[resolved][0] + '. ' : '') + LEVELS[resolved][1]));
   if (doc) {
     let size = JSON.stringify(doc).length;
     row.append(badge(size.toLocaleString('fr-FR') + ' caractères'), badge('≈ ' + Math.ceil(size / 3.5).toLocaleString('fr-FR') + ' tokens (estimation)'), badge(doc.data_origin === 'simconnect' ? 'SimConnect' : 'Données simulées', doc.data_origin === 'simconnect' ? 'ok' : 'sim'));
@@ -362,6 +413,7 @@ function exportView(view) {
     message('Fichier enregistré : ' + r.path);
   }, bar, 'ghost');
   help(controls, 'La copie ajoute une courte consigne invitant l’assistant à s’en tenir aux valeurs fournies. Aucun modèle d’IA n’est appelé par Glareshield.');
+  notesCard(view);
   if (doc) {
     let c = card(view, 'Aperçu', 'Généré le ' + doc.generated_utc.replace('T', ' ').replace('Z', ' UTC'));
     c.append(el('pre', JSON.stringify(doc, null, 2), { className: 'json' }));
@@ -406,7 +458,7 @@ function variablesView(view) {
   for (let v of ai.variables || []) {
     let tr = el('tr', null),
       name = el('td', v.label);
-    name.append(el('span', (v.origin === 'lvar' ? 'L:' : '') + v.variable + (v.unit ? ' · ' + v.unit : '') + ' · ' + (v.level === 'essential' ? 'essentiel' : 'détaillé'), { className: 'sub mono' }));
+    name.append(el('span', (v.origin === 'lvar' ? 'L:' : '') + v.variable + (v.unit ? ' · ' + v.unit : '') + ' · ' + ENTRY_LEVELS[v.level], { className: 'sub mono' }));
     let value = el('td', formatValue(v) + (v.unit && v.value !== null ? ' ' + v.unit : ''), { className: 'value' });
     value.append(el('span', v.meaning || ageText(v), { className: 'sub' }));
     let status = el('td', null),
@@ -458,13 +510,13 @@ function variablesView(view) {
     name = field(form, 'Nom de la LVar (sans L:)', ''),
     label = field(form, 'Libellé', ''),
     unit = field(form, 'Unité (facultative)', ''),
-    level = field(form, 'Niveau d’export', 'detailed', 'text', ['essential', 'detailed']),
+    level = field(form, 'Exportée dans', 'essential', 'text', ['essential', 'detailed']),
     interval = field(form, 'Intervalle de lecture (ms, 250 minimum)', 1000, 'number'),
     maxAge = field(form, 'Âge maximal avant péremption (s)', 5, 'number'),
     values = field(form, 'Signification des valeurs (ex. 0=OFF;1=ON)', ''),
     checked = field(form, 'Sens vérifié dans le cockpit', false, 'checkbox');
-  form.querySelectorAll('select')[0].options[0].textContent = 'Essentiel';
-  form.querySelectorAll('select')[0].options[1].textContent = 'Détaillé';
+  form.querySelectorAll('select')[0].options[0].textContent = 'Briefing, point en vol et complet';
+  form.querySelectorAll('select')[0].options[1].textContent = 'Complet seulement';
   let addBar = el('div', null, { className: 'row', style: 'margin-top:12px' });
   details.append(addBar);
   action('Ajouter', async () => {
@@ -494,7 +546,7 @@ for (let [name, [iconName, subtitle, renderer, live]] of Object.entries(AI_VIEWS
     subtitle,
     render: renderer,
     live,
-    actions: bar => action('Copier pour l’IA', () => copyForChat(name === 'Export IA' ? ai.level : 'essential'), bar, 'primary', 'copy'),
+    actions: bar => action('Copier pour l’IA', () => copyForChat(name === 'Export IA' ? ai.level : 'auto'), bar, 'primary', 'copy'),
     navBadge: name === 'Vol en cours' ? () => (ai.status?.mode === 'scenario' ? badge('Démo', 'sim') : null) : null,
   };
 VIEWS['Vol en cours'].summary = dashboardSummary;

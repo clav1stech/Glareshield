@@ -130,6 +130,7 @@ def parse_ofp(data) -> dict:
             continue
         waypoints.append({'ident': ident, 'airway': text(fix.get('via_airway')), 'type': text(fix.get('type')),
                           'stage': text(fix.get('stage')), 'altitude_ft': number(fix.get('altitude_feet'), True),
+                          'planned_fuel': number(fix.get('fuel_plan_onboard'), True),
                           'latitude': number(fix.get('pos_lat')), 'longitude': number(fix.get('pos_long'))})
     airline, flight = text(general.get('icao_airline')), text(general.get('flight_number'))
     units = {'kgs': 'kg', 'lbs': 'lb'}.get((text(params.get('units')) or '').casefold(), text(params.get('units')))

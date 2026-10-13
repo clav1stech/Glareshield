@@ -69,15 +69,20 @@ def test_settings_scenario_plan_and_export_flow(tmp_path):
         assert client.post('/api/ai/scenario', json={'active': True, 'phase': 'cruise'}, headers=headers).status_code == 200
         assert client.post('/api/ai/scenario', json={'active': True, 'phase': 'unknown'}, headers=headers).status_code == 422
         assert client.post('/api/ai/simbrief/demo', json={}, headers=headers).json()['plan']['nature'] == 'planned'
-        context = client.get('/api/ai/context?level=detailed', headers=headers).json()
+        context = client.get('/api/ai/context?level=full', headers=headers).json()
         assert context['data_origin'] == 'simulation_scenario'
         assert context['telemetry']['position']['altitude_msl']['value'] == 35000
         assert context['flight_plan']['waypoints']
         assert client.get('/api/ai/context?level=everything', headers=headers).status_code == 422
         chat = client.get('/api/ai/chat', headers=headers).json()
         assert chat['chars'] == len(chat['text']) and '```json' in chat['text']
-        exported = client.post('/api/ai/export', json={'level': 'essential'}, headers=headers).json()
+        exported = client.post('/api/ai/export', json={'level': 'briefing'}, headers=headers).json()
         assert exported['path'].startswith('local/exports/') and (tmp_path/exported['path']).exists()
+        assert client.put('/api/ai/notes', json={'text': 'STAR DEMO2B'}, headers=headers).status_code == 200
+        assert client.get('/api/ai/context?level=flight', headers=headers).json()['pilot_notes']['text'] == 'STAR DEMO2B'
+        assert client.put('/api/ai/notes', json={'text': 'x'*2001}, headers=headers).status_code == 400
+        assert client.get('/api/ai/notes').status_code == 403
+        assert client.get('/api/ai/context', headers=headers).json()['level'] == 'flight'
         assert client.post('/api/ai/simbrief/clear', json={}, headers=headers).status_code == 200
         assert client.get('/api/ai/plan', headers=headers).json()['plan'] is None
 

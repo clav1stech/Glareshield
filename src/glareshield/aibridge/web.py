@@ -8,16 +8,21 @@ from pydantic import ValidationError
 
 from ..model import StrictModel
 from .config import AIBridgeSettings
+from .context import chat_text
 from .scenario import PHASES
 from .simbrief import OFPError
 
 PHASE_NAMES = tuple(name for name, _, _ in PHASES)
 
-Level = Literal['essential', 'detailed']
+Level = Literal['auto', 'briefing', 'flight', 'full']
 
 
 class ExportRequest(StrictModel):
-    level: Level = 'essential'
+    level: Level = 'auto'
+
+
+class NotesRequest(StrictModel):
+    text: str
 
 
 class ScenarioRequest(StrictModel):
@@ -33,17 +38,29 @@ def create_router(bridge, changed=None) -> APIRouter:
         return bridge().status()
 
     @router.get('/context')
-    async def context(level: Level = 'essential'):
+    async def context(level: Level = 'auto'):
         return bridge().snapshot(level)
 
     @router.get('/chat')
-    async def chat(level: Level = 'essential'):
-        text = bridge().chat(level)
-        return {'text': text, 'chars': len(text)}
+    async def chat(level: Level = 'auto'):
+        document = bridge().snapshot(level)
+        text = chat_text(document)
+        return {'text': text, 'chars': len(text), 'level': document['level'], 'data_origin': document['data_origin']}
 
     @router.get('/variables')
     async def variables():
         return bridge().available_variables()
+
+    @router.get('/notes')
+    async def notes():
+        return bridge().notes
+
+    @router.put('/notes')
+    async def save_notes(payload: NotesRequest):
+        try:
+            return bridge().set_notes(payload.text)
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from None
 
     @router.get('/plan')
     async def plan():

@@ -103,7 +103,7 @@ async def test_lighting_test_values_never_reach_ai_snapshot(tmp_path, monkeypatc
         runtime.manual['warning'] = (1, time.monotonic()+5)
         await asyncio.sleep(.2)
         assert runtime.engine.values['warning'] == 1
-        document = runtime.ai.snapshot('detailed')
+        document = runtime.ai.snapshot('full')
         assert 'warning' not in str(document['telemetry'].keys())
         assert document['data_origin'] == 'simconnect'
         assert document['telemetry']['speed']['ias'] == {'label': 'Vitesse indiquée', 'value': 3, 'unit': 'kt',

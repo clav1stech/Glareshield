@@ -2,6 +2,17 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [0.1.4] - 2026-10-13
+
+Exports organisés par phase de vol, après un premier vol complet avec AI Bridge.
+
+- Trois modes remplacent essentiel et détaillé : briefing au sol, point en vol et
+  complet, avec choix automatique selon que l'appareil est au sol ou en l'air.
+- Avancement sur la route prévue : prochains points, distance restante et carburant
+  comparé au plan, présentés comme valeurs calculées.
+- Notes pilote incluses dans les exports pour ce que le simulateur ne fournit pas
+  (saisies MCDU, valeurs FCU, clairances, ATIS).
+
 ## [0.1.3] - 2026-10-13
 
 Import SimBrief vérifié avec un OFP réel.
