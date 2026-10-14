@@ -240,3 +240,15 @@ async def test_preview_while_suspended_does_not_reactivate_normal_rules(tmp_path
         assert load(path)==config
     finally:
         await runtime.stop()
+
+
+async def test_first_launch_without_configuration_starts_empty(tmp_path):
+    path=tmp_path/'local/config.yaml'
+    runtime=Runtime(tmp_path,path)
+    await runtime.start()
+    try:
+        assert not runtime.config.devices and not runtime.config.controllers
+        assert not path.exists()
+        assert runtime.status()['scope']=='default'
+    finally:
+        await runtime.stop()

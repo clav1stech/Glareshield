@@ -2,6 +2,12 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.0.2] - 2026-10-14
+
+- Ajout de scripts/stop.cmd pour arrêter une instance Glareshield lancée sans icône
+- start.cmd installe l'environnement s'il est absent et garde la fenêtre ouverte en cas d'échec
+- Premier lancement sans configuration : démarrage à vide sur l'onglet Contrôleurs, où la découverte et l'appairage Hue/Nanoleaf se font par boutons ; l'appairage lance la découverte si nécessaire
+
 ## [1.0.1] - 2026-10-13
 
 Publication des connaissances génériques sur le Fenix A320 acquises pendant les essais ;
