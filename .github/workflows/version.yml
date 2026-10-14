@@ -59,7 +59,15 @@ jobs:
         shell: bash
         run: |
           python scripts/version.py check --tag "$TAG_NAME"
-          python scripts/version.py notes > "$RUNNER_TEMP/release-notes.md"
-          if ! gh release view "$TAG_NAME" --json tagName > /dev/null 2>&1; then
-            gh release create "$TAG_NAME" --verify-tag --title "Glareshield ${TAG_NAME#v}" --notes-file "$RUNNER_TEMP/release-notes.md"
+          python scripts/version.py notes --series > "$RUNNER_TEMP/release-notes.md"
+          title=$(python scripts/version.py release-title)
+          series="${title%% *}"
+          # Une release par vX.Y : elle suit le dernier tag vX.Y.Z et reprend tout le journal de la série.
+          existing=$(gh release list --limit 200 --json tagName,name --jq ".[] | select(.name == \"$series\" or (.name | startswith(\"$series \"))) | .tagName" | head -n 1)
+          if [ -n "$existing" ] && [ "$existing" != "$TAG_NAME" ]; then
+            gh release edit "$existing" --tag "$TAG_NAME" --title "$title" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+          elif [ -n "$existing" ]; then
+            gh release edit "$TAG_NAME" --title "$title" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+          else
+            gh release create "$TAG_NAME" --verify-tag --title "$title" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
           fi

@@ -28,7 +28,8 @@
   et auditer l'index avec `scripts/check_public.py`. Ne jamais publier `local/`.
 - Publier les changements d'application avec leur entrée de `CHANGELOG.md`
   et un tag annoté `vX.Y.Z`. Pousser le tag après le code ; GitHub Actions crée
-  la release depuis cette entrée. Ne pas remplacer un tag déjà publié.
+  la release de la série `x.y` : une seule release par `x.y`, qui suit le dernier
+  tag et dont les notes cumulent les entrées de la série (ligne `Titre :` à renseigner). Ne pas remplacer un tag déjà publié.
 
 Version de départ publiée : **0.1.0**. La règle s'applique aux prochaines
 modifications ; l'historique antérieur n'est pas renuméroté.

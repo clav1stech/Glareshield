@@ -46,7 +46,12 @@ git push origin vX.Y.Z
 ```
 
 Remplacer `X.Y.Z` par la version effective affichée avec `scripts/version.py current`.
-La release GitHub est créée automatiquement depuis le journal des changements.
+Il y a une seule release GitHub par série `x.y`, nommée `vX.Y — Thème`. À chaque
+tag `vX.Y.Z`, GitHub Actions déplace cette release sur le nouveau tag et
+régénère ses notes : « Dernière version : vX.Y.Z », puis toutes les entrées
+`X.Y.*` du journal, la plus récente d'abord. Une entrée peut porter une ligne
+`Série : thème` (titre de la release) et une ligne `Titre : intitulé` (titre de
+sa version). Les tags `vX.Y.Z` restent tous publiés.
 Les archives source GitHub contiennent uniquement les fichiers suivis par Git.
 Une publication de documentation seule ne crée pas de nouveau tag ni de release.
 
