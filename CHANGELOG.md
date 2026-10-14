@@ -2,13 +2,20 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+Chaque série `x.y` a une seule release GitHub, dont les notes reprennent toutes ses entrées `x.y.z`.
+Lignes facultatives d'une entrée : `Série : thème` (titre de la release) et `Titre : intitulé` (de la version).
+
 ## [1.0.2] - 2026-10-14
+
+Titre : Script d'arrêt et premier lancement à vide
 
 - Ajout de scripts/stop.cmd pour arrêter une instance Glareshield lancée sans icône
 - start.cmd installe l'environnement s'il est absent et garde la fenêtre ouverte en cas d'échec
 - Premier lancement sans configuration : démarrage à vide sur l'onglet Contrôleurs, où la découverte et l'appairage Hue/Nanoleaf se font par boutons ; l'appairage lance la découverte si nécessaire
 
 ## [1.0.1] - 2026-10-13
+
+Titre : Connaissances Fenix A320
 
 Publication des connaissances génériques sur le Fenix A320 acquises pendant les essais ;
 aucune donnée de l'installation personnelle n'est incluse.
@@ -22,6 +29,9 @@ aucune donnée de l'installation personnelle n'est incluse.
   simulateur lit aussi des SimVars standard.
 
 ## [1.0.0] - 2026-10-13
+
+Série : AI Bridge
+Titre : Première version stable
 
 Version majeure explicitement demandée par l'utilisateur. Première version stable
 de Glareshield avec AI Bridge, validée sur un vol réel de près de deux heures sans

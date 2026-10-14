@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 from scripts.version import (app_changed,bump,check,current,next_version,parse,
-                             release_notes,transition)
+                             release_notes,series_notes,series_title,transition)
 
 
 PROJECT='[project]\nname = "fixture"\nversion = "0.1.0"\ndependencies = []\n'
@@ -56,6 +56,18 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(release_notes(log,'0.1.1'),'New feature.\n')
         with self.assertRaises(ValueError):
             release_notes(log,'0.1.2')
+
+    def test_one_release_per_series_accumulates_its_entries(self):
+        log=('# Changes\n\n## [0.2.1] - t\n\nTitre : Fix\n\n- b\n\n## [0.2.0] - t\n\nSérie : Thème\n\n- a\n\n'
+             '## [0.1.5] - t\n\n- old\n')
+        self.assertEqual(series_title(log,'0.2.1'),'v0.2 — Thème')
+        self.assertEqual(series_title(log,'0.1.5'),'v0.1')
+        notes=series_notes(log,'0.2.1')
+        self.assertTrue(notes.startswith('Dernière version : v0.2.1 (tag v0.2.1).'))
+        self.assertLess(notes.index('### 0.2.1 — Fix'),notes.index('### 0.2.0'))
+        self.assertNotIn('old',notes)
+        with self.assertRaises(ValueError):
+            series_notes(log,'0.2.0')
 
     def test_bump_updates_only_version_and_adds_release_notes(self):
         with tempfile.TemporaryDirectory() as directory:

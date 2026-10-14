@@ -71,6 +71,46 @@ def release_notes(text,version):
     return match.group(1).strip()+'\n'
 
 
+def entries(text,series):
+    """Changelog entries of one x.y series as (version, body), newest first."""
+    result=[]
+    for match in re.finditer(r'^## \[(\d+\.\d+\.\d+)\][^\n]*\n(.*?)(?=^## |\Z)',text,re.M|re.S):
+        if '.'.join(match.group(1).split('.')[:2])==series and match.group(2).strip():
+            result.append((match.group(1),match.group(2).strip()))
+    if not result:
+        raise ValueError('Aucune entrée de CHANGELOG.md pour la série '+series+'.')
+    return sorted(result,key=lambda item:parse(item[0]),reverse=True)
+
+
+def series_of(version):
+    parse(version)
+    return '.'.join(version.split('.')[:2])
+
+
+def series_title(text,version):
+    """Release title: v<x.y>, followed by the series theme if a 'Série :' line gives one."""
+    series=series_of(version)
+    for _,body in entries(text,series):
+        found=re.search(r'^Série\s*:\s*(.+)$',body,re.M)
+        if found:
+            return f'v{series} — {found.group(1).strip()}'
+    return 'v'+series
+
+
+def series_notes(text,version):
+    """One release per x.y: every z entry of the series, the latest tag first."""
+    items=entries(text,series_of(version))
+    if items[0][0]!=version:
+        raise ValueError('La version courante doit être la dernière du journal pour sa série.')
+    parts=[f'Dernière version : v{version} (tag v{version}).']
+    for number,body in items:
+        body=re.sub(r'^Série\s*:.*\n?','',body,flags=re.M).strip()
+        title=re.search(r'^Titre\s*:\s*(.+)$',body,re.M)
+        body=re.sub(r'^Titre\s*:.*\n?','',body,flags=re.M).strip()
+        parts.append(f'### {number}'+(f' — {title.group(1).strip()}' if title else '')+'\n\n'+body)
+    return '\n\n'.join(parts)+'\n'
+
+
 def transition(old,new,changed,major_requested=False,minor_approved=False):
     previous,following=parse(old),parse(new)
     if following<previous:
@@ -166,7 +206,9 @@ def main():
     parser=argparse.ArgumentParser(description='Politique x.y.z de Glareshield')
     commands=parser.add_subparsers(dest='command',required=True)
     commands.add_parser('current')
-    commands.add_parser('notes')
+    notes=commands.add_parser('notes')
+    notes.add_argument('--series',action='store_true',help='Notes cumulées de la série x.y')
+    commands.add_parser('release-title')
     validation=commands.add_parser('check')
     validation.add_argument('--base')
     validation.add_argument('--tag')
@@ -182,6 +224,10 @@ def main():
     try:
         if args.command=='current':
             print(current((ROOT/'pyproject.toml').read_text(encoding='utf-8')))
+        elif args.command=='release-title':
+            print(series_title((ROOT/'CHANGELOG.md').read_text(encoding='utf-8'),current((ROOT/'pyproject.toml').read_text(encoding='utf-8'))))
+        elif args.command=='notes' and args.series:
+            print(series_notes((ROOT/'CHANGELOG.md').read_text(encoding='utf-8'),current((ROOT/'pyproject.toml').read_text(encoding='utf-8'))),end='')
         elif args.command=='notes':
             print(release_notes((ROOT/'CHANGELOG.md').read_text(encoding='utf-8'),current((ROOT/'pyproject.toml').read_text(encoding='utf-8'))),end='')
         elif args.command=='bump':
