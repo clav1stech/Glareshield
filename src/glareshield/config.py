@@ -146,6 +146,13 @@ def atomic_write(path: Path, content: str) -> None:
             os.unlink(filename)
 
 
+def load_or_default(path: Path) -> Configuration:
+    """A first launch has no configuration yet: start empty, saved on first change."""
+    if path.exists():
+        return load(path)
+    return Configuration(scopes={"default": []}, active_scope="default")
+
+
 def load(path: Path) -> Configuration:
     return Configuration.model_validate(yaml.load(path.read_text(encoding="utf-8"),Loader=ConfigurationLoader))
 
