@@ -49,6 +49,7 @@
 !/src/glareshield/aibridge/telemetry.py
 !/src/glareshield/aibridge/web.py
 !/src/glareshield/aibridge/presets.py
+!/src/glareshield/aibridge/ivao.py
 !/src/glareshield/aibridge/demo_ofp.json
 !/src/glareshield/drivers/
 /src/glareshield/drivers/*
@@ -92,6 +93,7 @@
 !/tests/test_aibridge_web.py
 !/tests/test_telemetry_source.py
 !/tests/test_fenix.py
+!/tests/test_ivao.py
 !/docs/
 /docs/*
 !/docs/architecture.md

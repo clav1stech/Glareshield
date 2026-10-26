@@ -152,6 +152,8 @@ class Runtime:
             self.sources.append(source)
             self.tasks.append(asyncio.create_task(source.run()))
         self.tasks.extend([asyncio.create_task(self.render_loop()),asyncio.create_task(self.resolve_loop())])
+        # Optional IVAO collection: its own task, never awaited by lighting or SimConnect.
+        self.ai.ivao.attach()
         self.log('Démarrage')
 
     async def render_loop(self):
@@ -326,6 +328,7 @@ class Runtime:
         self.stopping=True
         self.render_wake.set()
         self.preview=None
+        await self.ai.ivao.stop()
         for task in list(self.test_tasks):
             task.cancel()
         await asyncio.gather(*list(self.test_tasks),return_exceptions=True)

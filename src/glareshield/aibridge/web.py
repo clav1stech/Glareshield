@@ -11,6 +11,7 @@ from .config import AIBridgeSettings
 from .context import chat_text
 from .presets import PRESETS, apply_preset
 from .scenario import PHASES
+from .ivao import IVAOError
 from .simbrief import OFPError
 
 PHASE_NAMES = tuple(name for name, _, _ in PHASES)
@@ -117,6 +118,25 @@ def create_router(bridge, changed=None) -> APIRouter:
     async def clear_plan():
         bridge().plan.clear()
         return {'ok': True}
+
+    @router.get('/ivao')
+    async def network():
+        return bridge().network_page()
+
+    @router.post('/ivao/refresh')
+    async def refresh_network():
+        try:
+            results = await bridge().ivao.refresh()
+        except IVAOError as error:
+            raise HTTPException(400, str(error)) from None
+        return {'results': results, **bridge().network_page()}
+
+    @router.get('/ivao/airport/{icao}')
+    async def network_airport(icao: str):
+        try:
+            return bridge().lookup_airport(icao)
+        except (ValueError, IVAOError) as error:
+            raise HTTPException(400, str(error)) from None
 
     @router.post('/scenario')
     async def scenario(payload: ScenarioRequest):

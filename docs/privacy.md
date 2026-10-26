@@ -13,7 +13,7 @@ local/
   planning/       # plan original et notes privées
   discovery/     # relevés du matériel et résultats de tests
   config.yaml    # appareils, groupes, portées et règles personnels
-  ai-bridge.yaml # réglages AI Bridge, identifiant SimBrief et LVars relevées
+  ai-bridge.yaml # réglages AI Bridge, identifiant SimBrief, LVars relevées et réglages IVAO
   exports/       # contextes de vol exportés
   secrets/       # clés et jetons d’appairage
   state/         # snapshots, cache de découverte et dernier OFP SimBrief

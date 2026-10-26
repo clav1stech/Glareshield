@@ -24,7 +24,7 @@ AirPlay est un pilote optionnel expérimental. Il reste inactif sans sortie et s
 
 ## AI Bridge
 
-Le module **Assistant IA** constitue un état de vol qualifié (valeur, unité, âge, statut observé, périmé, indisponible ou simulé), y adjoint le dernier OFP SimBrief importé manuellement et produit un export JSON à copier dans ChatGPT, Claude ou un autre assistant. Il utilise la connexion SimConnect existante, n'écrit rien dans le cockpit, n'appelle aucun modèle d'IA et reste désactivé tant qu'il n'est pas activé dans **Variables IA**. Un scénario de démonstration et un OFP fictif permettent de l'éprouver sans simulateur. Voir [la documentation d'AI Bridge](docs/ai-bridge.md).
+Le module **Assistant IA** constitue un état de vol qualifié (valeur, unité, âge, statut observé, périmé, indisponible ou simulé), y adjoint le dernier OFP SimBrief importé manuellement et, si activées, les données publiques IVAO (contrôleurs connectés, ATIS, METAR et TAF), et produit un export JSON à copier dans ChatGPT, Claude ou un autre assistant. Il utilise la connexion SimConnect existante, n'écrit rien dans le cockpit, n'appelle aucun modèle d'IA et reste désactivé tant qu'il n'est pas activé dans **Variables IA**. Un scénario de démonstration et un OFP fictif permettent de l'éprouver sans simulateur. Voir [la documentation d'AI Bridge](docs/ai-bridge.md).
 
 ## Installation et lancement
 

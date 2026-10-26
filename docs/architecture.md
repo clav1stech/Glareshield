@@ -10,7 +10,7 @@ Processus Python asynchrone, interface HTTP limitée à la boucle locale, page w
 - Moteur : priorités distinctes entre clignotements et fonds fixes, superposition, rendu différentiel, limitation de cadence et restauration des états.
 - Pilotes : découverte, capture d’état, application et restauration.
 - Interface : configuration, sondes, tests manuels et état des connexions. La page est servie sans compilation : `index.html`, `app.css`, `app.js` pour l'éclairage et `ai.js` pour AI Bridge.
-- AI Bridge (`aibridge/`) : catalogue de SimVars, stockage horodaté des observations, scénario de démonstration, résumé SimBrief et document de contexte versionné. Le module lit les variables par la connexion SimConnect existante, dans la boucle de lecture, après les LVars d'éclairage et au plus une par tour, et conserve ses réglages dans `local/ai-bridge.yaml`. Voir [AI Bridge](ai-bridge.md).
+- AI Bridge (`aibridge/`) : catalogue de SimVars, stockage horodaté des observations, scénario de démonstration, résumé SimBrief et document de contexte versionné. Le module lit les variables par la connexion SimConnect existante, dans la boucle de lecture, après les LVars d'éclairage et au plus une par tour, et conserve ses réglages dans `local/ai-bridge.yaml`. Une intégration IVAO facultative (`aibridge/ivao.py`) télécharge dans sa propre tâche les flux publics Whazzup, METAR et TAF ; l'interface et les exports lisent son cache en mémoire. Voir [AI Bridge](ai-bridge.md).
 
 Les appareils, groupes, variables, couleurs, seuils et affectations sont configurables. Les noms et valeurs des variables du simulateur doivent être vérifiés dans chaque installation. L’application lit le simulateur ; elle ne fournit aucune commande d’écriture vers le cockpit, y compris dans AI Bridge.
 

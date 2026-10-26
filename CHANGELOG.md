@@ -2,6 +2,22 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.0.2] - 2026-10-26
+
+Intégration IVAO facultative, désactivée par défaut et en lecture seule.
+
+- Onglet Réseau IVAO : contrôleurs connectés, ATIS, METAR et TAF des aérodromes de l'OFP
+  SimBrief et d'aérodromes ajoutés, consultation ponctuelle d'un autre aérodrome,
+  actualisation manuelle et état de chaque flux.
+- Sources publiques sans authentification : Whazzup v2 (une requête toutes les 15 s au plus)
+  et fichiers globaux METAR et TAF ; collecte dans une tâche propre, cache en mémoire partagé
+  par l'interface et les exports, dernier résultat valide conservé et signalé en cas d'échec.
+- Exports : schéma `glareshield.flight_context/3` avec une section `ivao` séparée de la
+  télémétrie, du plan et des notes pilote ; critères de sélection explicites avec un rayon
+  par type de position (30 NM pour DEL, GND et TWR, 80 NM pour APP et DEP, 400 NM pour CTR
+  et FSS), observateurs distincts, âge des bulletins distinct de l'âge de récupération, changements
+  d'ATIS signalés, réductions décrites dans `ivao.truncated`.
+
 ## [1.0.1] - 2026-10-13
 
 Publication des connaissances génériques sur le Fenix A320 acquises pendant les essais ;

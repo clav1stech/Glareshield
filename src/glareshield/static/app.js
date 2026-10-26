@@ -26,6 +26,7 @@ const ICONS = {
   stop: 'M6 6h12v12H6z',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   refresh: 'M20 11a8 8 0 10-2.3 5.7M20 4v7h-7',
+  network: 'M12 13v8M9 21h6M8.5 9.5a5 5 0 017 0M5.6 6.6a9 9 0 0112.8 0M12 12.5a.5.5 0 100-1 .5.5 0 000 1z',
 };
 function icon(name) {
   let svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -47,7 +48,7 @@ const NAV = [
   ['Pilotage', ['Tableau de bord', 'Journal']],
   ['Éclairage', ['Affectations', 'Règles', 'Effets', 'Sources']],
   ['Matériel', ['Appareils', 'Contrôleurs', 'Groupes', 'Portées']],
-  ['Assistant IA', ['Vol en cours', 'Plan de vol', 'Export IA', 'Variables IA']],
+  ['Assistant IA', ['Vol en cours', 'Plan de vol', 'Réseau IVAO', 'Export IA', 'Variables IA']],
   ['Système', ['Réglages']],
 ];
 function el(tag, text, attrs = {}) {

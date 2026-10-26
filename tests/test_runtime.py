@@ -240,3 +240,29 @@ async def test_preview_while_suspended_does_not_reactivate_normal_rules(tmp_path
         assert load(path)==config
     finally:
         await runtime.stop()
+
+
+async def test_ivao_collection_never_blocks_lighting_nor_opens_simconnect(tmp_path):
+    import httpx
+    from glareshield.aibridge.config import AIBridgeSettings,IVAOSettings,save_settings
+    path=tmp_path/'local/config.yaml'
+    save(path,load(Path(__file__).resolve().parents[1]/'examples/demo.yaml'))
+    save_settings(tmp_path/'local/ai-bridge.yaml',AIBridgeSettings(ivao=IVAOSettings(enabled=True)))
+    requests=[]
+    async def hanging(request):
+        requests.append(request.url.path)
+        await asyncio.sleep(30)
+    runtime=Runtime(tmp_path,path)
+    runtime.ai.ivao.transport=httpx.MockTransport(hanging)
+    await runtime.start()
+    try:
+        runtime.manual['warning']=(1,time.monotonic()+5)
+        await asyncio.sleep(.2)
+        assert requests and not runtime.ai.ivao.task.done()
+        assert runtime.engine.winners['light_a']=='warning'
+        assert runtime.simulator is None and runtime.ai.definitions()=={}
+    finally:
+        started=time.monotonic()
+        await runtime.stop()
+    assert time.monotonic()-started<2 and runtime.ai.ivao.task is None
+    assert runtime.ai.ivao.whazzup.data is None

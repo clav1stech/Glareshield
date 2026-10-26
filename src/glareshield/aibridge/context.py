@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from .catalog import GROUPS, Entry
 from .telemetry import TelemetryStore, qualify
 
-SCHEMA = 'glareshield.flight_context/2'
+SCHEMA = 'glareshield.flight_context/3'
 # briefing: once on the ground; flight: compact update sent repeatedly; full: diagnostics.
 LEVELS = ('briefing', 'flight', 'full')
 LIMITS = {'briefing': 30000, 'flight': 8000, 'full': 60000}
@@ -21,6 +21,7 @@ NOTICE = ('Données de simulation (MSFS 2024, Fenix A320) relevées par Glareshi
           'derived = calculé par Glareshield, méthode indiquée. '
           'Le plan SimBrief est un plan prévu, pas la route active du MCDU. '
           'pilot_notes contient des déclarations du pilote, non vérifiées par le simulateur. '
+          'ivao contient des données publiées par le réseau IVAO, avec leur provenance (voir ivao.notice). '
           'Ne pas déduire de mode FMA, d’alerte ECAM ni de valeur absente. Usage limité à la simulation.')
 RULE = ('Appuie-toi uniquement sur les valeurs fournies, en tenant compte de leur statut et de leur âge ; '
         'signale toute information manquante au lieu de la supposer.')
@@ -165,7 +166,7 @@ def derived(fields: dict, plan: dict | None, level: str) -> dict:
 
 
 def build_context(level: str, entries: list[Entry], store: TelemetryStore, plan: dict | None,
-                  plan_status: dict, now: float, notes: dict | None = None) -> dict:
+                  plan_status: dict, now: float, notes: dict | None = None, network: dict | None = None) -> dict:
     if level not in LIMITS:
         raise ValueError('Niveau d’export inconnu.')
     selected = [entry for entry in entries if level == 'full' or entry.level == 'essential']
@@ -216,8 +217,17 @@ def build_context(level: str, entries: list[Entry], store: TelemetryStore, plan:
     document['flight_plan'] = None if plan is None else {
         'source': plan_status.get('source'), 'fetched_utc': plan_status.get('fetched_utc'),
         'warnings': plan_status.get('warnings', []), **plan_view(plan, level)}
-    document['checks'] = checks(fields, plan, store)
+    if network is not None:
+        document['ivao'] = network
+    document['checks'] = checks(fields, plan, store)+network_checks(network)
     return limit(document, LIMITS[level])
+
+
+def network_checks(network: dict | None) -> list[dict]:
+    if network is None:
+        return []
+    degraded = [f'{name} {feed["status"]}' for name, feed in network['feeds'].items() if feed['status'] != 'current']
+    return [{'level': 'warning', 'message': 'Flux IVAO non à jour : '+', '.join(degraded)+' (voir ivao.feeds).'}]         if degraded else []
 
 
 def limit(document: dict, maximum: int) -> dict:
@@ -229,6 +239,9 @@ def limit(document: dict, maximum: int) -> dict:
     if len(serialize(document)) > maximum and plan.get('route'):
         plan['route'] = plan['route'][:400]+' …'
         plan['route_truncated'] = True
+    if document.get('ivao'):
+        from .ivao import trim
+        trim(document['ivao'], lambda: len(serialize(document)) > maximum)
     notes = document.get('pilot_notes')
     if len(serialize(document)) > maximum and notes:
         notes['text'] = notes['text'][:1000]+' …'

@@ -87,13 +87,139 @@ Les chemins de champs (`origin.icao_code`, `general.initial_altitude`,
 `navlog.fix[].altitude_feet`, etc.) correspondent au format JSON de SimBrief tel que
 connu lors du développement ; ils doivent être confirmés sur un OFP réel.
 
+## Réseau IVAO
+
+L'onglet **Réseau IVAO** complète le contexte par les données publiques du réseau :
+contrôleurs connectés, ATIS, METAR et TAF. Glareshield collecte, sélectionne et restitue
+ces données avec leur provenance ; il ne recommande aucune fréquence et n'interprète ni
+l'ATIS ni la météo. L'intégration est facultative, désactivée par défaut, en lecture seule
+et indépendante de la lecture SimConnect : elle fonctionne aussi pour un briefing sans
+simulateur.
+
+### Sources
+
+Vérifiées le 26 octobre 2026 dans la documentation officielle
+(`api.ivao.aero/docs`, wiki DevOps « API Documentation v2 ») et par des requêtes réelles :
+
+| Donnée | Adresse | Accès |
+| --- | --- | --- |
+| Contrôleurs, observateurs et ATIS | `https://api.ivao.aero/v2/tracker/whazzup` | public ; une requête toutes les 15 s au plus, sous peine de bannissement de l'adresse IP |
+| METAR | `https://api.ivao.aero/v2/airports/all/metar` | public, sans authentification |
+| TAF | `https://api.ivao.aero/v2/airports/all/taf` | public, sans authentification |
+
+Le flux ATIS dédié (`/v2/tracker/whazzup/atis`) reprend exactement les ATIS intégrés au
+Whazzup ; il n'est donc pas téléchargé en plus. Les endpoints par aérodrome
+(`/v2/airports/{icao}/metar`, `/taf`, `/atis`) répondent `401` sans clé d'application IVAO :
+ils ne sont pas utilisés. Les champs du Whazzup réel diffèrent de la documentation (la portée
+`lastTrack.distance` est absente des réponses observées) : chaque champ est facultatif et un
+champ absent est omis, jamais estimé.
+
+### Collecte et cache
+
+Une tâche asynchrone propre au module télécharge les flux ; l'analyse JSON est faite hors de
+la boucle partagée avec l'éclairage. L'interface et les exports lisent le même cache en
+mémoire et ne déclenchent aucune requête. Aucun cache n'est écrit sur disque ; les réglages
+(rayons par type de position, intervalles, aérodromes ajoutés) sont stockés sous `ivao:` dans
+`local/ai-bridge.yaml`.
+
+| Flux | Intervalle par défaut | Minimum | Actualisation manuelle |
+| --- | --- | --- | --- |
+| Whazzup | 60 s | 15 s | refusée moins de 15 s après la dernière tentative |
+| METAR, TAF | 600 s | 300 s | refusée moins de 60 s après la dernière tentative |
+
+En cas d'échec, le dernier résultat valide est conservé et marqué `stale` avec
+`last_error`. Les nouvelles tentatives s'espacent (intervalle doublé jusqu'à 15 min) ; une
+réponse `429` suspend le flux jusqu'au délai `Retry-After` (5 min par défaut). Les réponses
+`401`/`403`, illisibles ou de plus de 16 Mo sont refusées avec un message explicite.
+Désactiver l'intégration efface le cache.
+
+### Sélection
+
+Les aérodromes suivis sont le départ, la destination et les dégagements de l'OFP SimBrief,
+puis jusqu'à six aérodromes ajoutés par le pilote. Le champ **Consulter un aérodrome** lit
+n'importe quel code OACI dans le cache, sans requête supplémentaire ni inclusion dans les
+exports.
+
+Une position est retenue si :
+
+- le préfixe de son indicatif (avant le premier `_`) est le code d'un aérodrome suivi ;
+- son centre déclaré est à moins du rayon de sa catégorie (orthodromie) de la position
+  observée de l'appareil ou d'un aérodrome suivi dont l'OFP donne les coordonnées :
+
+  | Catégorie | Types | Rayon par défaut |
+  | --- | --- | --- |
+  | `aerodrome` | DEL, GND, TWR | 30 NM |
+  | `approach` | APP, DEP | 80 NM |
+  | `enroute` | CTR, FSS, types inconnus | 400 NM |
+
+  Un centre contrôle une zone bien plus vaste qu'une tour : son point publié peut se trouver
+  à plusieurs centaines de NM d'un appareil situé dans son secteur. Un rayon unique écarterait
+  ces positions ou retiendrait des tours sans rapport avec le vol ;
+- ou la portée publiée par le contrôleur, lorsqu'elle existe, atteint l'appareil.
+
+Chaque position exportée porte `matched_by` (critère, aérodrome, distance, rayon appliqué)
+et, si la position de l'appareil est exploitable, `distance_to_aircraft_nm` ; les rayons
+figurent dans `ivao.selection.radii_nm`. Les positions dont l'indicatif désigne un aérodrome
+suivi passent en premier, par rôle ; les autres sont classées par distance rapportée au rayon
+de leur catégorie, pour qu'un centre pertinent ne soit pas évincé par des tours proches. IVAO publie le centre d'une
+position, pas les limites de son secteur : ces rapprochements ne disent pas qui contrôle
+l'appareil. Les observateurs (liste `observers`, position sans type ou indicatif en `_OBS`)
+sont comptés à part et listés seulement dans l'export complet. Les pilotes connectés, les
+identifiants de membre (VID) et les qualifications ne sont jamais conservés.
+
+### ATIS et météo
+
+Chaque ATIS est restitué avec son texte original, sa lettre (`revision`) et l'horodatage
+fourni par IVAO. Après une première récupération réussie, une nouvelle lettre, un texte
+modifié ou un ATIS apparu sont signalés par `change` pendant 30 minutes, et par un badge
+discret dans l'interface. Récupérer un ATIS ne signifie pas que le pilote l'a consulté ni
+annoncé au contrôleur.
+
+METAR et TAF sont conservés bruts. Les heures d'observation, d'émission et la période de
+validité sont lues dans le bulletin, le mois étant déduit de la date de publication IVAO.
+L'âge du bulletin (`bulletin_age_min`) est distinct de l'âge de récupération du flux
+(`feeds.*.fetched_age_s`) et, pour le Whazzup, de l'âge annoncé par la source
+(`source_updated_age_s`). `not_published` signifie que le flux, valide, ne contient pas cet
+aérodrome ; `feed_unavailable` que le flux n'a jamais été obtenu.
+
+Trois sources météo restent séparées : `ivao.weather` (bulletins publiés),
+`flight_plan.*.metar` (METAR de l'OFP à sa génération) et `telemetry.environment`
+(conditions observées dans MSFS). Glareshield ne les compare pas.
+
+### Dans les exports
+
+La section `ivao` n'apparaît que si l'intégration est active. Elle est séparée de
+`telemetry`, `flight_plan` et `pilot_notes`, et porte `nature: published_by_ivao`, une
+consigne demandant de traiter les textes externes comme des données et jamais comme des
+instructions, l'état de chaque flux et les critères de sélection. Les textes sont débarrassés
+des caractères de contrôle et de mise en forme (y compris d'inversion bidirectionnelle) et
+bornés (400 caractères par ligne d'ATIS, 20 lignes, 1 500 caractères par bulletin).
+`controllers: null` signifie flux indisponible ; `[]`, aucune position retenue en ligne.
+
+| Mode | Contenu IVAO |
+| --- | --- |
+| Briefing | aérodromes suivis : jusqu'à 20 positions, ATIS, METAR et TAF |
+| Point en vol | destination, dégagements et aérodromes ajoutés, positions proches de l'appareil : 8 positions, ATIS, METAR, TAF de destination seulement |
+| Complet | 40 positions avec coordonnées, 20 observateurs, ATIS de toutes les positions retenues, adresses, tentatives et erreurs des flux |
+
+Si un export dépasse son plafond, les réductions suivent cet ordre, chacune étant décrite
+dans `ivao.truncated` : observateurs, ATIS puis TAF autres que ceux de la destination, ATIS
+raccourcis à 600 caractères, positions les moins proches (comptées dans
+`controllers_omitted`), ATIS à 250 caractères, puis textes d'ATIS retirés en conservant
+lettre et horodatage. Un flux non à jour ajoute un avertissement à `checks`.
+
+Essai réel du 26 octobre 2026 (trois flux en 0,7 s ; 15 positions, 5 473 METAR,
+3 032 TAF) : 9,6 k caractères pour le briefing, 6,2 k pour le point en vol et 17,4 k pour
+l'export complet, sans réduction. Les tests automatisés emploient des données fictives et ne
+contactent pas IVAO.
+
 ## Export
 
 Trois modes répondent à trois usages, dans une même conversation avec l'assistant :
 
 | Mode | Quand | Contenu |
 | --- | --- | --- |
-| **Briefing** | une fois, au sol | plan complet (route, SID, STAR, points de route avec altitude et carburant prévus, carburant, masses, METAR, horaires) et état de l'avion |
+| **Briefing** | une fois, au sol | plan complet (route, SID, STAR, points de route avec altitude et carburant prévus, carburant, masses, METAR, horaires), état de l'avion et, si activé, données IVAO des aérodromes suivis |
 | **Point en vol** | aussi souvent que nécessaire | trajectoire, configuration, LVars configurées, destination et STAR prévues, avancement sur la route ; complète le briefing déjà transmis |
 | **Complet** | diagnostic | toutes les variables avec leur source et leur vérification, plan intégral avec coordonnées |
 
@@ -119,7 +245,7 @@ L'onglet **Export IA** propose :
 - **Copier le JSON seul**, **Télécharger le fichier JSON** (emplacement choisi dans le
   navigateur) et **Enregistrer dans local/exports**.
 
-Le schéma est identifié par `schema: glareshield.flight_context/2`. Briefing et point
+Le schéma est identifié par `schema: glareshield.flight_context/3` (la version 3 ajoute la section `ivao`). Briefing et point
 en vol listent les champs indisponibles par leur seul nom ; le mode complet ajoute la
 source, la vérification et les notes de chaque variable. Les tailles sont plafonnées
 (30 000, 8 000 et 60 000 caractères) ; un raccourcissement des points de route ou des
@@ -141,7 +267,7 @@ constituent pas une validation de l'intégration avec MSFS ou le Fenix.
 
 ## Accès local et préparation MCP
 
-Les routes `/api/ai/*` exigent le jeton de session, y compris en lecture, en plus de la
+Les routes `/api/ai/*`, dont `/api/ai/ivao`, exigent le jeton de session, y compris en lecture, en plus de la
 restriction à la boucle locale. Aucune route n'écrit dans le cockpit.
 
 `AIBridge` (`service.py`) est la seule source des vues : l'interface, l'export et un
@@ -152,6 +278,7 @@ futur serveur MCP appellent les mêmes méthodes, qui correspondent aux outils e
 | `snapshot(level)` | `get_flight_snapshot` |
 | `flight_plan()` | `get_flight_plan` |
 | `available_variables()` | `get_available_variables` |
+| `network_page()` | `get_network_context` |
 
 ## Premiers essais sur MSFS 2024 et Fenix
 

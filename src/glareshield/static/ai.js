@@ -1,5 +1,5 @@
-// AI Bridge views: live flight context, SimBrief plan, export and variable catalogue.
-const AI_PAGES = ['Vol en cours', 'Plan de vol', 'Export IA', 'Variables IA'];
+// AI Bridge views: live flight context, SimBrief plan, IVAO network, export and variable catalogue.
+const AI_PAGES = ['Vol en cours', 'Plan de vol', 'Réseau IVAO', 'Export IA', 'Variables IA'];
 const STATUS_LABELS = {
   observed: 'Observée',
   simulated: 'Simulée',
@@ -24,12 +24,12 @@ const GROUP_LABELS = {
   time: 'Heure',
   fenix: 'Variables Fenix configurées',
 };
-let ai = { status: null, context: null, settings: null, variables: null, level: 'auto', preview: null };
+let ai = { status: null, context: null, settings: null, variables: null, level: 'auto', preview: null, network: null, lookup: null };
 const LEVELS = {
   auto: ['Automatique', 'Briefing au sol, point en vol une fois en l’air.'],
-  briefing: ['Briefing', 'À envoyer une fois, au sol : plan complet (route, SID, STAR, points de route, carburant, masses, METAR, horaires) et état de l’avion.'],
-  flight: ['Point en vol', 'À envoyer aussi souvent que nécessaire : trajectoire, configuration, autopilote, prochains points, distance restante et carburant comparé au plan. Complète le briefing déjà transmis.'],
-  full: ['Complet', 'Diagnostic : toutes les variables avec leur source et leur vérification, et le plan intégral.'],
+  briefing: ['Briefing', 'À envoyer une fois, au sol : plan complet (route, SID, STAR, points de route, carburant, masses, METAR, horaires), état de l’avion et, si IVAO est activé, contrôleurs, ATIS, METAR et TAF des aérodromes suivis.'],
+  flight: ['Point en vol', 'À envoyer aussi souvent que nécessaire : trajectoire, configuration, autopilote, prochains points, distance restante, carburant comparé au plan et, si IVAO est activé, contrôleurs proches, ATIS et météo de destination. Complète le briefing déjà transmis.'],
+  full: ['Complet', 'Diagnostic : toutes les variables avec leur source et leur vérification, le plan intégral et les données IVAO avec leur provenance.'],
 };
 const ENTRY_LEVELS = { essential: 'briefing et vol', detailed: 'complet seulement' };
 
@@ -72,6 +72,7 @@ async function loadAI(full = false) {
   if (full || !ai.settings) ai.settings = await api('ai/settings');
   if (tab === 'Variables IA' && (full || !ai.variables || !isEditing())) ai.variables = await api('ai/variables');
   if (tab === 'Export IA' && !isEditing()) ai.preview = await api('ai/context?level=' + ai.level);
+  if (tab === 'Réseau IVAO' && (full || !ai.network || !isEditing())) ai.network = await api('ai/ivao');
 }
 REFRESH_HOOKS.push(async () => {
   if (AI_PAGES.includes(tab) || tab === 'Tableau de bord') await loadAI();
@@ -178,6 +179,7 @@ function liveView(view) {
   }
   if (doc.derived) progressCard(right, doc.derived, doc.flight_plan);
   planSummary(right, doc.flight_plan);
+  networkSummary(right, doc.ivao);
   notesCard(right);
   let info = card(right, 'Lecture des statuts', 'Le liseré de chaque mesure reprend la couleur de son statut');
   for (let [status, text] of [
@@ -542,9 +544,209 @@ function variablesView(view) {
   lvars.append(details);
 }
 
+// IVAO network: published data shown as received; untrusted texts are only ever inserted as text.
+const FEED_STATUS = { current: ['À jour', 'ok'], stale: ['Périmé', 'warn'], unavailable: ['Indisponible', 'danger'] };
+const FEED_NAMES = { whazzup: 'Contrôleurs et ATIS', metar: 'METAR', taf: 'TAF' };
+const ROLE_LABELS = { origin: 'Départ', destination: 'Destination', alternate: 'Dégagement', manual: 'Ajouté' };
+const MATCH_LABELS = {
+  callsign_prefix: m => 'indicatif ' + m.airport,
+  distance_to_aircraft: m => m.distance_nm + ' NM de l’appareil',
+  distance_to_airport: m => m.distance_nm + ' NM de ' + m.airport,
+  published_range: m => 'portée publiée ' + m.range_nm + ' NM',
+};
+const CHANGE_LABELS = {
+  new: () => 'Nouvel ATIS',
+  revision: c => 'Nouvelle révision' + (c.previous_revision ? ' (était ' + c.previous_revision + ')' : ''),
+  text: () => 'Texte modifié',
+};
+function utcText(value) {
+  return value ? value.replace('T', ' ').replace('Z', ' UTC') : '—';
+}
+function durationText(s) {
+  return s < 90 ? s + ' s' : s < 5400 ? Math.round(s / 60) + ' min' : Math.round(s / 3600) + ' h';
+}
+function matchText(item) {
+  return item.matched_by.map(m => MATCH_LABELS[m.basis]?.(m) || m.basis).join(' ; ');
+}
+function feedNote(feed) {
+  let parts = [];
+  if (feed.fetched_age_s !== undefined) parts.push('récupéré il y a ' + durationText(feed.fetched_age_s));
+  if (feed.source_updated_age_s !== undefined) parts.push('source mise à jour il y a ' + durationText(feed.source_updated_age_s));
+  return feed.last_error || parts.join(' · ') || feed.reason || '';
+}
+function networkSummary(parent, section) {
+  let s = ai.status?.ivao;
+  if (!s?.enabled) return;
+  let c = card(parent, 'Réseau IVAO', 'Données publiées par IVAO, distinctes de la télémétrie'),
+    dl = el('dl', null, { className: 'kv' });
+  for (let [name, status] of Object.entries(s.feeds)) dl.append(el('dt', FEED_NAMES[name]), el('dd', FEED_STATUS[status][0]));
+  if (section?.controllers) dl.append(el('dt', 'Positions retenues'), el('dd', section.controllers.map(item => item.callsign).join(', ') || 'aucune'));
+  c.append(dl);
+  if (s.atis_changes) c.append(el('div', s.atis_changes + ' ATIS modifié(s) depuis la première récupération.', { className: 'banner' }));
+  let bar = cardActions(c);
+  action('Ouvrir Réseau IVAO', () => { tab = 'Réseau IVAO'; render(); }, bar, 'small');
+}
+async function saveNetwork(changes, text) {
+  await api('ai/settings', 'PUT', { ...ai.settings, ivao: { ...ai.settings.ivao, ...changes } });
+  if (text) message(text);
+  await reloadAI();
+}
+async function refreshNetwork() {
+  let r = await api('ai/ivao/refresh', 'POST', {}),
+    results = Object.entries(r.results),
+    errors = results.filter(([, v]) => v.result === 'error'),
+    fetched = results.filter(([, v]) => v.result === 'fetched').map(([k]) => FEED_NAMES[k]);
+  ai.network = r;
+  if (errors.length) message(errors.map(([, v]) => v.message).join(' '), true);
+  else message(fetched.length ? 'Actualisé : ' + fetched.join(', ') + '.' : 'Données déjà récentes : intervalle minimal IVAO respecté.');
+  render();
+}
+function bulletinBlock(parent, label, bulletin, kind) {
+  parent.append(el('h4', label));
+  if (bulletin.status === 'feed_unavailable') return parent.append(el('p', 'Flux ' + kind + ' indisponible.', { className: 'muted' }));
+  if (bulletin.status === 'not_published') return parent.append(el('p', 'Aucun ' + kind + ' publié par IVAO pour cet aérodrome.', { className: 'muted' }));
+  parent.append(el('div', bulletin.raw, { className: 'route' }));
+  let times = [];
+  if (bulletin.observed_utc) times.push('observé ' + utcText(bulletin.observed_utc));
+  if (bulletin.issued_utc) times.push('émis ' + utcText(bulletin.issued_utc));
+  if (bulletin.valid_from_utc) times.push('valide du ' + utcText(bulletin.valid_from_utc) + ' au ' + utcText(bulletin.valid_to_utc));
+  if (bulletin.bulletin_age_min !== undefined) times.push('bulletin âgé de ' + durationText(bulletin.bulletin_age_min * 60));
+  if (times.length) parent.append(el('small', times.join(' · '), { className: 'hint' }));
+}
+function atisBlock(parent, item) {
+  let head = el('div', null, { className: 'row' });
+  head.append(el('strong', item.station, { className: 'mono' }));
+  if (item.revision) head.append(badge('Information ' + item.revision, 'accent'));
+  if (item.change) head.append(badge(CHANGE_LABELS[item.change.kind]?.(item.change) || 'Modifié', 'warn'));
+  head.append(el('small', 'émis ' + utcText(item.source_timestamp_utc) + (item.source_age_min !== undefined ? ' (il y a ' + durationText(item.source_age_min * 60) + ')' : ''), { className: 'hint' }));
+  parent.append(head);
+  if (item.lines) parent.append(el('div', item.lines.join('\n'), { className: 'route', style: 'white-space:pre-wrap' }));
+}
+function airportCard(parent, doc, weather, lookup = false) {
+  let extra = lookup ? null : badge(weather.roles.map(role => ROLE_LABELS[role] || role).join(' · '), weather.roles.includes('destination') ? 'accent' : '');
+  let c = card(parent, weather.icao, lookup ? 'Consultation ponctuelle, non incluse dans les exports' : null, extra);
+  bulletinBlock(c, 'METAR publié', weather.metar, 'METAR');
+  if (weather.taf) bulletinBlock(c, 'TAF publié', weather.taf, 'TAF');
+  c.append(el('h4', 'ATIS'));
+  let atis = (doc.atis || []).filter(item => item.airport === weather.icao);
+  if (doc.controllers === null) c.append(el('p', 'Flux Whazzup indisponible.', { className: 'muted' }));
+  else if (!atis.length) c.append(el('p', 'Aucun ATIS publié par une position de cet aérodrome.', { className: 'muted' }));
+  for (let item of atis) atisBlock(c, item);
+  let positions = (doc.controllers || []).filter(item => item.matched_by.some(m => m.basis === 'callsign_prefix' && m.airport === weather.icao));
+  if (positions.length) {
+    c.append(el('h4', 'Positions de l’aérodrome'));
+    let row = el('div', null, { className: 'row' });
+    for (let item of positions) row.append(badge(item.callsign + (item.frequency_mhz ? ' · ' + item.frequency_mhz.toFixed(3) : ''), 'ok'));
+    c.append(row);
+  }
+}
+function controllersCard(parent, doc) {
+  let position = doc.selection.aircraft_position,
+    c = card(parent, 'Positions en ligne retenues', 'Rayons : aérodrome ' + doc.selection.radii_nm.aerodrome + ' NM, approche ' + doc.selection.radii_nm.approach + ' NM, en route ' + doc.selection.radii_nm.enroute + ' NM · position de l’appareil : ' + (STATUS_LABELS[position.status] || position.status).toLowerCase() + (position.reason ? ' (' + position.reason + ')' : ''));
+  if (doc.controllers === null) {
+    c.append(el('p', 'Flux Whazzup indisponible : la présence de contrôleurs est inconnue.'));
+    return;
+  }
+  if (!doc.controllers.length) c.append(el('p', 'Aucune position opérationnelle en ligne ne répond aux critères.'));
+  else {
+    let wrap = el('div', null, { className: 'table-wrap' }),
+      table = el('table', null),
+      tbody = el('tbody', null);
+    table.innerHTML = '<thead><tr><th>Indicatif</th><th>Type</th><th>Fréquence</th><th>Retenue par</th><th>Distance à l’appareil</th></tr></thead>';
+    for (let item of doc.controllers) {
+      let tr = el('tr', null);
+      tr.append(el('td', item.callsign, { className: 'mono' }), el('td', item.position || '—'), el('td', item.frequency_mhz ? item.frequency_mhz.toFixed(3) : '—', { className: 'value' }), el('td', matchText(item)), el('td', item.distance_to_aircraft_nm !== undefined ? item.distance_to_aircraft_nm + ' NM' : '—', { className: 'value' }));
+      tbody.append(tr);
+    }
+    table.append(tbody);
+    wrap.append(table);
+    c.append(wrap);
+  }
+  if (doc.controllers_omitted) c.append(el('p', doc.controllers_omitted + ' position(s) supplémentaire(s) non affichée(s).', { className: 'muted' }));
+  if (doc.observers?.length) {
+    let details = el('details', null);
+    details.append(el('summary', doc.observers_selected + ' observateur(s), sans position opérationnelle'));
+    for (let item of doc.observers) details.append(el('div', item.callsign + ' — ' + matchText(item), { className: 'mono muted' }));
+    c.append(details);
+  }
+  help(c, doc.selection.method);
+}
+function lookupCard(parent, settings) {
+  let c = card(parent, 'Consulter un aérodrome', 'Lecture des données déjà récupérées : aucune requête supplémentaire vers IVAO'),
+    grid = el('div', null, { className: 'grid' }),
+    code = field(grid, 'Code OACI', ai.lookup?.weather.airports[0]?.icao || '');
+  c.append(grid);
+  let bar = cardActions(c);
+  action('Consulter', async () => {
+    ai.lookup = await api('ai/ivao/airport/' + encodeURIComponent(code().trim()));
+    render();
+  }, bar, 'small primary');
+  action('Suivre dans les exports', async () => {
+    let icao = code().trim().toUpperCase();
+    if ((settings.airports || []).includes(icao)) throw Error(icao + ' est déjà suivi.');
+    await saveNetwork({ airports: [...(settings.airports || []), icao] }, icao + ' ajouté aux aérodromes suivis.');
+  }, bar, 'small');
+  if (ai.lookup) airportCard(parent, ai.lookup, ai.lookup.weather.airports[0], true);
+}
+function networkSettings(parent, settings) {
+  let c = card(parent, 'Réglages IVAO', 'Lecture seule, sans authentification ; réglages conservés dans local/ai-bridge.yaml'),
+    grid = el('div', null, { className: 'grid' });
+  c.append(grid);
+  let enabled = field(grid, 'Récupérer les données publiques IVAO', settings.enabled, 'checkbox'),
+    aerodrome = field(grid, 'Rayon DEL, GND, TWR (NM)', settings.radius_aerodrome_nm ?? 30, 'number'),
+    approach = field(grid, 'Rayon APP, DEP (NM)', settings.radius_approach_nm ?? 80, 'number'),
+    enroute = field(grid, 'Rayon CTR, FSS (NM)', settings.radius_enroute_nm ?? 400, 'number'),
+    whazzup = field(grid, 'Intervalle Whazzup (s, 15 minimum)', settings.whazzup_interval_s ?? 60, 'number'),
+    weather = field(grid, 'Intervalle METAR et TAF (s, 300 minimum)', settings.weather_interval_s ?? 600, 'number');
+  help(c, 'Les rayons portent sur le centre déclaré de chaque position, autour de l’appareil et des aérodromes suivis : un centre contrôle une zone bien plus vaste qu’une tour. Départ, destination et dégagements viennent de l’OFP SimBrief. Aérodromes ajoutés, inclus dans les exports (6 au plus) :');
+  let row = el('div', null, { className: 'row' });
+  if (!settings.airports?.length) row.append(el('span', 'aucun', { className: 'muted' }));
+  for (let icao of settings.airports || [])
+    action('Retirer ' + icao, () => saveNetwork({ airports: settings.airports.filter(item => item !== icao) }, icao + ' retiré.'), row, 'small ghost');
+  c.append(row);
+  let bar = cardActions(c);
+  action('Enregistrer', () => saveNetwork({ enabled: enabled(), radius_aerodrome_nm: aerodrome(), radius_approach_nm: approach(), radius_enroute_nm: enroute(), whazzup_interval_s: whazzup(), weather_interval_s: weather() }, 'Réglages IVAO enregistrés.'), bar, 'small primary');
+}
+function networkView(view) {
+  let page = ai.network || {},
+    settings = page.settings || {},
+    doc = page.view;
+  if (!page.enabled) {
+    let box = el('div', null, { className: 'banner warn' }),
+      text = el('div', null),
+      row = el('div', null, { className: 'row' });
+    text.append(el('strong', 'Intégration IVAO désactivée. '), 'Aucune requête n’est envoyée à IVAO et les exports ne contiennent aucune donnée réseau.');
+    action('Activer', () => saveNetwork({ enabled: true }, 'Intégration IVAO activée.'), row, 'small primary');
+    box.append(text, row);
+    view.append(box);
+  }
+  if (doc) {
+    let tiles = el('div', null, { className: 'tiles' });
+    for (let [name, feed] of Object.entries(doc.feeds)) {
+      let [label, kind] = FEED_STATUS[feed.status],
+        tile = el('div', null, { className: 'tile' }),
+        strong = el('strong', null);
+      strong.append(el('span', null, { className: 'dot ' + (kind === 'danger' ? 'warn' : kind) }), label);
+      tile.append(el('span', FEED_NAMES[name]), strong, el('small', feedNote(feed)));
+      tiles.append(tile);
+    }
+    view.append(tiles);
+    help(view, 'Bulletins publiés par IVAO. Le METAR inclus dans l’OFP figure dans Plan de vol, les conditions observées dans MSFS dans Vol en cours.');
+    if (!doc.weather.airports.length) view.append(el('div', 'Aucun aérodrome suivi : importer un OFP dans Plan de vol ou ajouter un aérodrome ci-dessous.', { className: 'empty' }));
+    let grid = el('div', null, { className: 'groups' });
+    view.append(grid);
+    for (let weather of doc.weather.airports) airportCard(grid, doc, weather);
+    controllersCard(view, doc);
+    lookupCard(view, settings);
+    help(view, 'Glareshield restitue ces données avec leur provenance ; leur interprétation revient à l’assistant. Un ATIS affiché ici n’a pas pour autant été consulté par le pilote ni annoncé au contrôleur.');
+  }
+  networkSettings(view, settings);
+}
+
 const AI_VIEWS = {
   'Vol en cours': ['plane', 'Télémétrie qualifiée et plan prévu, tels qu’ils seront transmis à l’assistant', liveView, true],
   'Plan de vol': ['plan', 'Dernier OFP SimBrief, importé manuellement', planView, false],
+  'Réseau IVAO': ['network', 'Contrôleurs en ligne, ATIS et météo publiés par IVAO, en lecture seule', networkView, true],
   'Export IA': ['export', 'Contexte prêt à coller dans ChatGPT, Claude ou un autre assistant', exportView, false],
   'Variables IA': ['variables', 'Catalogue lu dans le simulateur, vérifications et LVars locales', variablesView, false],
 };
@@ -554,13 +756,20 @@ for (let [name, [iconName, subtitle, renderer, live]] of Object.entries(AI_VIEWS
     subtitle,
     render: renderer,
     live,
-    actions: bar => action('Copier pour l’IA', () => copyForChat(name === 'Export IA' ? ai.level : 'auto'), bar, 'primary', 'copy'),
-    navBadge: name === 'Vol en cours' ? () => (ai.status?.mode === 'scenario' ? badge('Démo', 'sim') : null) : null,
+    actions: bar => {
+      if (name === 'Réseau IVAO' && ai.network?.enabled) action('Actualiser', refreshNetwork, bar, '', 'refresh');
+      action('Copier pour l’IA', () => copyForChat(name === 'Export IA' ? ai.level : 'auto'), bar, 'primary', 'copy');
+    },
+    navBadge:
+      name === 'Vol en cours' ? () => (ai.status?.mode === 'scenario' ? badge('Démo', 'sim') : null)
+      : name === 'Réseau IVAO' ? () => (ai.status?.ivao?.atis_changes ? badge('ATIS', 'warn') : null)
+      : null,
   };
 VIEWS['Vol en cours'].summary = dashboardSummary;
 const AI_READY = {
   'Vol en cours': () => ai.context,
   'Plan de vol': () => true,
+  'Réseau IVAO': () => ai.network,
   'Export IA': () => ai.preview,
   'Variables IA': () => ai.variables,
 };

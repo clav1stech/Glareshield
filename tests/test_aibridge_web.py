@@ -96,3 +96,43 @@ def test_simbrief_refresh_without_identifier_is_explicit(tmp_path):
     with client:
         response = client.post('/api/ai/simbrief/refresh', json={}, headers=headers)
         assert response.status_code == 502 and 'identifiant' in response.json()['detail']
+
+
+def test_ivao_routes_are_token_protected_disabled_by_default_and_validated(tmp_path):
+    import httpx
+    runtime, client, headers = client_and_headers(tmp_path)
+    requests = []
+
+    def network(request):
+        requests.append(request.url.path)
+        if request.url.path.endswith('whazzup'):
+            return httpx.Response(200, json={'updatedAt': '2026-10-26T06:00:00Z', 'clients': {'atcs': [
+                {'callsign': 'XXNC_TWR', 'atcSession': {'frequency': 118.7, 'position': 'TWR'},
+                 'lastTrack': {'latitude': 43.66, 'longitude': 7.22}}]}})
+        return httpx.Response(200, json=[{'airportIcao': 'XXNC', 'metar': 'XXNC 260600Z 09006KT CAVOK 20/12 Q1015',
+                                          'taf': 'XXNC 260500Z 2606/2712 09008KT CAVOK'}])
+    runtime.ai.ivao.transport = httpx.MockTransport(network)
+    with client:
+        assert client.get('/api/ai/ivao').status_code == 403
+        page = client.get('/api/ai/ivao', headers=headers).json()
+        assert page['enabled'] is False and page['view'] is None
+        assert 'ivao' not in client.get('/api/ai/context?level=full', headers=headers).json()
+        assert client.post('/api/ai/ivao/refresh', json={}, headers=headers).status_code == 400
+        assert client.get('/api/ai/ivao/airport/XXNC', headers=headers).status_code == 400
+        settings = client.get('/api/ai/settings', headers=headers).json()
+        bad = {**settings, 'ivao': {**settings['ivao'], 'enabled': True, 'whazzup_interval_s': 5}}
+        assert client.put('/api/ai/settings', json=bad, headers=headers).status_code == 400
+        good = {**settings, 'ivao': {**settings['ivao'], 'enabled': True, 'airports': ['xxnc']}}
+        assert client.put('/api/ai/settings', json=good, headers=headers).status_code == 200
+        assert runtime.ai.ivao.task is None and requests == []
+        refreshed = client.post('/api/ai/ivao/refresh', json={}, headers=headers).json()
+        assert {item['result'] for item in refreshed['results'].values()} == {'fetched'}
+        assert refreshed['view']['controllers'][0]['callsign'] == 'XXNC_TWR'
+        again = client.post('/api/ai/ivao/refresh', json={}, headers=headers).json()
+        assert {item['result'] for item in again['results'].values()} == {'skipped'} and len(requests) == 3
+        lookup = client.get('/api/ai/ivao/airport/xxnc', headers=headers).json()
+        assert lookup['weather']['airports'][0]['metar']['status'] == 'published'
+        assert client.get('/api/ai/ivao/airport/XX1', headers=headers).status_code == 400
+        context = client.get('/api/ai/context?level=briefing', headers=headers).json()
+        assert context['ivao']['weather']['airports'][0]['icao'] == 'XXNC'
+        assert client.get('/api/ai/status', headers=headers).json()['ivao']['feeds']['whazzup'] == 'current'

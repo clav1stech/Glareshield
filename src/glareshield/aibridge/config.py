@@ -1,11 +1,12 @@
 """Private AI Bridge settings stored outside the lighting configuration."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from ..config import ConfigurationLoader, atomic_write
 from ..model import StrictModel
@@ -33,6 +34,27 @@ class LVarEntry(StrictModel):
                      'lvar', self.note, dict(self.values), self.validated)
 
 
+class IVAOSettings(StrictModel):
+    """Optional read-only IVAO network data, independent from the SimConnect reading."""
+    enabled: bool = False
+    # Distances to the declared centre of a position, by type: a centre covers far more than a tower.
+    radius_aerodrome_nm: int = Field(default=30, ge=5, le=200)
+    radius_approach_nm: int = Field(default=80, ge=10, le=300)
+    radius_enroute_nm: int = Field(default=400, ge=50, le=1500)
+    # IVAO allows one Whazzup download every 15 s at most.
+    whazzup_interval_s: int = Field(default=60, ge=15, le=900)
+    weather_interval_s: int = Field(default=600, ge=300, le=3600)
+    airports: list[str] = Field(default_factory=list, max_length=6)
+
+    @field_validator('airports')
+    @classmethod
+    def airports_valid(cls, value):
+        codes = [code.strip().upper() for code in value]
+        if any(not re.fullmatch(r'[A-Z0-9]{4}', code) for code in codes) or len(codes) != len(set(codes)):
+            raise ValueError('Codes OACI invalides ou dupliqués.')
+        return codes
+
+
 class AIBridgeSettings(StrictModel):
     version: int = 1
     enabled: bool = False
@@ -42,6 +64,7 @@ class AIBridgeSettings(StrictModel):
     disabled: list[str] = Field(default_factory=list)
     validated: list[str] = Field(default_factory=list)
     lvars: list[LVarEntry] = Field(default_factory=list)
+    ivao: IVAOSettings = Field(default_factory=IVAOSettings)
 
     @model_validator(mode='after')
     def references_valid(self):

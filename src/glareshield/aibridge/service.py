@@ -11,6 +11,7 @@ from ..config import atomic_write
 from .catalog import GROUPS, STANDARD, Entry
 from .config import AIBridgeSettings, load_settings, save_settings
 from .context import LEVELS, build_context, chat_text, iso, serialize
+from .ivao import ICAO, IVAOError, IVAOService, airports_of_interest
 from .scenario import PHASES, ScenarioPlayer, phase
 from .simbrief import FlightPlanStore, parse_ofp
 from .telemetry import TelemetryStore, qualify
@@ -20,7 +21,7 @@ NOTES_MAX = 2000
 
 
 class AIBridge:
-    def __init__(self, root: Path, clock=time.time, transport=None):
+    def __init__(self, root: Path, clock=time.time, transport=None, network_transport=None):
         self.root = root
         self.clock = clock
         self.path = root/'local/ai-bridge.yaml'
@@ -37,6 +38,7 @@ class AIBridge:
         self.notes_path = root/'local/state/pilot-notes.json'
         self.notes = self.load_notes()
         self.listeners = []
+        self.ivao = IVAOService(clock, network_transport, self.settings.ivao)
 
     # Catalogue
 
@@ -54,6 +56,7 @@ class AIBridge:
         previous = self.definitions()
         self.settings = save_settings(self.path, settings)
         self.settings_error = None
+        self.ivao.configure(self.settings.ivao)
         if not self.settings.enabled:
             self.live.clear()
         if self.definitions() != previous:
@@ -112,12 +115,56 @@ class AIBridge:
             raise ValueError('Niveau d’export inconnu.')
         return level
 
+    # IVAO network data: collected by its own loop, read here from the shared cache only
+
+    def aircraft_position(self, now: float) -> dict:
+        """Observed position used to select nearby IVAO stations, with its status."""
+        store, fields = self.store(), {}
+        for entry in self.entries():
+            if entry.key in ('latitude', 'longitude'):
+                fields[entry.key] = qualify(entry, store, now)
+        lat, lon = fields.get('latitude'), fields.get('longitude')
+        if not lat or not lon:
+            return {'status': 'unavailable', 'reason': 'Position non lue par AI Bridge'}
+        if lat['status'] not in ('observed', 'simulated') or lon['status'] not in ('observed', 'simulated'):
+            worst = lat if lat['status'] not in ('observed', 'simulated') else lon
+            return {'status': worst['status'], 'reason': worst.get('reason') or 'Position non exploitable'}
+        return {'status': lat['status'], 'age_s': max(lat['age_s'], lon['age_s']),
+                'latitude': lat['value'], 'longitude': lon['value']}
+
+    def network(self, level: str, now: float | None = None) -> dict | None:
+        now = self.clock() if now is None else now
+        return self.ivao.view(level, airports_of_interest(self.plan.plan, self.settings.ivao.airports),
+                              self.aircraft_position(now), now)
+
+    def network_page(self) -> dict:
+        """get_network_context: IVAO data for the interface, with full provenance."""
+        now = self.clock()
+        return {**self.ivao.summary(now), 'settings': self.settings.ivao.model_dump(mode='json'),
+                'view': self.network('full', now)}
+
+    def lookup_airport(self, icao: str) -> dict:
+        """Manual consultation of any airport from the cache; it is not added to the exports."""
+        icao = icao.strip().upper()
+        if not ICAO.match(icao):
+            raise ValueError('Code OACI attendu (4 caractères).')
+        if not self.settings.ivao.enabled:
+            raise IVAOError('Activer l’intégration IVAO pour consulter un aérodrome.')
+        known = next((item for item in airports_of_interest(self.plan.plan, []) if item['icao'] == icao), {})
+        airport = {'icao': icao, 'roles': ['manual']}
+        if 'latitude' in known:
+            airport['latitude'], airport['longitude'] = known['latitude'], known['longitude']
+        now = self.clock()
+        return self.ivao.view('full', [airport], {'status': 'unavailable', 'reason': 'Consultation d’un aérodrome'}, now)
+
     # Read-only views, intended to back future MCP tools one to one
 
     def snapshot(self, level: str = 'auto') -> dict:
         """get_flight_snapshot"""
-        return build_context(self.resolve(level), self.entries(), self.store(), self.plan.plan,
-                             self.plan.describe(self.settings.ofp_max_age_h), self.clock(), self.notes)
+        level, now = self.resolve(level), self.clock()
+        return build_context(level, self.entries(), self.store(), self.plan.plan,
+                             self.plan.describe(self.settings.ofp_max_age_h), now, self.notes,
+                             self.network(level, now))
 
     def flight_plan(self) -> dict:
         """get_flight_plan"""
@@ -162,4 +209,5 @@ class AIBridge:
                 'sizes': {level: len(serialize(self.snapshot(level))) for level in LEVELS},
                 'notes': self.notes,
                 'simbrief_configured': bool(self.settings.simbrief_user),
+                'ivao': self.ivao.summary(),
                 'plan': self.plan.describe(self.settings.ofp_max_age_h)}
