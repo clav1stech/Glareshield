@@ -30,6 +30,7 @@
 !/src/glareshield/simulator.py
 !/src/glareshield/audio.py
 !/src/glareshield/keyboard.py
+!/src/glareshield/overlay.py
 !/src/glareshield/sounds.py
 !/src/glareshield/static/
 /src/glareshield/static/*

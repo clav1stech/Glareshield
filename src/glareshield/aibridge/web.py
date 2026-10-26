@@ -131,6 +131,12 @@ def create_router(bridge, changed=None) -> APIRouter:
             raise HTTPException(400, str(error)) from None
         return {'results': results, **bridge().network_page()}
 
+    @router.post('/ivao/notify-test')
+    async def notify_test():
+        if not bridge().test_notification():
+            raise HTTPException(400, 'Notifications indisponibles dans ce mode de lancement.')
+        return {'ok': True}
+
     @router.get('/ivao/airport/{icao}')
     async def network_airport(icao: str):
         try:

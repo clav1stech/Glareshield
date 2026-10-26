@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 import time
 import logging
 import uuid
@@ -23,6 +24,7 @@ from .engine import Bucket,Engine
 from .simulator import SimulatorSource
 from .audio import AudioSource
 from .keyboard import KeyboardSource
+from .overlay import Overlay
 from .model import Condition,Source
 from .effects import render
 from .aibridge.service import AIBridge
@@ -51,6 +53,7 @@ class Runtime:
         self.simulator=None
         self.lighting_simulator=False
         self.ai=AIBridge(root)
+        self.overlay=None
         log_path=self.root/'local/logs/glareshield.log'
         log_path.parent.mkdir(parents=True,exist_ok=True)
         self.logger=logging.getLogger('glareshield.'+str(id(self)))
@@ -153,6 +156,9 @@ class Runtime:
             self.tasks.append(asyncio.create_task(source.run()))
         self.tasks.extend([asyncio.create_task(self.render_loop()),asyncio.create_task(self.resolve_loop())])
         # Optional IVAO collection: its own task, never awaited by lighting or SimConnect.
+        if sys.platform=='win32' and self.overlay is None:
+            self.overlay=Overlay()
+        self.ai.ivao.notifier=self.overlay.show if self.overlay else None
         self.ai.ivao.attach()
         self.log('Démarrage')
 
@@ -329,6 +335,9 @@ class Runtime:
         self.render_wake.set()
         self.preview=None
         await self.ai.ivao.stop()
+        self.ai.ivao.notifier=None
+        if self.overlay:
+            await asyncio.to_thread(self.overlay.close)
         for task in list(self.test_tasks):
             task.cancel()
         await asyncio.gather(*list(self.test_tasks),return_exceptions=True)

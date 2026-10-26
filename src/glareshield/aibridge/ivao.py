@@ -34,6 +34,8 @@ MAX_BYTES = 16_000_000
 CHANGE_KEEP_S = 1800
 LINE_MAX, LINES_MAX, BULLETIN_MAX = 400, 20, 1500
 ROLES = ('origin', 'destination', 'alternate', 'manual')
+ROLE_LABELS = {'origin': 'départ', 'destination': 'arrivée', 'alternate': 'dégagement', 'manual': 'aérodrome suivi'}
+NOTICES_MAX = 4
 ICAO = re.compile(r'^[A-Z0-9]{4}$')
 CALLSIGN = re.compile(r'^[A-Z0-9][A-Z0-9_-]{1,23}$')
 POSITION = re.compile(r'^[A-Z]{2,5}$')
@@ -358,6 +360,21 @@ def match(station: dict, airports: list[dict], aircraft, radii: dict) -> tuple[l
     return matches, distance
 
 
+def reason(entry: dict, airports: list[dict]) -> str:
+    if entry['basis'] == 'callsign_prefix':
+        roles = next((item['roles'] for item in airports if item['icao'] == entry['airport']), [])
+        return f"{ROLE_LABELS[min(roles, key=ROLES.index)] if roles else 'aérodrome suivi'} {entry['airport']}"
+    if entry['basis'] == 'distance_to_airport':
+        return f"près de {entry['airport']}"
+    return 'près de l’appareil'
+
+
+def notice(event: str, item: dict) -> str:
+    station = item['station']
+    frequency = f" {station['frequency_mhz']:.3f}" if station['frequency_mhz'] is not None else ''
+    return f"{station['callsign']}{frequency} {event} ({', '.join(item['reasons'][:2])})"
+
+
 def rank(item, airports: list[dict], radii: dict) -> tuple:
     """Airport callsigns by role first, then distance relative to the radius of each category."""
     station, matches, distance = item
@@ -381,6 +398,13 @@ class IVAOService:
         self.atis_seen: dict[str, tuple] = {}
         self.atis_changes: dict[str, dict] = {}
         self.baseline = False
+        # Presence watch: callsigns online at the last retrieval and the watched positions among them.
+        self.online: set[str] | None = None
+        self.watched: dict[str, dict] = {}
+        # Set by the bridge: returns (airports, aircraft position or None, route points) of the current flight.
+        self.context = None
+        # Set by the runtime: callable(lines, seconds) showing a notice outside the web interface.
+        self.notifier = None
         self.attached = False
         self.task: asyncio.Task | None = None
         self.wake: asyncio.Event | None = None
@@ -402,6 +426,7 @@ class IVAOService:
             for feed in self.feeds:
                 feed.reset()
             self.atis_seen, self.atis_changes, self.baseline = {}, {}, False
+            self.online, self.watched = None, {}
         self.apply()
 
     def attach(self) -> None:
@@ -501,6 +526,7 @@ class IVAOService:
             if feed is self.whazzup:
                 feed.source_updated_at = parsed['updated_at']
                 self.track_atis(parsed['stations'], fetched)
+                self.track_presence(parsed['stations'])
             return {'result': 'fetched'}
 
     async def refresh(self) -> dict:
@@ -526,6 +552,44 @@ class IVAOService:
         self.atis_seen, self.baseline = current, True
         self.atis_changes = {key: value for key, value in self.atis_changes.items()
                              if key in current and now-value['detected_at'] <= CHANGE_KEEP_S}
+
+    def watch(self, stations: list[dict]) -> dict[str, dict]:
+        """Operational positions that matter to the flight, with the reasons shown in notices."""
+        airports, aircraft, route = self.context() if self.context else ([], None, [])
+        radii = {'aerodrome': self.settings.radius_aerodrome_nm, 'approach': self.settings.radius_approach_nm,
+                 'enroute': self.settings.radius_enroute_nm}
+        result = {}
+        for station in stations:
+            if station['kind'] != 'atc':
+                continue
+            matches, _ = match(station, airports, aircraft, radii)
+            reasons = [reason(entry, airports) for entry in matches]
+            if station['latitude'] is not None and category(station) == 'enroute' and any(
+                    distance_nm(lat, lon, station['latitude'], station['longitude']) <= radii['enroute']
+                    for lat, lon in route):
+                reasons.append('sur la route')
+            if reasons:
+                result[station['callsign']] = {'station': station, 'reasons': list(dict.fromkeys(reasons))}
+        return result
+
+    def track_presence(self, stations: list[dict]) -> None:
+        """Notify connections and disconnections of watched positions, once a first retrieval is the baseline.
+
+        A position that only comes into range was already online, so it is not announced; one that disappears
+        from the whole network is announced if it was watched at the previous retrieval."""
+        online = {station['callsign'] for station in stations if station['kind'] == 'atc'}
+        watched = self.watch(stations)
+        if self.online is not None and self.settings.notifications and self.notifier:
+            lines = [notice('connecté', item) for callsign, item in watched.items() if callsign not in self.online]
+            lines += [notice('déconnecté', item) for callsign, item in self.watched.items() if callsign not in online]
+            if lines:
+                if len(lines) > NOTICES_MAX:
+                    lines = lines[:NOTICES_MAX-1]+[f'… et {len(lines)-NOTICES_MAX+1} autres positions']
+                try:
+                    self.notifier(lines, self.settings.notification_seconds)
+                except Exception:
+                    pass
+        self.online, self.watched = online, watched
 
     # Read-only views
 

@@ -374,3 +374,97 @@ def test_settings_are_validated_and_older_files_still_load(tmp_path):
     path.parent.mkdir(parents=True)
     path.write_text('version: 1\nenabled: true\n', encoding='utf-8')
     assert load_settings(path).ivao == IVAOSettings()
+
+
+# Presence notices
+
+class Notices:
+    def __init__(self):
+        self.shown = []
+
+    def __call__(self, lines, seconds):
+        self.shown.append((lines, seconds))
+
+
+def watching(tmp_path, clock, network, **settings):
+    bridge = bridge_with_network(tmp_path, clock, network, notifications=True, notification_seconds=7, **settings)
+    bridge.ivao.notifier = Notices()
+    return bridge, bridge.ivao.notifier
+
+
+async def retrieve(bridge, clock, network, atcs):
+    clock.now += 60
+    network.payloads['whazzup'] = whazzup(atcs)
+    await bridge.ivao.fetch(bridge.ivao.whazzup)
+
+
+async def test_connection_and_disconnection_of_followed_positions_are_announced(tmp_path):
+    clock, network = Clock(), Network()
+    bridge, notices = watching(tmp_path, clock, network)
+    fly(bridge, clock, 48.7, 2.4)
+    await bridge.ivao.refresh()
+    # The first retrieval is the baseline: positions already online are not announced.
+    assert notices.shown == []
+    online = list(NETWORK['clients']['atcs'])
+    tower = atc('XXPO_TWR', 'TWR', 48.72, 2.38, 118.1)
+    await retrieve(bridge, clock, network, online+[tower])
+    assert notices.shown == [(['XXPO_TWR 118.100 connecté (départ XXPO)'], 7)]
+    await retrieve(bridge, clock, network, [item for item in online if item['callsign'] != 'XXNC_TWR']+[tower])
+    assert notices.shown[-1][0] == ['XXNC_TWR 118.700 déconnecté (arrivée XXNC)']
+    await retrieve(bridge, clock, network, [item for item in online if item['callsign'] != 'XXNC_TWR'])
+    assert notices.shown[-1][0] == ['XXPO_TWR 118.100 déconnecté (départ XXPO)']
+    assert len(notices.shown) == 3
+
+
+async def test_unrelated_positions_and_positions_coming_into_range_are_not_announced(tmp_path):
+    clock, network = Clock(), Network()
+    bridge, notices = watching(tmp_path, clock, network)
+    fly(bridge, clock, 10.0, 10.0)
+    await bridge.ivao.refresh()
+    online = list(NETWORK['clients']['atcs'])
+    # XXFA_CTR was already online: the aircraft coming into its range is not a connection.
+    fly(bridge, clock, 47.0, -4.0)
+    await retrieve(bridge, clock, network, online+[atc('YYYY_APP', 'APP', -33.0, 151.0, 120.0)])
+    assert 'XXFA_CTR' in bridge.ivao.watched and notices.shown == []
+    # An observer connecting at a followed airport is not an operational position.
+    await retrieve(bridge, clock, network, online+[atc('XXNC_X_OBS', 'TWR', 43.66, 7.22, 199.999)])
+    assert notices.shown == []
+
+
+async def test_centre_on_the_planned_route_is_announced_and_many_events_are_grouped(tmp_path):
+    clock, network = Clock(), Network()
+    bridge, notices = watching(tmp_path, clock, network, radius_enroute_nm=50)
+    fly(bridge, clock, 10.0, 10.0)
+    await bridge.ivao.refresh()
+    waypoints = bridge.plan.plan['waypoints']
+    waypoint = waypoints[len(waypoints)//2]
+    online = list(NETWORK['clients']['atcs'])
+    centre = atc('XXRT_CTR', 'CTR', waypoint['latitude'], waypoint['longitude'], 125.5)
+    await retrieve(bridge, clock, network, online+[centre])
+    assert notices.shown[-1][0] == ['XXRT_CTR 125.500 connecté (sur la route)']
+    crowd = [atc(f'XXNC_{index}_APP', 'APP', 43.6, 7.1, 120+index/10) for index in range(6)]
+    await retrieve(bridge, clock, network, online+crowd)
+    lines = notices.shown[-1][0]
+    # Six connections and the route centre leaving: three notices, then a count of the others.
+    assert len(lines) == ivao.NOTICES_MAX and lines[-1] == '… et 4 autres positions'
+
+
+async def test_notifications_are_off_by_default_and_notifier_errors_do_not_break_retrieval(tmp_path):
+    clock, network = Clock(), Network()
+    bridge = bridge_with_network(tmp_path, clock, network)
+    bridge.ivao.notifier = notices = Notices()
+    assert not IVAOSettings().notifications and bridge.test_notification() is True and len(notices.shown) == 1
+    notices.shown.clear()
+    await bridge.ivao.refresh()
+    online = list(NETWORK['clients']['atcs'])
+    await retrieve(bridge, clock, network, online+[atc('XXNC_GND', 'GND', 43.66, 7.22)])
+    assert notices.shown == []
+    bridge.save(AIBridgeSettings(enabled=True, ivao=IVAOSettings(enabled=True, notifications=True)))
+
+    def broken(lines, seconds):
+        raise RuntimeError('no display')
+
+    bridge.ivao.notifier = broken
+    await retrieve(bridge, clock, network, online)
+    await retrieve(bridge, clock, network, online+[atc('XXNC_GND', 'GND', 43.66, 7.22)])
+    assert bridge.ivao.whazzup.error is None

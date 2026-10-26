@@ -39,6 +39,7 @@ class AIBridge:
         self.notes = self.load_notes()
         self.listeners = []
         self.ivao = IVAOService(clock, network_transport, self.settings.ivao)
+        self.ivao.context = self.watch_context
 
     # Catalogue
 
@@ -131,6 +132,22 @@ class AIBridge:
             return {'status': worst['status'], 'reason': worst.get('reason') or 'Position non exploitable'}
         return {'status': lat['status'], 'age_s': max(lat['age_s'], lon['age_s']),
                 'latitude': lat['value'], 'longitude': lon['value']}
+
+    def watch_context(self) -> tuple[list[dict], tuple[float, float] | None, list[tuple[float, float]]]:
+        """Airports, aircraft position and planned route points used to pick the positions worth a notice."""
+        aircraft = self.aircraft_position(self.clock())
+        position = (aircraft['latitude'], aircraft['longitude']) if 'latitude' in aircraft else None
+        route = [(item['latitude'], item['longitude']) for item in (self.plan.plan or {}).get('waypoints', [])
+                 if item.get('latitude') is not None and item.get('longitude') is not None]
+        return airports_of_interest(self.plan.plan, self.settings.ivao.airports), position, route
+
+    def test_notification(self) -> bool:
+        """Show a sample notice so the pilot can check its visibility over the simulator."""
+        if not self.ivao.notifier:
+            return False
+        self.ivao.notifier(['XXNC_TWR 118.700 connecté (arrivée XXNC)', 'Notification de test Glareshield'],
+                           self.settings.ivao.notification_seconds)
+        return True
 
     def network(self, level: str, now: float | None = None) -> dict | None:
         now = self.clock() if now is None else now

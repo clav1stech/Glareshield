@@ -2,6 +2,21 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.1.0] - 2026-10-26
+
+- Notification au premier plan quand une position IVAO suivie se connecte ou se déconnecte
+- Version mineure choisie avec l'accord explicite du propriétaire : nouvelle fonction visible
+  (bande de notification), nouveau module `overlay.py`, nouveaux réglages `ivao.notifications`
+  et `ivao.notification_seconds`, nouvelle route `POST /api/ai/ivao/notify-test`. La version
+  1.0.2, jamais étiquetée, est publiée avec cette livraison.
+- Bande de notification toujours au premier plan, sans focus ni clic, visible par-dessus un
+  simulateur fenêtré ou en plein écran sans bordure (désactivée par défaut) ; bouton de test
+  dans Réglages IVAO. Non vérifiée en plein écran exclusif.
+- Positions suivies : mêmes critères que les exports, plus les centres proches des points de
+  route de l'OFP ; première récupération sans notification, observateurs exclus.
+
+Version mineure approuvée explicitement par l’utilisateur.
+
 ## [1.0.2] - 2026-10-26
 
 Intégration IVAO facultative, désactivée par défaut et en lecture seule.

@@ -697,7 +697,10 @@ function networkSettings(parent, settings) {
     approach = field(grid, 'Rayon APP, DEP (NM)', settings.radius_approach_nm ?? 80, 'number'),
     enroute = field(grid, 'Rayon CTR, FSS (NM)', settings.radius_enroute_nm ?? 400, 'number'),
     whazzup = field(grid, 'Intervalle Whazzup (s, 15 minimum)', settings.whazzup_interval_s ?? 60, 'number'),
-    weather = field(grid, 'Intervalle METAR et TAF (s, 300 minimum)', settings.weather_interval_s ?? 600, 'number');
+    weather = field(grid, 'Intervalle METAR et TAF (s, 300 minimum)', settings.weather_interval_s ?? 600, 'number'),
+    notify = field(grid, 'Notifier la connexion ou la déconnexion d’une position', settings.notifications, 'checkbox'),
+    seconds = field(grid, 'Durée d’affichage de la notification (s)', settings.notification_seconds ?? 10, 'number');
+  help(c, 'Notification : bande discrète toujours visible, sans prise de focus ni clic, pour les positions du départ, de l’arrivée, des dégagements, des aérodromes ajoutés et de la route de l’OFP. Visible sur MSFS en fenêtré ou plein écran sans bordure ; le plein écran exclusif peut la masquer, d’où le test ci-dessous.');
   help(c, 'Les rayons portent sur le centre déclaré de chaque position, autour de l’appareil et des aérodromes suivis : un centre contrôle une zone bien plus vaste qu’une tour. Départ, destination et dégagements viennent de l’OFP SimBrief. Aérodromes ajoutés, inclus dans les exports (6 au plus) :');
   let row = el('div', null, { className: 'row' });
   if (!settings.airports?.length) row.append(el('span', 'aucun', { className: 'muted' }));
@@ -705,7 +708,8 @@ function networkSettings(parent, settings) {
     action('Retirer ' + icao, () => saveNetwork({ airports: settings.airports.filter(item => item !== icao) }, icao + ' retiré.'), row, 'small ghost');
   c.append(row);
   let bar = cardActions(c);
-  action('Enregistrer', () => saveNetwork({ enabled: enabled(), radius_aerodrome_nm: aerodrome(), radius_approach_nm: approach(), radius_enroute_nm: enroute(), whazzup_interval_s: whazzup(), weather_interval_s: weather() }, 'Réglages IVAO enregistrés.'), bar, 'small primary');
+  action('Enregistrer', () => saveNetwork({ enabled: enabled(), radius_aerodrome_nm: aerodrome(), radius_approach_nm: approach(), radius_enroute_nm: enroute(), whazzup_interval_s: whazzup(), weather_interval_s: weather(), notifications: notify(), notification_seconds: seconds() }, 'Réglages IVAO enregistrés.'), bar, 'small primary');
+  action('Tester la notification', async () => { await api('ai/ivao/notify-test', 'POST', {}); message('Notification envoyée : vérifiez qu’elle apparaît par-dessus MSFS.'); }, bar, 'small');
 }
 function networkView(view) {
   let page = ai.network || {},

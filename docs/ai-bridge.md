@@ -175,6 +175,25 @@ modifié ou un ATIS apparu sont signalés par `change` pendant 30 minutes, et pa
 discret dans l'interface. Récupérer un ATIS ne signifie pas que le pilote l'a consulté ni
 annoncé au contrôleur.
 
+### Notification de connexion et de déconnexion
+
+Désactivée par défaut (`ivao.notifications`, durée d'affichage `ivao.notification_seconds`, 10 s). Quand
+une position suivie se connecte au réseau ou le quitte, une bande discrète apparaît en haut à droite de
+l'écran principal. Elle ne prend jamais le focus et ignore la souris : elle ne gêne ni le clavier ni les
+commandes de vol. Une notification Windows classique n'a pas été retenue, car Windows retient les
+toasts pendant qu'un jeu occupe l'écran.
+
+Sont suivies les positions retenues par le même rapprochement que les exports (indicatif préfixé par
+l'OACI du départ, de l'arrivée, d'un dégagement ou d'un aérodrome ajouté, centre proche d'un de ces
+aérodromes), plus les centres (CTR, FSS) dont le centre déclaré est à moins du rayon en route d'un point
+de route de l'OFP, et les positions proches de l'appareil. Une position déjà en ligne qui entre
+seulement dans le rayon n'est pas annoncée, de même que les observateurs. La première récupération
+sert de référence et ne notifie rien ; au-delà de quatre positions, les notices sont regroupées.
+
+Limites : l'affichage par-dessus MSFS est vérifié en fenêtré ou plein écran sans bordure, pas en plein
+écran exclusif. Le bouton **Tester la notification** des réglages IVAO permet de le contrôler avec le
+simulateur lancé. Une position qui se reconnecte après une coupure brève est annoncée deux fois.
+
 METAR et TAF sont conservés bruts. Les heures d'observation, d'émission et la période de
 validité sont lues dans le bulletin, le mois étant déduit de la date de publication IVAO.
 L'âge du bulletin (`bulletin_age_min`) est distinct de l'âge de récupération du flux

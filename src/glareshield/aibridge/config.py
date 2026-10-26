@@ -45,6 +45,9 @@ class IVAOSettings(StrictModel):
     whazzup_interval_s: int = Field(default=60, ge=15, le=900)
     weather_interval_s: int = Field(default=600, ge=300, le=3600)
     airports: list[str] = Field(default_factory=list, max_length=6)
+    # Overlay notice when a selected position connects or disconnects; off until the pilot asks for it.
+    notifications: bool = False
+    notification_seconds: int = Field(default=10, ge=3, le=60)
 
     @field_validator('airports')
     @classmethod
