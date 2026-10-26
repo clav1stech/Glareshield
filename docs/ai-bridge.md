@@ -253,6 +253,12 @@ notes est signalé par `waypoints_truncated` ou `truncated`.
 
 ## Consignes pour l'assistant
 
+Le skill prévoit trois envois par vol (briefing au poste, point en vol en croisière, point en
+vol en descente). Chaque réponse couvre la phase suivante en entier : positions IVAO en ligne,
+saisies MCDU et FCU, messages radio et checklists. Le pilote n'a pas à solliciter l'assistant
+pendant les phases critiques. L'intégration IVAO doit être activée pour que les positions en
+ligne figurent dans chaque export.
+
 `docs/SKILL.md` décrit à un assistant (compétence Claude, instructions personnalisées
 ChatGPT ou équivalent) comment lire les exports et ce que le pilote attend selon la phase
 de vol : tâches MCDU, checklists, messages ATC en voix ou annonces UNICOM en texte.
