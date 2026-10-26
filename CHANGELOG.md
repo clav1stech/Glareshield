@@ -2,6 +2,16 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.1.1] - 2026-10-26
+
+- Sélection IVAO limitée au plan de vol et ATIS des approches voisines
+- Les tours et approches survolées sans lien avec le plan ne sont plus exportées ni notifiées
+  (seuls les centres le sont par leur distance à l'appareil) ; une approche voisine qui couvre
+  un aérodrome suivi reste retenue ; sans aérodrome suivi, l'ancien critère s'applique.
+- `airports[].online_positions` : positions en ligne portant l'OACI de chaque aérodrome suivi.
+- ATIS d'une approche voisine qui couvre un aérodrome suivi joint aux exports briefing et vol
+  (`covers`), avec les rôles de l'aérodrome couvert.
+
 ## [1.1.0] - 2026-10-26
 
 - Notification au premier plan quand une position IVAO suivie se connecte ou se déconnecte

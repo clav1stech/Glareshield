@@ -163,11 +163,24 @@ figurent dans `ivao.selection.radii_nm`. Les positions dont l'indicatif désigne
 suivi passent en premier, par rôle ; les autres sont classées par distance rapportée au rayon
 de leur catégorie, pour qu'un centre pertinent ne soit pas évincé par des tours proches. IVAO publie le centre d'une
 position, pas les limites de son secteur : ces rapprochements ne disent pas qui contrôle
-l'appareil. Les observateurs (liste `observers`, position sans type ou indicatif en `_OBS`)
+l'appareil. Les tours et approches ne sont retenues que par
+rapport aux aérodromes suivis : indicatif portant leur OACI, ou centre à moins du rayon de leur
+catégorie (une approche voisine, comme celle d'un aéroport proche, qui reprend le contrôle en
+l'absence de la position locale, est donc retenue avec `distance_to_airport`). Ceux que l'avion
+survole sans lien avec le plan ne le sont pas ; seuls les centres (CTR, FSS) sont aussi retenus
+par leur distance à l'appareil. Sans aérodrome suivi, la distance à l'appareil s'applique à toutes
+les positions. `airports[].online_positions` liste les positions en ligne portant l'OACI de chaque
+aérodrome, ce qui distingue « aucune position en ligne » de « position non retenue ».
+Les observateurs (liste `observers`, position sans type ou indicatif en `_OBS`)
 sont comptés à part et listés seulement dans l'export complet. Les pilotes connectés, les
 identifiants de membre (VID) et les qualifications ne sont jamais conservés.
 
 ### ATIS et météo
+
+Les ATIS joints aux exports briefing et vol sont ceux des positions retenues pour un aérodrome
+suivi, y compris celui d'une approche voisine qui le couvre : `covers` indique alors l'aérodrome
+couvert, dont les pistes figurent souvent dans les remarques de l'ATIS. Celui d'une position
+survolée sans lien avec le plan n'est pas joint.
 
 Chaque ATIS est restitué avec son texte original, sa lettre (`revision`) et l'horodatage
 fourni par IVAO. Après une première récupération réussie, une nouvelle lettre, un texte

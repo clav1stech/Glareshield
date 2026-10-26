@@ -236,7 +236,7 @@ async def test_atis_changes_are_flagged_only_after_a_first_successful_retrieval(
     assert feeds.atis_changes['XXNC_TWR']['kind'] == 'revision'
     assert feeds.atis_changes['XXNC_TWR']['previous_revision'] == 'K'
     assert feeds.atis_changes['XXNC_APP']['kind'] == 'new' and 'XXPO_GND' not in feeds.atis_changes
-    view = feeds.atis_view(next(item for item in feeds.stations() if item['callsign'] == 'XXNC_TWR'), [], clock.now)
+    view = feeds.atis_view(next(item for item in feeds.stations() if item['callsign'] == 'XXNC_TWR'), [], [], clock.now)
     assert view['change'] == {'kind': 'revision', 'previous_revision': 'K', 'detected_utc': view['change']['detected_utc']}
     clock.now += CHANGE_KEEP_S+60
     await feeds.fetch(feeds.whazzup)
@@ -278,8 +278,8 @@ def test_selection_criteria_are_explicit_and_exclude_the_world_network():
     # Callsign matches by role (origin, destination…), then by distance relative to the category radius.
     assert list(controllers) == ['XXPO_GND', 'XXNC_APP', 'XXNC_TWR', 'XXZZ_CTR', 'XXFA_CTR']
     assert controllers['XXPO_GND']['matched_by'] == [{'basis': 'callsign_prefix', 'airport': 'XXPO'}]
-    assert {'basis': 'distance_to_aircraft', 'distance_nm': controllers['XXNC_APP']['distance_to_aircraft_nm'],
-            'radius_nm': 80} in controllers['XXNC_APP']['matched_by']
+    # Towers and approaches are selected through the followed airports, never by overflying them.
+    assert controllers['XXNC_APP']['matched_by'] == [{'basis': 'callsign_prefix', 'airport': 'XXNC'}]
     # A centre far from the aircraft is kept by the en-route radius; a tower at the same range would not be.
     assert 100 < controllers['XXZZ_CTR']['distance_to_aircraft_nm'] < 400
     assert controllers['XXZZ_CTR']['matched_by'][0] == {'basis': 'distance_to_aircraft', 'radius_nm': 400,
@@ -468,3 +468,34 @@ async def test_notifications_are_off_by_default_and_notifier_errors_do_not_break
     await retrieve(bridge, clock, network, online)
     await retrieve(bridge, clock, network, online+[atc('XXNC_GND', 'GND', 43.66, 7.22)])
     assert bridge.ivao.whazzup.error is None
+
+
+def test_neighbouring_approach_covering_a_followed_airport_is_kept_but_overflown_ones_are_not():
+    # An approach of another airport may control the destination in its absence (e.g. a neighbouring approach).
+    network = whazzup([atc('XXNB_APP', 'APP', 43.9, 7.4, 125.0), atc('XXRR_TWR', 'TWR', 44.0, 6.5, 119.0),
+                       atc('XXFR_APP', 'APP', 48.0, -5.0, 120.0)])
+    feeds, _ = service()
+    feeds.whazzup.data, feeds.whazzup.fetched_at = parse_whazzup(json.dumps(network).encode()), NOW
+    airports = [{'icao': 'XXNC', 'roles': ['destination'], 'latitude': 43.6584, 'longitude': 7.2159}]
+    cruise = {'status': 'observed', 'age_s': 1.0, 'latitude': 44.0, 'longitude': 6.5}
+    section = feeds.view('flight', airports, cruise, NOW)
+    kept = {item['callsign']: item['matched_by'][0]['basis'] for item in section['controllers']}
+    assert kept == {'XXNB_APP': 'distance_to_airport'}
+    assert section['airports'][0]['online_positions'] == []
+    # Without any followed airport the distance to the aircraft is the only criterion left.
+    assert {item['callsign'] for item in feeds.view('flight', [], cruise, NOW)['controllers']} == {'XXRR_TWR', 'XXNB_APP'}
+
+
+def test_atis_of_a_neighbouring_approach_covering_a_followed_airport_is_exported():
+    approach = atis('C', 'XXNB_APP', 'Neighbour information CHARLIE', 'RMK XXNC ARR RWY 20 DEP RWY 20')
+    network = whazzup([atc('XXNB_APP', 'APP', 43.9, 7.4, 125.0, approach), atc('XXLL_TWR', 'TWR', 44.0, 6.5, 119.0, atis('A', 'XXLL_TWR', 'x'))])
+    feeds, _ = service()
+    feeds.whazzup.data, feeds.whazzup.fetched_at = parse_whazzup(json.dumps(network).encode()), NOW
+    airports = [{'icao': 'XXNC', 'roles': ['destination'], 'latitude': 43.6584, 'longitude': 7.2159}]
+    cruise = {'status': 'observed', 'age_s': 1.0, 'latitude': 44.0, 'longitude': 6.5}
+    for level in ('briefing', 'flight'):
+        exported = feeds.view(level, airports, cruise, NOW)['atis']
+        # The tower being flown over is unrelated to the plan: neither its position nor its ATIS.
+        assert [item['station'] for item in exported] == ['XXNB_APP']
+        assert exported[0]['covers'] == ['XXNC'] and exported[0]['roles'] == ['destination']
+        assert 'XXNC ARR RWY 20' in ' '.join(exported[0]['lines'])

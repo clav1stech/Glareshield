@@ -51,11 +51,15 @@ NOTICE = ('Données publiées par le réseau IVAO et récupérées par Glareshie
           'telemetry.environment = conditions observées dans MSFS. Glareshield ne compare ni n’interprète ces '
           'sources. controllers null = flux indisponible ; liste vide = aucune position retenue en ligne.')
 SELECTION = ('Rapprochement technique, pas une couverture : une position est retenue si le préfixe de son '
-             'indicatif (avant le premier « _ ») est le code OACI d’un aérodrome suivi, si son centre déclaré '
-             'est à moins du rayon de sa catégorie (radii_nm, orthodromie) de la position de l’appareil ou d’un '
-             'aérodrome suivi dont l’OFP donne les coordonnées, ou si la portée publiée par le contrôleur '
-             'atteint l’appareil. Catégories : aerodrome = DEL, GND, TWR ; approach = APP, DEP ; enroute = CTR, '
-             'FSS et types inconnus. IVAO publie le centre de la position, pas les limites de son secteur : une '
+             'indicatif (avant le premier « _ ») est le code OACI d’un aérodrome suivi, ou si son centre déclaré '
+             'est à moins du rayon de sa catégorie (radii_nm, orthodromie) d’un aérodrome suivi dont l’OFP donne '
+             'les coordonnées. Les centres (CTR, FSS) le sont aussi s’ils sont à moins de leur rayon de l’appareil '
+             'ou si leur portée publiée l’atteint. Une tour ou une approche survolée, sans lien avec un aérodrome '
+             'suivi, n’est pas retenue ; sans aérodrome suivi, la distance à l’appareil s’applique à toutes les '
+             'positions. Catégories : aerodrome = DEL, GND, TWR ; approach = APP, DEP ; enroute = CTR, FSS et types '
+             'inconnus. airports[].online_positions liste toutes les positions en ligne portant l’OACI de '
+             'l’aérodrome, même hors liste controllers ; une liste vide signifie qu’aucune n’est en ligne à la '
+             'récupération du flux. IVAO publie le centre de la position, pas les limites de son secteur : une '
              'position en route lointaine peut couvrir l’appareil, une position proche peut ne pas le couvrir.')
 CATEGORIES = {'DEL': 'aerodrome', 'GND': 'aerodrome', 'TWR': 'aerodrome', 'APP': 'approach', 'DEP': 'approach'}
 TIMES = ('observed_utc, issued_utc et valid_*_utc : groupes horaires du bulletin brut, mois et année déduits de '
@@ -345,7 +349,11 @@ def match(station: dict, airports: list[dict], aircraft, radii: dict) -> tuple[l
             matches.append({'basis': 'callsign_prefix', 'airport': airport['icao']})
     if has_position and aircraft is not None:
         distance = distance_nm(aircraft[0], aircraft[1], station['latitude'], station['longitude'])
-        if distance <= radius:
+        # Towers and approaches flown over are unrelated to the plan: with airports followed, only centres
+        # are selected by their distance to the aircraft.
+        if airports and category(station) != 'enroute':
+            pass
+        elif distance <= radius:
             matches.append({'basis': 'distance_to_aircraft', 'distance_nm': round(distance), 'radius_nm': radius})
         elif station['range_nm'] is not None and distance <= station['range_nm']:
             matches.append({'basis': 'published_range', 'distance_nm': round(distance),
@@ -618,12 +626,19 @@ class IVAOService:
             result['ivao_updated_utc'] = iso(item['updated_at'])
         return result
 
-    def atis_view(self, station: dict, airports: list[dict], now: float) -> dict:
+    def atis_view(self, station: dict, matches: list[dict], airports: list[dict], now: float) -> dict:
         atis = station['atis']
         result = {'station': station['callsign']}
         airport = next((item for item in airports if item['icao'] == prefix(station['callsign'])), None)
         if airport:
             result['airport'], result['roles'] = airport['icao'], airport['roles']
+        # A neighbouring position that controls a followed airport: its ATIS often carries that airport's runways.
+        covered = [item for item in airports if item['icao'] in {entry.get('airport') for entry in matches}
+                   and item is not airport]
+        if covered:
+            result['covers'] = [item['icao'] for item in covered]
+            result['roles'] = sorted({role for item in [airport, *covered] if item for role in item['roles']},
+                                     key=ROLES.index)
         if atis['revision']:
             result['revision'] = atis['revision']
         if atis['timestamp'] is not None:
@@ -691,6 +706,9 @@ class IVAOService:
             operational = [item for item in selected if item[0]['kind'] == 'atc']
             observers = [item for item in selected if item[0]['kind'] == 'observer']
             exported = operational[:rules['controllers']]
+            for item in section['airports']:
+                item['online_positions'] = sorted(station['callsign'] for station in stations
+                                                  if station['kind'] == 'atc' and prefix(station['callsign']) == item['icao'])
             section['controllers'] = [self.station_view(*item, detailed) for item in exported]
             if len(operational) > len(exported):
                 section['controllers_omitted'] = len(operational)-len(exported)
@@ -698,8 +716,9 @@ class IVAOService:
                 section['observers'] = [self.station_view(*item, detailed) for item in observers[:rules['observers']]]
             section['observers_selected'] = len(observers)
             codes = {item['icao'] for item in airports}
-            section['atis'] = [self.atis_view(station, airports, now) for station, _, _ in exported
-                               if station['atis'] and (rules['atis'] == 'selected' or prefix(station['callsign']) in codes)]
+            section['atis'] = [self.atis_view(station, matches, airports, now) for station, matches, _ in exported
+                               if station['atis'] and (rules['atis'] == 'selected'
+                                                       or any(entry.get('airport') in codes for entry in matches))]
         section['weather'] = {'times_method': TIMES, 'airports': [
             {'icao': item['icao'], 'roles': item['roles'],
              'metar': self.bulletin(self.metar, item['icao'], now, detailed),
