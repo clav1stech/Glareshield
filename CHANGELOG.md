@@ -2,6 +2,15 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.1.2] - 2026-10-26
+
+- Fusion de la 1.0.2 (stop.cmd, premier lancement à vide) dans la ligne 1.1
+- Les versions 1.1.0 et 1.1.1 avaient été construites sans le code de la 1.0.2 publiée le
+  14/10 ; cette version est la première à contenir à la fois l'intégration IVAO et
+  `scripts/stop.cmd`, le démarrage à vide sans configuration et les corrections de `start.cmd`.
+- Le journal rattache l'intégration IVAO à la 1.1.0 : l'entrée qui portait le numéro 1.0.2 par
+  erreur est supprimée, la 1.0.2 du 14/10 reste celle de `stop.cmd`.
+
 ## [1.1.1] - 2026-10-26
 
 - Sélection IVAO limitée au plan de vol et ATIS des approches voisines
