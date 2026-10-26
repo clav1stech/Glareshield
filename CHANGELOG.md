@@ -17,8 +17,21 @@ La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 - Notification au premier plan quand une position IVAO suivie se connecte ou se déconnecte
 - Version mineure choisie avec l'accord explicite du propriétaire : nouvelle fonction visible
   (bande de notification), nouveau module `overlay.py`, nouveaux réglages `ivao.notifications`
-  et `ivao.notification_seconds`, nouvelle route `POST /api/ai/ivao/notify-test`. La version
-  1.0.2, jamais étiquetée, est publiée avec cette livraison.
+  et `ivao.notification_seconds`, nouvelle route `POST /api/ai/ivao/notify-test`.
+- Intégration IVAO facultative, désactivée par défaut et en lecture seule, développée avant la
+  1.0.2 du 14/10 (`stop.cmd`, premier lancement à vide) et publiée ici, sans le code de celle-ci
+  (présent à partir de la 1.1.2) :
+  - Onglet Réseau IVAO : contrôleurs connectés, ATIS, METAR et TAF des aérodromes de l'OFP
+    SimBrief et d'aérodromes ajoutés, consultation ponctuelle d'un autre aérodrome,
+    actualisation manuelle et état de chaque flux.
+  - Sources publiques sans authentification : Whazzup v2 (une requête toutes les 15 s au plus)
+    et fichiers globaux METAR et TAF ; collecte dans une tâche propre, cache en mémoire partagé
+    par l'interface et les exports, dernier résultat valide conservé et signalé en cas d'échec.
+  - Exports : schéma `glareshield.flight_context/3` avec une section `ivao` séparée de la
+    télémétrie, du plan et des notes pilote ; critères de sélection explicites avec un rayon
+    par type de position (30 NM pour DEL, GND et TWR, 80 NM pour APP et DEP, 400 NM pour CTR
+    et FSS), observateurs distincts, âge des bulletins distinct de l'âge de récupération, changements
+    d'ATIS signalés, réductions décrites dans `ivao.truncated`.
 - Bande de notification toujours au premier plan, sans focus ni clic, visible par-dessus un
   simulateur fenêtré ou en plein écran sans bordure (désactivée par défaut) ; bouton de test
   dans Réglages IVAO. Non vérifiée en plein écran exclusif.
@@ -27,21 +40,11 @@ La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
 Version mineure approuvée explicitement par l’utilisateur.
 
-## [1.0.2] - 2026-10-26
+## [1.0.2] - 2026-10-14
 
-Intégration IVAO facultative, désactivée par défaut et en lecture seule.
-
-- Onglet Réseau IVAO : contrôleurs connectés, ATIS, METAR et TAF des aérodromes de l'OFP
-  SimBrief et d'aérodromes ajoutés, consultation ponctuelle d'un autre aérodrome,
-  actualisation manuelle et état de chaque flux.
-- Sources publiques sans authentification : Whazzup v2 (une requête toutes les 15 s au plus)
-  et fichiers globaux METAR et TAF ; collecte dans une tâche propre, cache en mémoire partagé
-  par l'interface et les exports, dernier résultat valide conservé et signalé en cas d'échec.
-- Exports : schéma `glareshield.flight_context/3` avec une section `ivao` séparée de la
-  télémétrie, du plan et des notes pilote ; critères de sélection explicites avec un rayon
-  par type de position (30 NM pour DEL, GND et TWR, 80 NM pour APP et DEP, 400 NM pour CTR
-  et FSS), observateurs distincts, âge des bulletins distinct de l'âge de récupération, changements
-  d'ATIS signalés, réductions décrites dans `ivao.truncated`.
+- Ajout de scripts/stop.cmd pour arrêter une instance Glareshield lancée sans icône
+- start.cmd installe l'environnement s'il est absent et garde la fenêtre ouverte en cas d'échec
+- Premier lancement sans configuration : démarrage à vide sur l'onglet Contrôleurs, où la découverte et l'appairage Hue/Nanoleaf se font par boutons ; l'appairage lance la découverte si nécessaire
 
 ## [1.0.1] - 2026-10-13
 

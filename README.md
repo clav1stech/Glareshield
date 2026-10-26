@@ -37,6 +37,8 @@ if (!(Test-Path local/config.yaml)) { Copy-Item examples/demo.yaml local/config.
 ./scripts/start.cmd
 ```
 
+Si une instance reste active sans icône dans la zone de notification (lancement échoué), l'arrêter avec `./scripts/stop.cmd`.
+
 Conserver une configuration locale déjà existante. La copie de démonstration utilise uniquement des appareils et sources simulés.
 
 Ouvrir **http://127.0.0.1:8777** depuis le navigateur ou l’icône système. Le lancement n’ouvre pas automatiquement de fenêtre. Le menu « Quitter et restaurer les lampes » termine proprement l’application. Un second lancement sur le même port est refusé avant connexion au matériel.

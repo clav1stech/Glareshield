@@ -1479,6 +1479,7 @@ action('Arrêter le test', stopTest, $('#form>.row'), 'ghost', 'stop');
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     config = await api('config');
+    if (!Object.keys(config.devices).length && !Object.keys(config.controllers).length) tab = 'Contrôleurs';
     await refresh();
     render();
   } catch (e) {

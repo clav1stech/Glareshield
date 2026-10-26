@@ -12,7 +12,7 @@ from pathlib import Path
 
 import httpx
 
-from .config import Configuration,load,save
+from .config import Configuration,load,load_or_default,save
 from .discovery import network
 from .drivers.hue import HueDriver
 from .drivers.nanoleaf import NanoleafDriver
@@ -34,7 +34,7 @@ class Runtime:
     def __init__(self,root:Path,configuration_path:Path):
         self.root=root
         self.path=configuration_path
-        self.config=load(configuration_path)
+        self.config=load_or_default(configuration_path)
         self.engine=None
         self.sources=[]
         self.tasks=[]

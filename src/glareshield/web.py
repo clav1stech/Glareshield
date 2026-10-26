@@ -174,6 +174,9 @@ def create_app(runtime):
         if model:
             args+=['--model',model]
         try:
+            inventory=runtime.root/'local/discovery/inventory.json'
+            if not inventory.exists():
+                await command(runtime.root,'discover.py','--seconds','3',timeout=30)
             await command(runtime.root,'pair_lights.py',*args)
             return {'ok':True}
         except Exception:

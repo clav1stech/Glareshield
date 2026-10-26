@@ -266,3 +266,15 @@ async def test_ivao_collection_never_blocks_lighting_nor_opens_simconnect(tmp_pa
         await runtime.stop()
     assert time.monotonic()-started<2 and runtime.ai.ivao.task is None
     assert runtime.ai.ivao.whazzup.data is None
+
+
+async def test_first_launch_without_configuration_starts_empty(tmp_path):
+    path=tmp_path/'local/config.yaml'
+    runtime=Runtime(tmp_path,path)
+    await runtime.start()
+    try:
+        assert not runtime.config.devices and not runtime.config.controllers
+        assert not path.exists()
+        assert runtime.status()['scope']=='default'
+    finally:
+        await runtime.stop()

@@ -78,6 +78,7 @@
 !/scripts/test_hue.py
 !/scripts/test_nanoleaf.py
 !/scripts/start.cmd
+!/scripts/stop.cmd
 !/tests/
 /tests/*
 !/tests/test_privacy.py
