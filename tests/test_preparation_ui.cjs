@@ -66,7 +66,7 @@ async function browserPass() {
     await page.getByRole('heading', { name: 'Préparer le vol', exact: true }).waitFor();
     const before = await (await page.request.get(base+'/test/identity')).json();
     assert.equal(await page.locator('#nav button').count(), 3);
-    assert.equal(await page.getByRole('button', { name: 'Démarrer le suivi du vol', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Démarrer le suivi du vol', exact: true }).isDisabled(), false);
     const notes = page.getByRole('textbox', { name: 'Notes pilote', exact: true });
     await notes.fill('Déclaration fictive : piste à confirmer.');
     await page.getByRole('button', { name: 'Enregistrer les notes', exact: true }).click();
@@ -74,6 +74,36 @@ async function browserPass() {
     await page.getByRole('button', { name: 'Importer depuis SimBrief', exact: true }).click();
     await page.getByText('OFP importé.', { exact: true }).waitFor();
     await page.locator('.route').first().waitFor();
+    await page.getByRole('button', { name: 'Démarrer le suivi du vol', exact: true }).click();
+    await page.getByRole('heading', { name: 'Suivi du vol', exact: true }).waitFor();
+    const firstStep = page.locator('#view input[type=checkbox]').first();
+    const stepLabel = await firstStep.getAttribute('aria-label');
+    await firstStep.check();
+    await page.getByText('Manuel', { exact: false }).first().waitFor();
+    await page.getByLabel('Phase', { exact: true }).selectOption('cruise');
+    // The draft must survive a poll or unrelated render before explicit save.
+    await page.evaluate(() => render());
+    assert.equal(await page.getByLabel('Phase', { exact: true }).inputValue(), 'cruise');
+    await page.getByRole('button', { name: 'Enregistrer la phase', exact: true }).click();
+    const selection = page.locator('details').filter({ has: page.locator('summary', { hasText: 'Déclarer la piste ou l’approche retenue' }) });
+    await selection.locator('summary').click();
+    await selection.getByLabel('Valeur déclarée', { exact: true }).fill('27');
+    await selection.getByLabel('Référence (EFB, ATC ou bulletin)', { exact: true }).fill('Briefing fictif');
+    await selection.getByRole('button', { name: 'Enregistrer : Déclarer la piste ou l’approche retenue', exact: true }).click();
+    await page.getByText('Choix · Piste : 27', { exact: false }).waitFor();
+    await page.screenshot({ path: 'local/ui-test/flight-session.png', fullPage: true, animations: 'disabled' });
+    await page.reload();
+    await page.locator('#nav').getByRole('button', { name: 'Vol', exact: true }).click();
+    await page.getByRole('heading', { name: 'Suivi du vol', exact: true }).waitFor();
+    assert.equal(await page.getByLabel('Phase', { exact: true }).inputValue(), 'cruise');
+    await page.locator('summary').filter({ hasText: 'Prévol' }).click();
+    assert.equal(await page.getByRole('checkbox', { name: stepLabel, exact: true }).isChecked(), true);
+    await page.getByRole('checkbox', { name: stepLabel, exact: true }).uncheck();
+    await page.getByRole('button', { name: 'Terminer le suivi', exact: true }).click();
+    await page.getByRole('button', { name: 'Reprendre le suivi', exact: true }).click();
+    await page.locator('summary').filter({ hasText: 'Prévol' }).click();
+    assert.equal(await page.getByRole('checkbox', { name: stepLabel, exact: true }).isChecked(), false);
+    await page.getByText('Choix · Piste : 27', { exact: false }).waitFor();
     const names = await page.evaluate(() => SETTINGS.flatMap(([, pages]) => pages));
     await page.locator('#nav').getByRole('button', { name: 'Réglages', exact: true }).click();
     for (const name of names) {
@@ -115,7 +145,7 @@ async function browserPass() {
     await page.waitForTimeout(1800);
     assert.equal(await flight.evaluate(el => el === document.activeElement), true);
     await page.keyboard.press('Enter');
-    await page.getByRole('heading', { name: 'Suivi du vol bientôt disponible', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Suivi du vol', exact: true }).waitFor();
     assert.equal(await page.locator('#pageTitle').evaluate(el => el === document.activeElement), true);
     await page.getByRole('button', { name: 'Retour à l’initialisation', exact: true }).click();
     await notes.fill('Brouillon fictif non enregistré.');

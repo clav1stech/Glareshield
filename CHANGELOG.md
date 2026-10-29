@@ -2,6 +2,25 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.2] - 2026-10-29
+
+- Issue #13 : sessions de vol persistantes, déclarations pilote et priorité des gestes manuels
+- Démarrage, reprise, fin et réinitialisation depuis Initialisation / Vol ;
+  cases par identifiant stable, phase forcée et informations de rappel sous
+  `local/copilot/`, dans des suivis séparés pour démonstration et SimConnect.
+- Même OFP : progression conservée. Correction du plan : déclarations à vérifier.
+  Nouveau plan : suivi précédent archivé et nouveau suivi vide, avec règle visible.
+- Saisies explicites de clairance, piste/approche, ATIS effectivement consulté
+  avec heure déclarée, et performances manuelles sourcées et contextualisées.
+  Révisions et révocations conservées ; aucune interprétation des notes libres.
+- Un geste manuel coché ou décoché prime sur une détection ; preuves et conflits
+  restent visibles. Les détections historiques exigent une nouvelle confirmation.
+- Fichier ancien ou invalide conservé, récupération explicite avec sauvegarde,
+  écritures atomiques et refus des gestes issus d’un ancien suivi ou univers.
+  API protégées par la session locale existante, sans écriture cockpit.
+- Validation : 211 tests Python et parcours Edge sur serveur simulé isolé,
+  avec vérification de la conservation des ressources du moteur d’éclairage.
+
 ## [1.2.1] - 2026-10-29
 
 - Issue #12 : navigation permanente Initialisation / Vol / Réglages ; toutes les

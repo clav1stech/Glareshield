@@ -15,6 +15,7 @@ from .config import Configuration,atomic_write
 from .model import LightState,StrictModel
 from .setup import command,import_devices
 from .aibridge.web import create_router
+from .copilot.web import create_session_router
 
 STATIC=Path(__file__).parent/'static'
 ASSETS={'app.css':'text/css','app.js':'text/javascript','ai.js':'text/javascript','copilot.js':'text/javascript'}
@@ -70,6 +71,7 @@ def create_app(runtime):
         async with runtime.configuration_lock:
             await runtime.ai_settings_changed()
     app.include_router(create_router(lambda:runtime.ai,ai_changed))
+    app.include_router(create_session_router(lambda:runtime.ai))
 
     @app.get('/api/status')
     async def status():

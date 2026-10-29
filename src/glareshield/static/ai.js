@@ -69,6 +69,11 @@ async function copyForChat(level = ai.level) {
 }
 async function loadAI(full = false) {
   ai.status = await api('ai/status');
+  if (['Initialisation', 'Vol'].includes(tab)) {
+    let previous = ai.session, next = await api('ai/session');
+    // An older poll must not replace the result of a gesture completed meanwhile.
+    if (ai.session === previous) ai.session = next;
+  }
   if (tab === 'Vol en cours') ai.context = await api('ai/context?level=full');
   if (full || !ai.settings) ai.settings = await api('ai/settings');
   if (tab === 'Initialisation') ai.plan = await api('ai/plan');

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ..config import atomic_write
+from ..copilot.session import SessionService
 from .catalog import GROUPS, STANDARD, Entry
 from .config import AIBridgeSettings, load_settings, save_settings
 from .context import LEVELS, build_context, chat_text, iso, serialize
@@ -40,6 +41,7 @@ class AIBridge:
         self.listeners = []
         self.ivao = IVAOService(clock, network_transport, self.settings.ivao)
         self.ivao.context = self.watch_context
+        self.sessions = SessionService(self)
 
     # Catalogue
 
@@ -81,10 +83,14 @@ class AIBridge:
     def load_demo_plan(self) -> dict:
         data = json.loads((Path(__file__).parent/'demo_ofp.json').read_text(encoding='utf-8'))
         data['params']['time_generated'] = str(int(self.clock()))
-        return self.plan.store(parse_ofp(data), 'demo')
+        plan = self.plan.store(parse_ofp(data), 'demo')
+        self.sessions.view()  # Synchronize independently of the currently displayed page.
+        return plan
 
     async def refresh_plan(self) -> dict:
-        return await self.plan.refresh(self.settings.simbrief_user, self.settings.simbrief_kind)
+        plan = await self.plan.refresh(self.settings.simbrief_user, self.settings.simbrief_kind)
+        self.sessions.view()
+        return plan
 
     # Pilot notes: declarations that the simulator cannot provide (MCDU entries, clearances, ATIS)
 

@@ -28,10 +28,11 @@ Le module **Assistant IA** constitue un état de vol qualifié (valeur, unité, 
 
 ## Installation et lancement
 
-Le futur copilote intégré est cadré par le [contrat A320](docs/copilot-contract.md)
+Le copilote intégré est cadré par le [contrat A320](docs/copilot-contract.md)
 et la [référence des écrans](docs/copilot-mockup.md). Le profil embarqué et son
-chargeur sont disponibles pour les prochaines étapes ; le suivi de vol intégré
-n’est pas encore activé dans l’application.
+chargeur sont disponibles. Le [suivi de session](docs/copilot-session.md) conserve
+les cases, déclarations et phases forcées ; les phases et validations automatiques
+seront raccordées lors des prochaines étapes.
 
 Installer [uv](https://docs.astral.sh/uv/getting-started/installation/), puis depuis la racine du projet :
 
@@ -59,7 +60,7 @@ Python 3.13, l’environnement, les relevés, les fichiers audio et les journaux
 
 ## Configuration
 
-L’application s’ouvre sur **Initialisation** : états du simulateur, d’AI Bridge, de SimBrief, d’IVAO et de l’éclairage, import manuel de l’OFP, résumé et route, notes pilote et export IA. Les manques pour le suivi réel sont séparés des avertissements facultatifs : l’OFP, IVAO et l’éclairage ne sont pas des prérequis à la télémétrie. Les données de démonstration, erreurs et données périmées sont signalées. Le démarrage du suivi reste désactivé jusqu’au raccordement du service de session ; **Vol** explique cette attente et donne accès à la télémétrie existante.
+L’application s’ouvre sur **Initialisation** : états du simulateur, d’AI Bridge, de SimBrief, d’IVAO et de l’éclairage, import manuel de l’OFP, résumé et route, notes pilote et export IA. Les manques pour le suivi réel sont séparés des avertissements facultatifs : l’OFP, IVAO et l’éclairage ne sont pas des prérequis à la télémétrie. Les données de démonstration, erreurs et données périmées sont signalées. **Démarrer le suivi du vol** ouvre **Vol** : cases persistantes, phase forcée et déclarations explicites de clairance, piste/approche, ATIS consulté et performances manuelles. Le même OFP conserve les cases ; un nouveau plan archive le suivi précédent et ouvre un suivi vide. Démonstration et SimConnect sont séparés. Voir les [règles de reprise et de réinitialisation](docs/copilot-session.md).
 
 **Réglages** regroupe toutes les pages existantes : Copilote, Affichage, Intégrations (Plan de vol / SimBrief, Réseau IVAO, Variables IA), Éclairage et matériel, Application. Le thème automatique, clair ou sombre et trois tailles de texte sont conservés dans `local/display.json`. Changer de mode ou d’affichage ne reconfigure pas le moteur et ne reconnecte pas SimConnect. Les notes non enregistrées restent en mémoire pendant les changements de page.
 

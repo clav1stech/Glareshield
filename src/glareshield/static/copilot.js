@@ -1,4 +1,4 @@
-// Preparation and navigation only. Flight sessions will be connected by their service.
+// Session UI sends pilot gestures; the service owns persistence and arbitration.
 const DISPLAY_THEMES = { auto: 'automatique', light: 'clair', dark: 'sombre' };
 let display = { theme: 'auto', text_size: 'standard' };
 function applyDisplay() {
@@ -123,19 +123,143 @@ function preparationView(view) {
       readiness.append(list);
     }
   }
-  readiness.append(el('p', 'Le service de session n’est pas encore livré. Le démarrage du suivi sera raccordé à ce service.', { id: 'startExplanation', className: 'muted' }));
-  let start = action('Démarrer le suivi du vol', () => {}, cardActions(readiness), 'primary', 'play');
-  start.disabled = true;
+  readiness.append(el('p', 'Même identifiant OFP : cases conservées, corrections signalées. Nouvel identifiant : suivi précédent archivé et nouvelles cases vides. Sans identifiant, le vol, les aérodromes et l’heure de départ prévue définissent le suivi. Démonstration et SimConnect restent séparés.', { id: 'startExplanation', className: 'muted' }));
+  for (let text of ai.session?.warnings || []) readiness.append(el('p', text, { className: 'banner warn' }));
+  let start = action(ai.session?.session ? 'Ouvrir le suivi du vol' : 'Démarrer le suivi du vol', async () => {
+    if (!ai.session?.session) await sessionAction('start');
+    navigate('Vol');
+  }, cardActions(readiness), 'primary', 'play');
+  start.disabled = connectionLost || (!ai.session?.session && (ai.session?.storage_blocked || status.blockers.length > 0));
   start.setAttribute('aria-describedby', 'startExplanation');
   action('Voir le mode Vol', () => navigate('Vol'), cardActions(readiness), 'small');
 }
+let phaseDraft = null;
 function flightPendingView(view) {
-  let c = card(view, 'Suivi du vol bientôt disponible', 'Aucune session de suivi n’est démarrée.');
-  c.append(el('p', 'Le service de session et le contenu dynamique du vol seront livrés dans les étapes suivantes du copilote.'));
+  let data = ai.session, session = data?.session;
+  let c = card(view, 'Suivi du vol', data?.universe === 'demo' ? 'Démonstration · suivi séparé de SimConnect' : 'SimConnect · lecture seule du cockpit');
+  for (let text of data?.warnings || []) c.append(el('p', text, { className: 'banner warn' }));
   let bar = cardActions(c);
-  action('Retour à l’initialisation', () => navigate('Initialisation'), bar, 'primary');
+  action('Retour à l’initialisation', () => navigate('Initialisation'), bar);
   action('Consulter la télémétrie existante', () => navigate('Vol en cours'), bar);
-  action('Ouvrir Export IA', () => navigate('Export IA'), bar);
+  if (!session) {
+    c.append(el('p', 'Aucun suivi démarré. Les notes libres ne renseignent jamais les déclarations ci-dessous.'));
+    action('Démarrer le suivi du vol', () => sessionAction('start'), bar, 'primary').disabled = data?.storage_blocked || connectionLost;
+  } else {
+    c.append(el('p', (session.status === 'active' ? 'Suivi actif' : 'Suivi terminé') + ' · OFP : ' + (session.plan_summary.ofp_id || 'sans identifiant') + ' · révision ' + session.plan_revision + ' · ' + data.archived_count + ' suivi(s) archivé(s).'));
+    action(session.status === 'active' ? 'Terminer le suivi' : 'Reprendre le suivi', () => sessionAction(session.status === 'active' ? 'end' : 'resume'), bar);
+  }
+  action('Réinitialiser le suivi', async () => {
+    if (confirm('Ouvrir un suivi vide ? Le suivi précédent sera conservé sous local/, y compris un fichier ancien ou invalide.')) await sessionAction('reset');
+  }, bar, 'danger');
+  if (!session || session.status !== 'active' || data.storage_blocked) return;
+  let phase = card(view, 'Phase déclarée', 'Le calcul automatique des phases sera raccordé dans une prochaine étape. Changer de phase ne coche aucune case.');
+  let getPhase = field(phase, 'Phase', phaseDraft?.sessionId === session.id ? phaseDraft.value : session.forced_phase || 'automatic', 'text', ['automatic', ...data.phases.map(p => p.id)]);
+  phase.querySelector('select').oninput = () => { phaseDraft = { sessionId: session.id, value: getPhase() }; };
+  for (let option of phase.querySelector('select').options) option.textContent = option.value === 'automatic' ? 'Aucune phase forcée' : data.phases.find(p => p.id === option.value).label;
+  action('Enregistrer la phase', async () => {
+    await sessionAction('phase', 'PUT', { phase: getPhase() === 'automatic' ? null : getPhase() });
+    phaseDraft = null;
+    render();
+  }, cardActions(phase));
+  declarationForms(view, session);
+  let current = card(view, 'Déclarations du pilote', 'Saisies explicites, datées et révisées ; aucune interprétation des notes libres. L’ATIS est déclaré consulté à l’heure saisie.');
+  if (!session.declarations.length) current.append(el('p', 'Aucune déclaration.'));
+  for (let d of session.declarations) {
+    let line = el('div', null, { className: 'card' });
+    line.append(el('p', declarationLabel(d.field) + ' : ' + d.value + (d.unit ? ' ' + d.unit : '') + ' · déclarée · révision ' + d.revision + ' · ' + new Date(d.recorded_at * 1000).toLocaleString('fr-FR')));
+    if (d.occurred_at) line.append(el('p', 'Heure déclarée : ' + new Date(d.occurred_at * 1000).toLocaleString('fr-FR')));
+    line.append(el('p', 'Référence : ' + d.reference + ' · ' + Object.entries(d.context).map(([k,v]) => declarationLabel(k) + ' : ' + declarationLabel(v)).join(' · ')));
+    if (d.revoked_at || d.invalidated_reason) line.append(el('p', d.revoked_at ? 'Révoquée / remplacée' : d.invalidated_reason, { className: 'banner warn' }));
+    if (!d.revoked_at) action('Révoquer', () => sessionAction('declarations/' + d.id + '/revoke'), cardActions(line), 'small');
+    current.append(line);
+  }
+  for (let p of data.phases) {
+    let details = el('details', null), summary = el('summary', p.label);
+    details.open = session.forced_phase === p.id || (!session.forced_phase && p.id === 'preflight');
+    details.append(summary); view.append(details);
+    for (let group of data.groups.filter(g => g.phase === p.id)) {
+      let groupCard = card(details, group.label);
+      for (let step of group.steps) {
+        let label = el('label', null, { className: 'check' }), input = el('input', null, { type: 'checkbox', checked: step.checked });
+        input.setAttribute('aria-label', step.label);
+        input.onchange = async () => {
+          input.disabled = true;
+          try { await sessionAction('steps/' + step.id, 'PUT', { checked: input.checked }); }
+          catch (e) { input.checked = step.checked; message(e.message, true); }
+          finally { input.disabled = false; }
+        };
+        label.append(input, el('span', step.label + ' · ' + ({manual:'Manuel', detected:'Détecté', pending:'À confirmer'}[step.provenance])));
+        groupCard.append(label);
+        if (step.detected) groupCard.append(el('small', 'Observation ' + (step.detected.checked ? 'cochée' : 'décochée') + ' · ' + step.detected.reference + (step.detection_current ? '' : ' · historique à reconfirmer'), { className: 'muted' }));
+        if (step.conflict) groupCard.append(el('p', 'Observation contradictoire ; le geste manuel reste prioritaire.', { className: 'banner warn' }));
+      }
+    }
+  }
+}
+
+async function sessionAction(path, method = 'POST', values = {}) {
+  let current = ai.session;
+  try {
+    ai.session = await api('ai/session/' + path, method, { session_id: current?.session?.id || null, universe: current.universe, ...values });
+    render();
+  } catch (e) {
+    // A stale tab must not apply a gesture to a newly opened flight.
+    ai.session = await api('ai/session');
+    render();
+    throw e;
+  }
+}
+
+let declarationDrafts = {};
+const DECLARATION_LABELS = {
+  clearance:'Clairance', selection:'Choix', atis:'ATIS consulté', performance:'Performance',
+  altitude:'Altitude autorisée', heading:'Cap autorisé', speed:'Vitesse autorisée', squawk:'Code transpondeur', instruction:'Instruction reçue',
+  runway:'Piste', approach:'Approche', sid:'SID', star:'STAR', heard_letter:'Lettre écoutée',
+  v1:'V1', vr:'VR', v2:'V2', flex:'FLEX', vapp:'VAPP', thr_red:'THR RED', acc:'ACC',
+  departure:'Départ', arrival:'Arrivée', climb:'Montée', descent:'Descente', taxi:'Roulage', transfer:'Transfert',
+  type:'Type', station:'Station', stage:'Départ / arrivée', airport:'Aérodrome', version:'Version ATIS',
+  aircraft:'Appareil', mass:'Masse', configuration:'Configuration', weather:'Météo',
+};
+function declarationLabel(value) {
+  let text = String(value), parts = text.split('.');
+  return parts.length === 2 && ['clearance','selection','atis','performance'].includes(parts[0])
+    ? parts.map(key => DECLARATION_LABELS[key] || key).join(' · ') : DECLARATION_LABELS[text] || text;
+}
+function declarationForms(view, session) {
+  if (declarationDrafts.sessionId !== session.id) declarationDrafts = { sessionId: session.id };
+  for (let [kind, title, fields, contextFields] of [
+    ['clearance', 'Déclarer une clairance', ['altitude', 'heading', 'speed', 'squawk', 'instruction'], [['type','Type de clairance', ['departure','climb','descent','approach','runway','taxi','transfer']], ['station','Station / origine']]],
+    ['selection', 'Déclarer la piste ou l’approche retenue', ['runway','approach','sid','star'], [['stage','Départ / arrivée', ['departure','arrival']]]],
+    ['atis', 'Déclarer un ATIS effectivement consulté', ['heard_letter'], [['airport','Aérodrome OACI'], ['version','Version / référence du bulletin']]],
+    ['performance', 'Déclarer une performance manuelle', ['v1','vr','v2','flex','vapp','thr_red','acc'], [['aircraft','Appareil'], ['runway','Piste'], ['mass','Masse et unité'], ['configuration','Configuration'], ['weather','Météo associée']]],
+  ]) {
+    let draft = declarationDrafts[kind] ||= {}, details = el('details', null);
+    details.append(el('summary', title)); view.append(details);
+    let c = card(details, title, 'Référence et contexte obligatoires. Une nouvelle saisie remplace le même champ ; l’historique est conservé.');
+    const draftField = (key, label, choices = null) => {
+      let get = field(c, label, draft[key] ?? choices?.[0] ?? '', 'text', choices), input = c.lastChild.querySelector('input,select');
+      if (choices) for (let option of input.options) option.textContent = declarationLabel(option.value);
+      input.oninput = () => { draft[key] = get(); };
+      return get;
+    };
+    let getField = draftField('field', 'Champ déclaré', fields), value = draftField('value', 'Valeur déclarée'), unit = draftField('unit', 'Unité (ex. kt, ft, °C)'), reference = draftField('reference', 'Référence (EFB, ATC ou bulletin)');
+    let getTime = null;
+    if (kind === 'atis') {
+      let now = new Date(), local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0,16);
+      getTime = field(c, 'ATIS consulté le', draft.time || local, 'datetime-local');
+      c.lastChild.querySelector('input').oninput = () => { draft.time = getTime(); };
+    }
+    let getters = contextFields.map(([key,label,choices]) => [key, draftField(key,label,choices)]);
+    action('Enregistrer : ' + title, async () => {
+      let raw = value().trim();
+      if (!raw || !reference().trim()) throw Error('Valeur et référence obligatoires.');
+      if (kind === 'performance' && !Number.isFinite(Number(raw))) throw Error('Saisir une performance numérique.');
+      if (getTime && !Number.isFinite(new Date(getTime()).getTime())) throw Error('Saisir l’heure de consultation de l’ATIS.');
+      await sessionAction('declarations', 'PUT', { declaration: { kind, field: kind + '.' + getField(), value: kind === 'performance' ? Number(raw) : raw, unit: unit().trim() || null, reference: reference().trim(), occurred_at: getTime ? new Date(getTime()).getTime()/1000 : null, context: Object.fromEntries(getters.map(([key,get]) => [key,get().trim()])) } });
+      delete declarationDrafts[kind];
+      render();
+    }, cardActions(c), 'primary');
+  }
 }
 function settingsHome(view) {
   for (let [category, names] of SETTINGS) {
@@ -156,7 +280,7 @@ function displayView(view) {
 }
 function copilotSettingsView(view) {
   let c = card(view, 'Copilote A320', 'Navigation et préparation du vol');
-  c.append(el('p', 'Le contrat A320 est disponible. Le suivi de session, les phases et les procédures dynamiques seront raccordés lors des prochaines étapes.'));
+  c.append(el('p', 'Le suivi conserve les cases, déclarations et phases forcées sous local/copilot/. Les phases automatiques et détections seront raccordées lors des prochaines étapes.'));
   action('Variables et démonstration', () => navigate('Variables IA'), cardActions(c));
 }
 function applicationView(view) {
@@ -177,3 +301,6 @@ for (let [name, renderer, iconName, subtitle] of [
 VIEWS['Initialisation'].live = true;
 VIEWS['Initialisation'].ready = () => ai.status && ai.settings && ai.plan;
 VIEWS['Initialisation'].load = () => loadAI(true);
+VIEWS['Vol'].live = true;
+VIEWS['Vol'].ready = () => ai.session;
+VIEWS['Vol'].load = () => loadAI(true);
