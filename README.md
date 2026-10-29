@@ -59,7 +59,11 @@ Python 3.13, l’environnement, les relevés, les fichiers audio et les journaux
 
 ## Configuration
 
-Les onglets permettent de gérer appareils, contrôleurs, groupes, portées, sources, effets, règles et paramètres. Les modifications sont validées puis appliquées sans relancer l’application. Le tableau de bord affiche connexions, pause, variables, niveaux audio, règles actives et erreurs. Les tests de source sont temporaires et ne modifient aucune commande du simulateur.
+L’application s’ouvre sur **Initialisation** : états du simulateur, d’AI Bridge, de SimBrief, d’IVAO et de l’éclairage, import manuel de l’OFP, résumé et route, notes pilote et export IA. Les manques pour le suivi réel sont séparés des avertissements facultatifs : l’OFP, IVAO et l’éclairage ne sont pas des prérequis à la télémétrie. Les données de démonstration, erreurs et données périmées sont signalées. Le démarrage du suivi reste désactivé jusqu’au raccordement du service de session ; **Vol** explique cette attente et donne accès à la télémétrie existante.
+
+**Réglages** regroupe toutes les pages existantes : Copilote, Affichage, Intégrations (Plan de vol / SimBrief, Réseau IVAO, Variables IA), Éclairage et matériel, Application. Le thème automatique, clair ou sombre et trois tailles de texte sont conservés dans `local/display.json`. Changer de mode ou d’affichage ne reconfigure pas le moteur et ne reconnecte pas SimConnect. Les notes non enregistrées restent en mémoire pendant les changements de page.
+
+Les pages d’éclairage permettent de gérer appareils, contrôleurs, groupes, portées, sources, effets, règles et paramètres. Les modifications sont validées puis appliquées sans relancer l’application. Le tableau de bord affiche connexions, pause, variables, niveaux audio, règles actives et erreurs. Les tests de source sont temporaires et ne modifient aucune commande du simulateur.
 
 Dans **Affectations**, chaque fonction dispose de sa propre sélection : choisir des appareils individuellement, ou combiner groupes, portée active et exclusions. L’aperçu affiche les appareils réellement concernés. Une sélection individuelle reste indépendante de la portée active ; un groupe suit les changements de ses membres. La copie reprend les appareils actuellement sélectionnés par une autre fonction. Une sélection vide ne pilote aucun appareil. Désactiver une fonction conserve ses affectations pour la réactiver ensuite.
 
@@ -72,7 +76,7 @@ Les paramètres modifiables sont répartis ainsi :
 | Règles | Nom de fonction, activation, priorité, conditions ET/OU, source, effet, son, dépendance au simulateur et à la pause |
 | Effets | Couleurs, températures, luminosités, transitions, période et fraction haute des flashes, nombre de cycles, paliers DOME, fichiers et volumes sonores |
 | Sources | Variables, touche PTT, intervalle de lecture, processus audio, seuil, durée minimale, maintien et délai entre contacts |
-| Réglages | Cadence moteur, plafond des flashes, seuil de changement de luminosité, cadences des pilotes, délais de commande/restauration/son, reprises après erreur, actualisation des adresses et de l’interface, durée des tests |
+| Moteur d’éclairage | Cadence moteur, plafond des flashes, seuil de changement de luminosité, cadences des pilotes, délais de commande/restauration/son, reprises après erreur, actualisation des adresses et de l’interface, durée des tests |
 
 L’intervalle de lecture s’applique aussi aux sources clavier et audio. La cadence Hue règle également le limiteur de commandes du pont. Les limites sont validées avant enregistrement ; une configuration invalide conserve la configuration précédente. Les clés et constantes internes des protocoles restent gérées par les pilotes.
 
@@ -103,6 +107,21 @@ $env:PYTHONPATH='src'
 local/.venv/Scripts/python.exe -m glareshield.cli demo
 local/.venv/Scripts/python.exe -m pytest -q
 ```
+
+Pour vérifier la navigation du copilote sans installation personnelle ni connexion
+réelle, lancer `$env:PYTHONPATH='src'; local/.venv/Scripts/python.exe tests/test_preparation.py`.
+Ce serveur utilise le port local 18762 et une racine jetable sous `local/test-roots/`,
+avec pilotes simulés et import SimBrief fictif. Les statuts sont testés aussi par
+`node tests/test_preparation_ui.cjs`. Pour le parcours navigateur, installer
+Playwright sous `local/ui-test/` (`npm install --prefix local/ui-test playwright@1.56.1`),
+puis lancer dans un autre terminal :
+
+```powershell
+$env:NODE_PATH=(Resolve-Path local/ui-test/node_modules).Path
+node tests/test_preparation_ui.cjs --browser
+```
+
+Le parcours emploie Edge installé et conserve ses captures uniquement sous `local/ui-test/`.
 
 La sonde simulateur lit `local/discovery/probe-variables.json`, liste de noms de LVars, et
 `local/discovery/probe-simvars.json`, liste de paires `["NOM", "unité"]` de SimVars standard.

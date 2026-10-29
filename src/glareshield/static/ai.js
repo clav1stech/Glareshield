@@ -24,7 +24,8 @@ const GROUP_LABELS = {
   time: 'Heure',
   fenix: 'Variables Fenix configurées',
 };
-let ai = { status: null, context: null, settings: null, variables: null, level: 'auto', preview: null, network: null, lookup: null };
+let ai = { status: null, context: null, settings: null, variables: null, level: 'auto', preview: null, network: null, lookup: null, plan: null };
+let notesDraft = null;
 const LEVELS = {
   auto: ['Automatique', 'Briefing au sol, point en vol une fois en l’air.'],
   briefing: ['Briefing', 'À envoyer une fois, au sol : plan complet (route, SID, STAR, points de route, carburant, masses, METAR, horaires), état de l’avion et, si IVAO est activé, contrôleurs, ATIS, METAR et TAF des aérodromes suivis.'],
@@ -70,12 +71,14 @@ async function loadAI(full = false) {
   ai.status = await api('ai/status');
   if (tab === 'Vol en cours') ai.context = await api('ai/context?level=full');
   if (full || !ai.settings) ai.settings = await api('ai/settings');
+  if (tab === 'Initialisation') ai.plan = await api('ai/plan');
   if (tab === 'Variables IA' && (full || !ai.variables || !isEditing())) ai.variables = await api('ai/variables');
   if (tab === 'Export IA' && !isEditing()) ai.preview = await api('ai/context?level=' + ai.level);
   if (tab === 'Réseau IVAO' && (full || !ai.network || !isEditing())) ai.network = await api('ai/ivao');
 }
 REFRESH_HOOKS.push(async () => {
-  if (AI_PAGES.includes(tab) || tab === 'Tableau de bord') await loadAI();
+  await loadAI();
+  if (typeof updatePreparationFoot === 'function') updatePreparationFoot();
 });
 async function reloadAI() {
   await loadAI(true);
@@ -222,17 +225,18 @@ function progressCard(parent, derived, plan) {
 function notesCard(parent) {
   let notes = ai.status?.notes || { text: '' },
     c = card(parent, 'Notes pilote', 'Ce que le simulateur ne fournit pas : STAR et VIA saisis au MCDU, piste, ATIS, clairance, messages. Incluses dans chaque export comme déclarations du pilote.'),
-    area = el('textarea', null, { value: notes.text || '', maxLength: 2000, rows: 5, placeholder: 'Ex. : STAR LERG1D via ELRUN, ILS 31R, ATIS K, QNH 1022, clairance FL340' }),
+    area = el('textarea', null, { value: notesDraft ?? notes.text ?? '', maxLength: 2000, rows: 5, placeholder: 'Ex. : STAR DEMO2B, piste à confirmer, ATIS à écouter' }),
     counter = el('small', null, { className: 'hint' });
   area.setAttribute('aria-label', 'Notes pilote');
   let count = () => (counter.textContent = area.value.length + ' / 2000' + (notes.updated_utc ? ' · mises à jour ' + notes.updated_utc.replace('T', ' ').replace('Z', ' UTC') : ''));
-  area.oninput = count;
+  area.oninput = () => { notesDraft = area.value; count(); };
   count();
   c.append(area, counter);
   let bar = cardActions(c);
   action('Enregistrer les notes', async () => {
     let saved = await api('ai/notes', 'PUT', { text: area.value });
     ai.status = { ...ai.status, notes: saved };
+    notesDraft = null;
     message(saved.text ? 'Notes enregistrées.' : 'Notes effacées.');
     area.blur();
     await reloadAI();
@@ -243,7 +247,7 @@ function planSummary(parent, plan) {
   if (!plan) {
     c.append(el('p', 'Aucun OFP chargé.'));
     let bar = cardActions(c);
-    action('Ouvrir Plan de vol', () => { tab = 'Plan de vol'; render(); }, bar, 'small');
+    action('Ouvrir Plan de vol', () => navigate('Plan de vol'), bar, 'small');
     return;
   }
   let dl = el('dl', null, { className: 'kv' });
@@ -265,7 +269,7 @@ function dashboardSummary(parent) {
   c.append(el('p', (s.counts.observed + s.counts.simulated) + ' mesure(s) exploitable(s), ' + s.counts.stale + ' périmée(s), ' + s.counts.unavailable + ' indisponible(s). Plan : ' + (s.plan.available ? 'chargé' : 'aucun') + '.'));
   let bar = cardActions(c);
   action('Copier pour l’IA', () => copyForChat('auto'), bar, 'small primary', 'copy');
-  action('Vol en cours', () => { tab = 'Vol en cours'; render(); }, bar, 'small ghost');
+  action('Vol en cours', () => navigate('Vol en cours'), bar, 'small ghost');
 }
 
 function planView(view) {
@@ -287,10 +291,7 @@ function planView(view) {
     await reloadAI();
   }, bar, 'small');
   action('Actualiser depuis SimBrief', async () => {
-    message('Récupération du dernier OFP…');
-    await api('ai/simbrief/refresh', 'POST', {});
-    message('OFP importé.');
-    await reloadAI();
+    await importPlan();
   }, bar, 'small primary', 'refresh');
   let side = card(top, 'État du plan'),
     dl = el('dl', null, { className: 'kv' });
@@ -584,7 +585,7 @@ function networkSummary(parent, section) {
   c.append(dl);
   if (s.atis_changes) c.append(el('div', s.atis_changes + ' ATIS modifié(s) depuis la première récupération.', { className: 'banner' }));
   let bar = cardActions(c);
-  action('Ouvrir Réseau IVAO', () => { tab = 'Réseau IVAO'; render(); }, bar, 'small');
+  action('Ouvrir Réseau IVAO', () => navigate('Réseau IVAO'), bar, 'small');
 }
 async function saveNetwork(changes, text) {
   await api('ai/settings', 'PUT', { ...ai.settings, ivao: { ...ai.settings.ivao, ...changes } });

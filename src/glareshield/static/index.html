@@ -14,16 +14,20 @@
       <div><strong>GLARESHIELD</strong><small>Le cockpit, dans la lumière.</small></div>
     </div>
     <nav class="nav" id="nav" aria-label="Navigation principale"></nav>
+    <nav id="settingsNav" aria-label="Catégories de réglages" hidden></nav>
     <div class="sidebar-foot">
       <div class="status-line"><span class="dot" id="simDot"></span><span id="connection">Connexion…</span></div>
       <div class="status-line"><span class="dot" id="rulesDot"></span><span id="rulesState">—</span></div>
+      <div class="status-line"><span class="dot" id="ivaoDot"></span><span id="ivaoState">IVAO en attente</span></div>
+      <button type="button" id="themeButton">Thème : automatique</button>
     </div>
   </aside>
   <div class="main">
     <header class="topbar">
-      <div><h1 id="pageTitle">Glareshield</h1><div class="subtitle" id="pageSubtitle"></div></div>
+      <div><h1 id="pageTitle" tabindex="-1">Glareshield</h1><div class="subtitle" id="pageSubtitle"></div></div>
       <span class="badge warn" id="testState" hidden></span><div class="actions" id="pageActions"></div>
     </header>
+    <p class="banner warn connection-notice" id="connectionNotice" role="status" hidden>Connexion à Glareshield interrompue : les états affichés ne sont plus confirmés.</p>
     <main class="content" id="view"></main>
   </div>
 </div>
@@ -33,5 +37,6 @@
 <script>const TOKEN='__TOKEN__';</script>
 <script src="/static/app.js"></script>
 <script src="/static/ai.js"></script>
+<script src="/static/copilot.js"></script>
 </body>
 </html>

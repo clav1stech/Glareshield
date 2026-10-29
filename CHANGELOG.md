@@ -2,6 +2,26 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.1] - 2026-10-29
+
+- Issue #12 : navigation permanente Initialisation / Vol / Réglages ; toutes les
+  pages existantes restent accessibles depuis les cinq catégories de réglages.
+- Initialisation rassemble les états du simulateur, d’AI Bridge, de SimBrief,
+  d’IVAO et de l’éclairage, l’import manuel de l’OFP, son résumé et sa route,
+  les notes pilote et les exports IA existants. Les manques pour le suivi réel
+  sont distingués des intégrations facultatives et des données de démonstration.
+- État SimConnect observé séparé de l’activité du moteur simulé, erreurs et
+  données périmées signalées ; perte de connexion de l’interface rendue explicite.
+- Thèmes automatique, clair et sombre et trois tailles de texte, conservés dans
+  `local/display.json` sans reconnecter SimConnect ni redémarrer les éclairages.
+  Focus clavier conservé lors des rafraîchissements et brouillons des notes
+  conservés pendant les changements de page.
+- Vol présente un état d’attente explicite ; « Démarrer le suivi du vol » reste
+  désactivé jusqu’au raccordement du service de session. Aucune déduction de
+  phase ni modification des règles d’éclairage.
+- Validation avec pilotes simulés et racine jetable : navigation, import,
+  notes, exports, affichage, clavier et conservation des ressources du moteur.
+
 ## [1.2.0] - 2026-10-29
 
 - Contrat du futur copilote A320 : profil embarqué validable, six phases,

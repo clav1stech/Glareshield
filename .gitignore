@@ -38,6 +38,7 @@
 !/src/glareshield/static/app.css
 !/src/glareshield/static/app.js
 !/src/glareshield/static/ai.js
+!/src/glareshield/static/copilot.js
 !/src/glareshield/aibridge/
 /src/glareshield/aibridge/*
 !/src/glareshield/aibridge/__init__.py
@@ -103,6 +104,8 @@
 !/tests/test_fenix.py
 !/tests/test_ivao.py
 !/tests/test_copilot_contract.py
+!/tests/test_preparation.py
+!/tests/test_preparation_ui.cjs
 !/docs/
 /docs/*
 !/docs/architecture.md

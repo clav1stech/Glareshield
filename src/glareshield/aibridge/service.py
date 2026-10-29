@@ -222,6 +222,7 @@ class AIBridge:
         return {'enabled': self.settings.enabled, 'settings_error': self.settings_error, 'mode': 'scenario' if self.scenario else 'simconnect',
                 'scenario_phase': phase(self.scenario.elapsed()) if self.scenario else None,
                 'connected': store.connected, 'paused': store.paused, 'counts': counts,
+                'telemetry_errors': len(store.errors),
                 'suggested_level': self.suggested_level(),
                 'sizes': {level: len(serialize(self.snapshot(level))) for level in LEVELS},
                 'notes': self.notes,

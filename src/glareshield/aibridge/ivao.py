@@ -731,6 +731,7 @@ class IVAOService:
         now = self.clock() if now is None else now
         return {'enabled': self.settings.enabled,
                 'feeds': {feed.name: feed.describe(now, self.interval(feed))['status'] for feed in self.feeds},
+                'feed_errors': {feed.name: feed.error for feed in self.feeds if feed.error},
                 'atis_changes': len(self.atis_changes)}
 
 

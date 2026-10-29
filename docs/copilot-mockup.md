@@ -59,9 +59,20 @@ de production ont des identifiants stables indépendants de leur position.
 
 ## Points restant à éprouver
 
-Navigation clavier complète, très grandes polices, comportement du bandeau sur
-second écran, définition des prérequis de démarrage, persistance des réglages,
-réaction aux erreurs et données périmées : à vérifier lors de #12/#16/#20.
+La navigation Initialisation / Vol / Réglages est livrée par #12. Initialisation
+réutilise les imports, notes et exports ; Vol reste un écran d’attente du service
+de session. La lecture SimConnect active, connectée et récente et une télémétrie
+AI Bridge récente sont les prérequis affichés pour le suivi réel ; OFP, IVAO et
+éclairage sont facultatifs. Le bouton de démarrage demeure désactivé tant que
+le service n’est pas livré. Le mode démonstration ne confirme aucun vol réel.
+
+Le parcours des pages, l’import, les exports, les notes, le focus clavier après
+rafraîchissement, les thèmes et les grandes polices sont testés avec une racine
+jetable et des pilotes simulés (`tests/test_preparation.py`,
+`tests/test_preparation_ui.cjs`). Les préférences persistent dans
+`local/display.json` sans reconfiguration du moteur. Les états d’erreur,
+périmés, désactivés et de démonstration ont des tests distincts. Le comportement
+du futur bandeau Vol sur un second écran reste à éprouver lors de #16/#20.
 La source suffit à identifier le dessin et ses interactions ; elle ne constitue
 pas un test d’intégration de l’application. Le [contrat de données](copilot-contract.md)
 fixe les règles de procédure qui remplacent ses simulations visuelles.

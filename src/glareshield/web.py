@@ -5,18 +5,24 @@ import secrets
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI,HTTPException,Request
 from fastapi.responses import FileResponse,HTMLResponse,JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from .config import Configuration
+from .config import Configuration,atomic_write
 from .model import LightState,StrictModel
 from .setup import command,import_devices
 from .aibridge.web import create_router
 
 STATIC=Path(__file__).parent/'static'
-ASSETS={'app.css':'text/css','app.js':'text/javascript','ai.js':'text/javascript'}
+ASSETS={'app.css':'text/css','app.js':'text/javascript','ai.js':'text/javascript','copilot.js':'text/javascript'}
+
+
+class DisplaySettings(StrictModel):
+    theme: Literal['auto','light','dark'] = 'auto'
+    text_size: Literal['standard','large','extra'] = 'standard'
 
 
 class PreviewRequest(StrictModel):
@@ -72,6 +78,18 @@ def create_app(runtime):
     @app.get('/api/config')
     async def configuration():
         return runtime.config.model_dump(mode='json')
+
+    @app.get('/api/display')
+    async def display():
+        try:
+            return DisplaySettings.model_validate_json((runtime.root/'local/display.json').read_text(encoding='utf-8'))
+        except (OSError,ValueError):
+            return DisplaySettings()
+
+    @app.put('/api/display')
+    async def save_display(settings:DisplaySettings):
+        atomic_write(runtime.root/'local/display.json',settings.model_dump_json())
+        return settings
 
     @app.put('/api/config')
     async def configure(payload:dict):

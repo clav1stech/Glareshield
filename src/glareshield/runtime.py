@@ -51,6 +51,7 @@ class Runtime:
         self.test_tasks=set()
         self.render_wake=asyncio.Event()
         self.simulator=None
+        self.simulator_observation=None
         self.lighting_simulator=False
         self.ai=AIBridge(root)
         self.overlay=None
@@ -105,6 +106,7 @@ class Runtime:
         return result
 
     def simulator_update(self,message):
+        self.simulator_observation=(dict(message),time.monotonic())
         if self.lighting_simulator:
             self.engine.connected=message['connected']
             self.engine.paused=message['paused']
@@ -112,6 +114,7 @@ class Runtime:
         self.ai.on_simulator_message(message)
 
     def start_simulator(self):
+        self.simulator_observation=None
         self.simulator=SimulatorSource(self.config.sources,self.simulator_update,telemetry=self.ai.definitions())
         self.sources.append(self.simulator)
         task=asyncio.create_task(self.simulator.run())
@@ -403,7 +406,14 @@ class Runtime:
         await self.start()
 
     def status(self):
+        observation,received=self.simulator_observation or ({},0)
+        simulator={'enabled':self.simulator is not None,
+                   'connected':bool(self.simulator and observation.get('connected')),
+                   'paused':bool(observation.get('paused')),
+                   'stale':bool(self.simulator and received and time.monotonic()-received>15),
+                   'error':getattr(self.simulator,'error',None)}
         return {'connected':self.engine.connected,'paused':self.engine.paused,'suspended':self.suspended,
+            'simulator':simulator,
             'test_remaining_s':max([0,*[max(0,expiry-time.monotonic()) for _,expiry in self.manual.values()],
                                     max(0,self.preview['until']-time.monotonic()) if self.preview else 0]),
             'preview':{'rule':self.preview['rule'],'remaining_s':max(0,self.preview['until']-time.monotonic())} if self.preview else None,

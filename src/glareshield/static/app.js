@@ -1,7 +1,7 @@
 // Glareshield local interface. Lighting views; AI Bridge views live in ai.js.
 let config,
   state,
-  tab = 'Tableau de bord',
+  tab = 'Initialisation',
   editing = null,
   connectionLost = false,
   sessionToken = TOKEN;
@@ -44,13 +44,22 @@ function icon(name) {
 }
 // Each view declares its section, icon, subtitle, renderer and whether lighting tests apply.
 const VIEWS = {};
-const NAV = [
-  ['Pilotage', ['Tableau de bord', 'Journal']],
-  ['Éclairage', ['Affectations', 'Règles', 'Effets', 'Sources']],
-  ['Matériel', ['Appareils', 'Contrôleurs', 'Groupes', 'Portées']],
-  ['Assistant IA', ['Vol en cours', 'Plan de vol', 'Réseau IVAO', 'Export IA', 'Variables IA']],
-  ['Système', ['Réglages']],
+const MODES = ['Initialisation', 'Vol', 'Réglages'];
+const SETTINGS = [
+  ['Copilote', ['Copilote', 'Vol en cours', 'Export IA']],
+  ['Affichage', ['Affichage']],
+  ['Intégrations', ['Plan de vol', 'Réseau IVAO', 'Variables IA']],
+  ['Éclairage et matériel', ['Tableau de bord', 'Affectations', 'Règles', 'Effets', 'Sources', 'Appareils', 'Contrôleurs', 'Groupes', 'Portées', 'Moteur d’éclairage']],
+  ['Application', ['Application', 'Journal']],
 ];
+function pageMode() { return ['Initialisation', 'Vol'].includes(tab) ? tab : 'Réglages'; }
+function navigate(name) {
+  tab = name;
+  draftPreview = null;
+  render();
+  window.scrollTo(0, 0);
+  $('#pageTitle').focus({ preventScroll: true });
+}
 function el(tag, text, attrs = {}) {
   let n = document.createElement(tag);
   if (text !== null) n.textContent = text;
@@ -85,6 +94,8 @@ async function api(path, method = 'GET', body) {
   } catch (e) {
     connectionLost = true;
     setConnection('Reconnexion en cours…', 'danger');
+    if (typeof updatePreparationFoot === 'function') updatePreparationFoot();
+    if (tab === 'Initialisation' && config && ai.plan && !isEditing()) render();
     throw Error('Connexion à Glareshield interrompue. Reconnexion en cours…');
   }
   let d = await r.json();
@@ -1145,7 +1156,7 @@ function stopTest() {
   return api('test/stop', 'POST', {}).then(() => message('Test arrêté ; retour aux règles normales.'));
 }
 function testActions(bar) {
-  action('Tester 3 s', () => openTest(tab === 'Réglages' && draftPreview ? draftPreview() : { configuration: config }), bar, '', 'play');
+  action('Tester 3 s', () => openTest(tab === 'Moteur d’éclairage' && draftPreview ? draftPreview() : { configuration: config }), bar, '', 'play');
   action('Arrêter le test', stopTest, bar, 'ghost', 'stop');
 }
 function errorsOf(status) {
@@ -1392,14 +1403,26 @@ const LIGHTING_VIEWS = {
   Contrôleurs: ['controllers', 'Ponts Hue, contrôleurs Nanoleaf et sorties AirPlay', collection],
   Groupes: ['groups', 'Ensembles d’appareils, éventuellement imbriqués', collection],
   Portées: ['scopes', 'Jeux de groupes sélectionnables depuis le tableau de bord', collection],
-  Réglages: ['settings', 'Cadences, délais et limites du moteur', settingsView],
+  'Moteur d’éclairage': ['settings', 'Cadences, délais et limites du moteur', settingsView],
 };
 for (let [name, [iconName, subtitle, renderer]] of Object.entries(LIGHTING_VIEWS))
   VIEWS[name] = { icon: iconName, subtitle, render: renderer, tests: name !== 'Journal', live: ['Tableau de bord', 'Journal'].includes(name) };
 function renderNav() {
-  let nav = $('#nav');
+  let focused = document.activeElement?.closest('#nav button, #settingsNav button')?.dataset.page,
+    nav = $('#nav');
   nav.replaceChildren();
-  for (let [group, names] of NAV) {
+  for (let name of MODES) {
+    let b = el('button', null, { type: 'button', className: 'nav-item' + (pageMode() === name ? ' active' : '') });
+    b.append(icon({ Initialisation: 'plan', Vol: 'plane', Réglages: 'settings' }[name]), el('span', name));
+    b.dataset.page = name;
+    if (pageMode() === name) b.setAttribute('aria-current', 'page');
+    b.onclick = () => navigate(name);
+    nav.append(b);
+  }
+  let settingsNav = $('#settingsNav');
+  settingsNav.replaceChildren();
+  settingsNav.hidden = pageMode() !== 'Réglages';
+  for (let [group, names] of settingsNav.hidden ? [] : SETTINGS) {
     let box = el('div', null, { className: 'nav-group' });
     box.append(el('span', group));
     for (let name of names) {
@@ -1407,24 +1430,22 @@ function renderNav() {
       if (!view) continue;
       let b = el('button', null, { type: 'button', className: 'nav-item' + (tab === name ? ' active' : '') });
       b.append(icon(view.icon), el('span', name));
+      b.dataset.page = name;
       if (view.navBadge) {
         let extra = view.navBadge();
         if (extra) b.append(extra);
       }
       if (tab === name) b.setAttribute('aria-current', 'page');
-      b.onclick = () => {
-        tab = name;
-        draftPreview = null;
-        render();
-        window.scrollTo(0, 0);
-      };
+      b.onclick = () => navigate(name);
       box.append(b);
     }
-    nav.append(box);
+    settingsNav.append(box);
   }
+  if (focused) [...nav.querySelectorAll('button'), ...settingsNav.querySelectorAll('button')]
+    .find(b => b.dataset.page === focused)?.focus({ preventScroll: true });
 }
 function render() {
-  let current = VIEWS[tab] || VIEWS['Tableau de bord'];
+  let current = VIEWS[tab] || VIEWS['Initialisation'];
   if (current.ready && !current.ready()) {
     current.load().then(render).catch(e => message(e.message, true));
     return;
@@ -1440,10 +1461,11 @@ function render() {
   if (current.tests) testActions(bar);
   if (current.actions) current.actions(bar);
   current.render(view);
+  if (typeof updatePreparationFoot === 'function') updatePreparationFoot();
 }
 function isEditing() {
   let active = document.activeElement;
-  return ['INPUT', 'SELECT', 'TEXTAREA'].includes(active?.tagName) || document.querySelector('dialog[open]');
+  return ['INPUT', 'SELECT', 'TEXTAREA'].includes(active?.tagName) || active?.matches('#view button') || document.querySelector('dialog[open]');
 }
 async function refresh() {
   let wasTesting = (state?.test_remaining_s || 0) > 0;
@@ -1479,7 +1501,7 @@ action('Arrêter le test', stopTest, $('#form>.row'), 'ghost', 'stop');
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     config = await api('config');
-    if (!Object.keys(config.devices).length && !Object.keys(config.controllers).length) tab = 'Contrôleurs';
+    await loadDisplay();
     await refresh();
     render();
   } catch (e) {
