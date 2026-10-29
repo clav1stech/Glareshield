@@ -31,8 +31,10 @@ Le module **Assistant IA** constitue un état de vol qualifié (valeur, unité, 
 Le copilote intégré est cadré par le [contrat A320](docs/copilot-contract.md)
 et la [référence des écrans](docs/copilot-mockup.md). Le profil embarqué et son
 chargeur sont disponibles. Le [suivi de session](docs/copilot-session.md) conserve
-les cases, déclarations et phases forcées ; les phases et validations automatiques
-seront raccordées lors des prochaines étapes.
+les cases, déclarations et phases forcées. Le [moteur des six phases](docs/copilot-phases.md)
+affiche les indices, incertitudes et prochains déclencheurs ; une correction
+manuelle reste active jusqu’au retour explicite en automatique. Les validations
+automatiques des checklists relèvent des prochaines étapes.
 
 Installer [uv](https://docs.astral.sh/uv/getting-started/installation/), puis depuis la racine du projet :
 

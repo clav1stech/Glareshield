@@ -1,9 +1,10 @@
-"""Durable pilot gestures; no phase algorithm, simulator client or cockpit writes."""
+"""Durable pilot gestures and read-only phase tracking; no cockpit writes."""
 from __future__ import annotations
 
 import hashlib
 import json
 import shutil
+from datetime import datetime
 from uuid import uuid4
 from pathlib import Path
 from typing import Annotated, Literal
@@ -13,6 +14,8 @@ from pydantic import Field, model_validator
 from ..config import atomic_write
 from ..model import StrictModel
 from .contract import Identifier, PhaseId, Scalar, Text, load_profile
+from .phases import PhaseEngine, PhaseState
+from ..aibridge.telemetry import qualify
 
 Universe = Literal['simconnect', 'demo']
 MAX_BYTES = 8_388_608
@@ -114,6 +117,7 @@ class FlightSession(StrictModel):
     steps: dict[Identifier, Progress] = Field(default_factory=dict)
     declarations: list[Declaration] = Field(default_factory=list)
     forced_phase: PhaseId | None = None
+    phase_state: PhaseState = Field(default_factory=PhaseState)
     reminders: dict[Identifier, Gesture] = Field(default_factory=dict)
     history: list[dict] = Field(default_factory=list)
 
@@ -143,6 +147,8 @@ class SessionService:
         self.epoch = uuid4().hex
         self.documents = {}
         self.errors = {}
+        self.phase_engines = {}
+        self.phase_error = None
         for universe in ('simconnect', 'demo'):
             try:
                 path = self.path(universe)
@@ -224,6 +230,8 @@ class SessionService:
                 if declaration.revoked_at is None:
                     declaration.invalidated_reason = 'Plan modifié : confirmer à nouveau le contexte.'
         self._save(candidate)
+
+        self.phase_engines.pop(session.id, None)
 
     def _active(self, candidate):
         if not candidate.sessions or candidate.sessions[-1].status != 'active':
@@ -313,7 +321,58 @@ class SessionService:
         def apply(session):
             session.forced_phase = phase
             session.history.append({'event': 'phase', 'phase': phase, 'at': self.clock()})
+            self.phase_engines.pop(session.id, None)
         return self.change(apply)
+
+    def refresh_phase(self, persist=True):
+        """Use the existing store only. Persist transitions, never polling timers."""
+        if persist:
+            self.synchronize()
+        document = self.documents[self.universe]
+        if self.universe in self.errors or not document.sessions:
+            return None
+        session = document.sessions[-1]
+        engine = self.phase_engines.setdefault(session.id, PhaseEngine())
+        store, now = self.bridge.store(), self.clock()
+        keys = {'on_ground', 'ground_speed', 'vertical_speed', 'altitude_msl',
+                'latitude', 'longitude', 'altitude_agl'}
+        fields = {entry.key: qualify(entry, store, now) for entry in self.bridge.entries()
+                  if entry.key in keys and entry.origin == 'simvar'}
+        for key in store.errors.keys() & fields.keys():
+            fields[key] = {**fields[key], 'value': None, 'status': 'unavailable'}
+        ready = any(d.kind == 'event' and d.field == 'event.departure_ready' and d.value is True
+                    and d.revoked_at is None and d.invalidated_reason is None for d in session.declarations)
+        compatible = (session.profile_id, session.profile_revision) == (self.profile.id, self.profile.revision)
+        forced_at = next((event['at'] for event in reversed(session.history)
+                          if event.get('event') == 'phase'), session.started_at)
+        plan = self.current_plan()
+        try:
+            generated = datetime.fromisoformat(plan['generated_utc'].replace('Z', '+00:00'))
+            plan_current = generated.tzinfo is not None and 0 <= now-generated.timestamp() <= self.bridge.settings.ofp_max_age_h*3600
+        except (KeyError, TypeError, ValueError):
+            plan_current = False
+        state, view = engine.evaluate(session.phase_state, fields, plan, now,
+                                      connected=store.connected, paused=store.paused,
+                                      last_message=store.last_message, forced=session.forced_phase,
+                                      forced_at=forced_at,
+                                      plan_current=plan_current,
+                                      suspension_reason=None if persist else 'Écriture impossible : dernière phase conservée, transitions suspendues.',
+                                      active=session.status == 'active' and compatible, departure_ready=ready)
+        if state != session.phase_state:
+            candidate = self._copy()
+            target = candidate.sessions[-1]
+            if state.phase != target.phase_state.phase:
+                target.history.append({'event': 'derived_phase', 'phase': state.phase,
+                                       'at': now, 'evidence': state.evidence})
+            target.phase_state = state
+            try:
+                self._save(candidate)
+            except (OSError, ValueError):
+                engine.reset()
+                raise
+        if persist:
+            self.phase_error = None
+        return view
 
     def declare(self, payload):
         if payload.occurred_at is not None and payload.occurred_at > self.clock()+60:
@@ -353,10 +412,15 @@ class SessionService:
 
     def view(self):
         warnings = list(self.profile_load.errors)
+        phase_view = None
         try:
             self.synchronize()
+            phase_view = self.refresh_phase()
         except (OSError, ValueError):
-            warnings.append('Enregistrement du plan impossible ; dernier suivi conservé. Réessayer avant toute action.')
+            warnings.append('Enregistrement du plan ou de la phase impossible ; dernier suivi conservé. Réessayer avant toute action.')
+            phase_view = self.refresh_phase(persist=False)
+        if self.phase_error:
+            warnings.append(self.phase_error)
         if self.universe in self.errors:
             warnings.append(self.errors[self.universe])
         document = self.documents[self.universe]
@@ -392,6 +456,7 @@ class SessionService:
                                   'conflict': bool(manual and current and manual.checked != detected.checked)})
                 groups.append({'phase': phase.id, 'phase_label': phase.label, 'label': group.label, 'steps': steps})
         return {'universe': self.universe, 'session': session.model_dump() if session else None,
+                'phase': phase_view,
                 'warnings': warnings, 'storage_blocked': self.universe in self.errors,
                 'archived_count': max(0, len(document.sessions)-1), 'groups': groups,
                 'phases': [{'id': p.id, 'label': p.label} for p in self.profile.phases]}

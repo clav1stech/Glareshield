@@ -58,6 +58,7 @@
 !/src/glareshield/copilot/__init__.py
 !/src/glareshield/copilot/contract.py
 !/src/glareshield/copilot/session.py
+!/src/glareshield/copilot/phases.py
 !/src/glareshield/copilot/web.py
 !/src/glareshield/copilot/a320.json
 !/src/glareshield/drivers/
@@ -109,6 +110,7 @@
 !/tests/test_preparation.py
 !/tests/test_preparation_ui.cjs
 !/tests/test_copilot_session.py
+!/tests/test_copilot_phases.py
 !/docs/
 /docs/*
 !/docs/architecture.md
@@ -121,6 +123,7 @@
 !/docs/copilot-contract.md
 !/docs/copilot-mockup.md
 !/docs/copilot-session.md
+!/docs/copilot-phases.md
 
 # Private installation data must never enter Git.
 /local/

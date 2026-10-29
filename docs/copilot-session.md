@@ -42,8 +42,9 @@ consulter ou compléter les gestes manuels ; les observations ne sont pas actuel
 Les cases sont indexées par identifiant stable d’étape. Cocher **ou décocher**
 est un geste manuel durable, prioritaire sur toute validation détectée. La
 provenance, la mesure détectée et une contradiction éventuelle restent visibles.
-Une phase forcée ne modifie aucune case. Revenir à « Aucune phase forcée » retire
-seulement ce choix ; le calcul des phases relève de l’issue suivante.
+Une phase forcée ne modifie aucune case. Depuis la version 1.2.3,
+« Revenir en automatique » retire explicitement ce choix et reprend le
+[moteur de phases](copilot-phases.md), avec de nouvelles temporisations.
 
 Les formulaires proposent des saisies distinctes :
 
@@ -106,8 +107,9 @@ elles exigent une reconfirmation après redémarrage, une connexion récente hor
 pause et un âge inférieur ou égal à 8 s pour être présentées comme actuelles.
 Le futur adaptateur doit encore vérifier le sens et la fraîcheur du signal.
 
-Ce lot ne calcule ni phase, ni performances, ni validation automatique à partir
-de la télémétrie. Aucun client SimConnect ou IVAO supplémentaire, aucune écriture
+Le lot initial 1.2.2 ne calculait ni phase, ni performances, ni validation automatique
+à partir de la télémétrie. Le moteur de phases est raccordé depuis la 1.2.3.
+Aucun client SimConnect ou IVAO supplémentaire, aucune écriture
 cockpit et aucune reconfiguration des ressources d’éclairage. Les exports
 `glareshield.flight_context/3` et les notes conservent leur contrat actuel.
 

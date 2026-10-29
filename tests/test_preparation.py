@@ -32,6 +32,7 @@ class FakeSimulator:
         while not self.stopping:
             self.update({'connected': True, 'paused': False, 'values': {},
                          'telemetry': {'on_ground': (True, time.time()),
+                                       'ground_speed': (0, time.time()),
                                        'altitude_msl': (500, time.time())}})
             await asyncio.sleep(.05)
 

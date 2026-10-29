@@ -152,15 +152,35 @@ function flightPendingView(view) {
     if (confirm('Ouvrir un suivi vide ? Le suivi précédent sera conservé sous local/, y compris un fichier ancien ou invalide.')) await sessionAction('reset');
   }, bar, 'danger');
   if (!session || session.status !== 'active' || data.storage_blocked) return;
-  let phase = card(view, 'Phase déclarée', 'Le calcul automatique des phases sera raccordé dans une prochaine étape. Changer de phase ne coche aucune case.');
+  let phaseData = data.phase, effectivePhase = phaseData?.effective?.value;
+  let phase = card(view, 'Phase du vol', 'Changer de phase ne coche aucune case. Le choix manuel reste actif jusqu’au retour explicite en automatique.');
+  const phaseLabel = id => data.phases.find(p => p.id === id)?.label || 'Non confirmée';
+  const substates = { taxi: 'Roulage', takeoff: 'Décollage', approach: 'Approche', landing: 'Atterrissage', parking: 'Parking', go_around: 'Remise des gaz' };
+  phase.append(el('p', phaseLabel(effectivePhase) + ' · ' + (phaseData?.mode === 'manual' ? 'Déclarée par le pilote' : 'Calculée') + (phaseData?.substate ? ' · ' + substates[phaseData.substate] : ''), { id: 'flightPhase' }));
+  if (phaseData?.suspended) phase.append(el('p', 'Transitions automatiques suspendues.', { className: 'banner warn' }));
+  if (phaseData?.effective?.status === 'stale') phase.append(el('p', 'Dernière phase connue · données périmées.', { className: 'banner warn' }));
+  for (let text of phaseData?.evidence || []) phase.append(el('p', text, { className: 'muted' }));
+  for (let text of phaseData?.uncertainty || []) phase.append(el('p', text, { className: 'banner warn' }));
+  if (phaseData?.automatic?.method) phase.append(el('p', phaseData.automatic.method, { className: 'muted' }));
+  if (phaseData?.next_trigger) phase.append(el('p', 'Prochain déclencheur : ' + phaseData.next_trigger.label + (phaseData.next_trigger.elapsed_s ? ' · confirmation ' + Math.floor(phaseData.next_trigger.elapsed_s) + '/' + phaseData.next_trigger.hold_s + ' s' : '')));
+  let progress = phaseData?.geometry?.route_progress;
+  if (progress) phase.append(el('p', 'Route prévue : prochain point géométrique ' + progress.next_waypoint + ', reste ' + progress.remaining_along_route_nm + ' NM. Un direct ou un écart à la route peut fausser cet avancement ; il ne décrit pas la route active du MCDU.', { className: 'muted' }));
   let getPhase = field(phase, 'Phase', phaseDraft?.sessionId === session.id ? phaseDraft.value : session.forced_phase || 'automatic', 'text', ['automatic', ...data.phases.map(p => p.id)]);
   phase.querySelector('select').oninput = () => { phaseDraft = { sessionId: session.id, value: getPhase() }; };
-  for (let option of phase.querySelector('select').options) option.textContent = option.value === 'automatic' ? 'Aucune phase forcée' : data.phases.find(p => p.id === option.value).label;
+  for (let option of phase.querySelector('select').options) option.textContent = option.value === 'automatic' ? 'Automatique' : data.phases.find(p => p.id === option.value).label;
+  let phaseActions = cardActions(phase);
   action('Enregistrer la phase', async () => {
     await sessionAction('phase', 'PUT', { phase: getPhase() === 'automatic' ? null : getPhase() });
     phaseDraft = null;
     render();
-  }, cardActions(phase));
+  }, phaseActions);
+  action('Revenir en automatique', async () => {
+    await sessionAction('phase', 'PUT', { phase: null });
+    phaseDraft = null; render();
+  }, phaseActions).disabled = !session.forced_phase;
+  action('Prêt pour le départ', () => sessionAction('declarations', 'PUT', { declaration: {
+    kind: 'event', field: 'event.departure_ready', value: true, reference: 'Geste explicite du pilote', context: { stage: 'departure' },
+  } }), phaseActions).disabled = effectivePhase !== 'preflight';
   declarationForms(view, session);
   let current = card(view, 'Déclarations du pilote', 'Saisies explicites, datées et révisées ; aucune interprétation des notes libres. L’ATIS est déclaré consulté à l’heure saisie.');
   if (!session.declarations.length) current.append(el('p', 'Aucune déclaration.'));
@@ -175,7 +195,7 @@ function flightPendingView(view) {
   }
   for (let p of data.phases) {
     let details = el('details', null), summary = el('summary', p.label);
-    details.open = session.forced_phase === p.id || (!session.forced_phase && p.id === 'preflight');
+    details.open = (effectivePhase || 'preflight') === p.id;
     details.append(summary); view.append(details);
     for (let group of data.groups.filter(g => g.phase === p.id)) {
       let groupCard = card(details, group.label);

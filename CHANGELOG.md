@@ -2,6 +2,18 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.3] - 2026-10-29
+
+- Issue #14 : moteur indépendant des six phases de vol, indices, méthode,
+  incertitudes et prochain déclencheur affichés dans Vol.
+- Confirmation continue et hystérésis ; paliers conservés, interruptions et
+  données périmées suspendant les transitions concernées. Sous-états de roulage,
+  décollage, approche, atterrissage, parking et remise des gaz.
+- Correction manuelle persistante et retour explicite en automatique ;
+  cases, déclarations et rappels conservés. Réutilisation de la géométrie de
+  route prévue, sans déduction de FMA, ECAM ou TOD MCDU ni commande cockpit.
+- Tests déterministes sur données fictives et parcours Edge en racine isolée.
+
 ## [1.2.2] - 2026-10-29
 
 - Issue #13 : sessions de vol persistantes, déclarations pilote et priorité des gestes manuels

@@ -105,6 +105,15 @@ async function browserPass() {
     assert.equal(await page.getByRole('checkbox', { name: stepLabel, exact: true }).isChecked(), false);
     await page.getByText('Choix · Piste : 27', { exact: false }).waitFor();
     const names = await page.evaluate(() => SETTINGS.flatMap(([, pages]) => pages));
+    await page.waitForTimeout(1200);
+    assert.match(await page.locator('#flightPhase').textContent(), /Croisière.*Déclarée/);
+    await page.getByRole('button', { name: 'Revenir en automatique', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#flightPhase').textContent.includes('Prévol'));
+    assert.match(await page.locator('#flightPhase').textContent(), /Prévol.*Calculée/);
+    assert.equal(await page.getByLabel('Phase', { exact: true }).inputValue(), 'automatic');
+    assert.equal(await page.getByRole('checkbox', { name: stepLabel, exact: true }).isChecked(), false);
+    await page.getByText('Prochain déclencheur :', { exact: false }).waitFor();
+    await page.screenshot({ path: 'local/ui-test/flight-phase-automatic.png', fullPage: true, animations: 'disabled' });
     await page.locator('#nav').getByRole('button', { name: 'Réglages', exact: true }).click();
     for (const name of names) {
       await page.locator('#settingsNav').getByRole('button', { name, exact: true }).click();

@@ -171,6 +171,11 @@ changement d’ATIS non confirmé par le pilote.
 
 ## Six phases visibles et déclencheurs
 
+Le [moteur livré en 1.2.3](copilot-phases.md) précise ces propositions,
+notamment le départ par mouvement observé et le retour au sol après un vol
+interrompu. Ses paramètres sont regroupés dans `PhaseThresholds` ; les
+déclencheurs du profil destinés aux procédures ne sont pas exécutés par ce moteur.
+
 Ces seuils sont des choix de première version pour la simulation, modifiables
 en données. Ils ne décrivent aucun mode de guidage.
 

@@ -72,10 +72,16 @@ class AIBridge:
     def on_simulator_message(self, message: dict) -> None:
         if self.settings.enabled:
             self.live.update(message)
+            if not self.scenario:
+                try:
+                    self.sessions.refresh_phase()
+                except (OSError, ValueError):
+                    self.sessions.phase_error = 'Phase non enregistrée ; dernier suivi conservé.'
 
     def set_scenario(self, active: bool, start_phase: str | None = None) -> None:
         offset = next((start for name, start, _ in PHASES if name == start_phase), 0)
         self.scenario = ScenarioPlayer(self.clock, offset) if active else None
+        self.sessions.phase_engines.clear()
 
     def store(self) -> TelemetryStore:
         return self.scenario.tick() if self.scenario else self.live
