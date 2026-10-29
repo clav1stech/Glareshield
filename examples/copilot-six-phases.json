@@ -1,0 +1,709 @@
+{
+  "schema_version": "glareshield.copilot_examples/1",
+  "examples": [
+    {
+      "phase": "preflight",
+      "data_origin": "simulation_scenario",
+      "values": {
+        "phase": {
+          "value": "preflight",
+          "unit": null,
+          "nature": "calculated",
+          "status": "derived",
+          "source": "copilot",
+          "reference": "demo-session",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "not_applicable",
+          "method": "Exemple de phase calculée selon les seuils du profil ; sans moteur exécuté.",
+          "inputs": [
+            "telemetry",
+            "session"
+          ]
+        },
+        "callsign": {
+          "value": "DEMO123",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "origin": {
+          "value": "ZZAA",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "destination": {
+          "value": "ZZBB",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "cleared_altitude": {
+          "value": null,
+          "unit": "ft",
+          "nature": "declared",
+          "status": "unavailable",
+          "source": "pilot",
+          "reference": "demo-clearance",
+          "age_s": null,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "altitude_msl": {
+          "value": 100,
+          "unit": "ft",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "vertical_speed": {
+          "value": 0,
+          "unit": "ft/min",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "v1": {
+          "value": null,
+          "unit": "kt",
+          "nature": "declared",
+          "status": "unavailable",
+          "source": "pilot",
+          "reference": "demo-performance",
+          "age_s": null,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        }
+      },
+      "now_step": "init_a",
+      "conflicts": []
+    },
+    {
+      "phase": "departure",
+      "data_origin": "simulation_scenario",
+      "values": {
+        "phase": {
+          "value": "departure",
+          "unit": null,
+          "nature": "calculated",
+          "status": "derived",
+          "source": "copilot",
+          "reference": "demo-session",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "not_applicable",
+          "method": "Exemple de phase calculée selon les seuils du profil ; sans moteur exécuté.",
+          "inputs": [
+            "telemetry",
+            "session"
+          ]
+        },
+        "callsign": {
+          "value": "DEMO123",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "origin": {
+          "value": "ZZAA",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "destination": {
+          "value": "ZZBB",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "cleared_altitude": {
+          "value": 5000,
+          "unit": "ft",
+          "nature": "declared",
+          "status": "available",
+          "source": "pilot",
+          "reference": "demo-clearance-1",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "altitude_msl": {
+          "value": 100,
+          "unit": "ft",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "vertical_speed": {
+          "value": 0,
+          "unit": "ft/min",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        }
+      },
+      "now_step": "check_cleared_route",
+      "conflicts": []
+    },
+    {
+      "phase": "climb",
+      "data_origin": "simulation_scenario",
+      "values": {
+        "phase": {
+          "value": "climb",
+          "unit": null,
+          "nature": "calculated",
+          "status": "derived",
+          "source": "copilot",
+          "reference": "demo-session",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "not_applicable",
+          "method": "Exemple de phase calculée selon les seuils du profil ; sans moteur exécuté.",
+          "inputs": [
+            "telemetry",
+            "session"
+          ]
+        },
+        "callsign": {
+          "value": "DEMO123",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "origin": {
+          "value": "ZZAA",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "destination": {
+          "value": "ZZBB",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "cleared_altitude": {
+          "value": null,
+          "unit": "ft",
+          "nature": "declared",
+          "status": "unavailable",
+          "source": "pilot",
+          "reference": "demo-clearance",
+          "age_s": null,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "altitude_msl": {
+          "value": 18000,
+          "unit": "ft",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "vertical_speed": {
+          "value": 1500,
+          "unit": "ft/min",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        }
+      },
+      "now_step": "climb_std",
+      "conflicts": []
+    },
+    {
+      "phase": "cruise",
+      "data_origin": "simulation_scenario",
+      "values": {
+        "phase": {
+          "value": "cruise",
+          "unit": null,
+          "nature": "calculated",
+          "status": "derived",
+          "source": "copilot",
+          "reference": "demo-session",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "not_applicable",
+          "method": "Exemple de phase calculée selon les seuils du profil ; sans moteur exécuté.",
+          "inputs": [
+            "telemetry",
+            "session"
+          ]
+        },
+        "callsign": {
+          "value": "DEMO123",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "origin": {
+          "value": "ZZAA",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "destination": {
+          "value": "ZZBB",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "cleared_altitude": {
+          "value": null,
+          "unit": "ft",
+          "nature": "declared",
+          "status": "unavailable",
+          "source": "pilot",
+          "reference": "demo-clearance",
+          "age_s": null,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "altitude_msl": {
+          "value": 35000,
+          "unit": "ft",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "vertical_speed": {
+          "value": 0,
+          "unit": "ft/min",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "tod": {
+          "value": null,
+          "unit": "NM",
+          "nature": "declared",
+          "status": "unavailable",
+          "source": "pilot",
+          "reference": "demo-tod",
+          "age_s": null,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        }
+      },
+      "now_step": "arrival_plan",
+      "conflicts": []
+    },
+    {
+      "phase": "descent",
+      "data_origin": "simulation_scenario",
+      "values": {
+        "phase": {
+          "value": "descent",
+          "unit": null,
+          "nature": "calculated",
+          "status": "derived",
+          "source": "copilot",
+          "reference": "demo-session",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "not_applicable",
+          "method": "Exemple de phase calculée selon les seuils du profil ; sans moteur exécuté.",
+          "inputs": [
+            "telemetry",
+            "session"
+          ]
+        },
+        "callsign": {
+          "value": "DEMO123",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "origin": {
+          "value": "ZZAA",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "destination": {
+          "value": "ZZBB",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "cleared_altitude": {
+          "value": null,
+          "unit": "ft",
+          "nature": "declared",
+          "status": "unavailable",
+          "source": "pilot",
+          "reference": "demo-clearance",
+          "age_s": null,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "altitude_msl": {
+          "value": 15000,
+          "unit": "ft",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "vertical_speed": {
+          "value": -1500,
+          "unit": "ft/min",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "qnh": {
+          "value": 1017,
+          "unit": "hPa",
+          "nature": "published",
+          "status": "available",
+          "source": "ivao",
+          "reference": "demo-atis-P",
+          "age_s": 300,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "atis_heard": {
+          "value": "O",
+          "unit": null,
+          "nature": "declared",
+          "status": "available",
+          "source": "pilot",
+          "reference": "demo-heard-O",
+          "age_s": 900,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        }
+      },
+      "now_step": "update_arrival",
+      "conflicts": [
+        {
+          "kind": "atis_changed",
+          "published": "P",
+          "heard": "O",
+          "resolution": "Nouvelle écoute à confirmer ; ne pas annoncer P automatiquement."
+        }
+      ]
+    },
+    {
+      "phase": "arrival",
+      "data_origin": "simulation_scenario",
+      "values": {
+        "phase": {
+          "value": "arrival",
+          "unit": null,
+          "nature": "calculated",
+          "status": "derived",
+          "source": "copilot",
+          "reference": "demo-session",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "not_applicable",
+          "method": "Exemple de phase calculée selon les seuils du profil ; sans moteur exécuté.",
+          "inputs": [
+            "telemetry",
+            "session"
+          ]
+        },
+        "callsign": {
+          "value": "DEMO123",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "origin": {
+          "value": "ZZAA",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "destination": {
+          "value": "ZZBB",
+          "unit": null,
+          "nature": "planned",
+          "status": "available",
+          "source": "simbrief",
+          "reference": "demo-ofp",
+          "age_s": 2,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "cleared_altitude": {
+          "value": null,
+          "unit": "ft",
+          "nature": "declared",
+          "status": "unavailable",
+          "source": "pilot",
+          "reference": "demo-clearance",
+          "age_s": null,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "altitude_msl": {
+          "value": 3000,
+          "unit": "ft",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "vertical_speed": {
+          "value": -700,
+          "unit": "ft/min",
+          "nature": "observed",
+          "status": "simulated",
+          "source": "simulation_scenario",
+          "reference": "demo-telemetry",
+          "age_s": 2,
+          "max_age_s": 8,
+          "verification": "unverified",
+          "method": null,
+          "inputs": []
+        },
+        "qnh": {
+          "value": 1017,
+          "unit": "hPa",
+          "nature": "published",
+          "status": "available",
+          "source": "ivao",
+          "reference": "demo-atis-P",
+          "age_s": 300,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        },
+        "atis_heard": {
+          "value": "O",
+          "unit": null,
+          "nature": "declared",
+          "status": "available",
+          "source": "pilot",
+          "reference": "demo-heard-O",
+          "age_s": 900,
+          "max_age_s": null,
+          "verification": "not_applicable",
+          "method": null,
+          "inputs": []
+        }
+      },
+      "now_step": "final_approach_data",
+      "conflicts": [
+        {
+          "kind": "atis_changed",
+          "published": "P",
+          "heard": "O",
+          "resolution": "Nouvelle écoute à confirmer ; ne pas annoncer P automatiquement."
+        }
+      ]
+    }
+  ]
+}

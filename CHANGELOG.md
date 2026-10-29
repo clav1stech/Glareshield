@@ -2,6 +2,19 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.0] - 2026-10-29
+
+- Contrat du futur copilote A320 : profil embarqué validable, six phases,
+  étapes et messages radio décrits en données, sources et déclarations distinctes.
+- Chargement des profils personnalisés privés avec validation stricte et repli
+  sur le dernier profil valide ou le profil embarqué en cas d’erreur.
+- Exemples fictifs des six phases, référence de la maquette fournie et limites
+  de déduction documentées. Aucun moteur de suivi ou nouvel écran activé ;
+  les exports `glareshield.flight_context/3` conservent leur comportement.
+
+Version mineure choisie avec l’accord explicite de l’utilisateur pour le socle
+du copilote : contrat commun, procédures en données et validation des profils.
+
 ## [1.1.2] - 2026-10-26
 
 - Fusion de la 1.0.2 (stop.cmd, premier lancement à vide) dans la ligne 1.1

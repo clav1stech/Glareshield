@@ -14,6 +14,7 @@ local/
   discovery/     # relevés du matériel et résultats de tests
   config.yaml    # appareils, groupes, portées et règles personnels
   ai-bridge.yaml # réglages AI Bridge, identifiant SimBrief, LVars relevées et réglages IVAO
+  copilot/       # profil/checklists personnalisés ; futures déclarations et sessions privées
   exports/       # contextes de vol exportés
   secrets/       # clés et jetons d’appairage
   state/         # snapshots, cache de découverte et dernier OFP SimBrief

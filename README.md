@@ -28,6 +28,11 @@ Le module **Assistant IA** constitue un état de vol qualifié (valeur, unité, 
 
 ## Installation et lancement
 
+Le futur copilote intégré est cadré par le [contrat A320](docs/copilot-contract.md)
+et la [référence des écrans](docs/copilot-mockup.md). Le profil embarqué et son
+chargeur sont disponibles pour les prochaines étapes ; le suivi de vol intégré
+n’est pas encore activé dans l’application.
+
 Installer [uv](https://docs.astral.sh/uv/getting-started/installation/), puis depuis la racine du projet :
 
 ```powershell

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glareshield"
-version = "1.1.2"
+version = "1.2.0"
 description = "Local flight simulator lighting and audio integration"
 requires-python = ">=3.13,<3.14"
 dependencies = [
@@ -25,7 +25,7 @@ glareshield-app = "glareshield.app:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-glareshield = ["static/*.html", "static/*.css", "static/*.js", "aibridge/*.json"]
+glareshield = ["static/*.html", "static/*.css", "static/*.js", "aibridge/*.json", "copilot/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

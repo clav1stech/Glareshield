@@ -1,0 +1,2809 @@
+{
+  "schema_version": "glareshield.copilot_profile/1",
+  "id": "a320_normal",
+  "revision": 1,
+  "aircraft": "A320 / Fenix — procédures normales génériques de simulation",
+  "scope": "simulation_only",
+  "procedure_reference": "docs/SKILL.md sections 4, 5, 7 ; docs/copilot-contract.md",
+  "sources": {
+    "plan_callsign": {
+      "path": "flight_plan.flight.callsign",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_origin": {
+      "path": "flight_plan.origin.icao",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_destination": {
+      "path": "flight_plan.destination.icao",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_alternate": {
+      "path": "flight_plan.alternates.primary.icao",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_cruise_altitude": {
+      "path": "flight_plan.cruise.initial_altitude_ft",
+      "nature": "planned",
+      "kind": "number",
+      "unit": "ft",
+      "max_age_s": null
+    },
+    "plan_cost_index": {
+      "path": "flight_plan.cruise.cost_index",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_route": {
+      "path": "flight_plan.route",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_sid": {
+      "path": "flight_plan.sid",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_star": {
+      "path": "flight_plan.star",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_block_fuel": {
+      "path": "flight_plan.fuel.ramp",
+      "nature": "planned",
+      "kind": "number",
+      "unit": "kg",
+      "max_age_s": null
+    },
+    "plan_zfw": {
+      "path": "flight_plan.weights.zero_fuel",
+      "nature": "planned",
+      "kind": "number",
+      "unit": "kg",
+      "max_age_s": null
+    },
+    "plan_reserve": {
+      "path": "flight_plan.fuel.final_reserve",
+      "nature": "planned",
+      "kind": "number",
+      "unit": "kg",
+      "max_age_s": null
+    },
+    "plan_landing_fuel": {
+      "path": "flight_plan.fuel.landing",
+      "nature": "planned",
+      "kind": "number",
+      "unit": "kg",
+      "max_age_s": null
+    },
+    "pilot_departure_runway": {
+      "path": "pilot.departure.runway",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_departure_runway": {
+      "path": "flight_plan.origin.runway",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_arrival_runway": {
+      "path": "pilot.arrival.runway",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "plan_arrival_runway": {
+      "path": "flight_plan.destination.runway",
+      "nature": "planned",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_stand": {
+      "path": "pilot.stand",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_zfwcg": {
+      "path": "pilot.zfwcg",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "% MAC",
+      "max_age_s": null
+    },
+    "pilot_via": {
+      "path": "pilot.arrival.via",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_approach": {
+      "path": "pilot.arrival.approach",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_minima": {
+      "path": "pilot.arrival.minima",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_navigation_aid": {
+      "path": "pilot.arrival.navigation_aid",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_transition_altitude": {
+      "path": "pilot.departure.transition_altitude",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "ft",
+      "max_age_s": null
+    },
+    "pilot_transition_level": {
+      "path": "pilot.arrival.transition_level",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "FL",
+      "max_age_s": null
+    },
+    "pilot_thrust_reduction": {
+      "path": "pilot.performance.thrust_reduction",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "ft",
+      "max_age_s": null
+    },
+    "pilot_acceleration": {
+      "path": "pilot.performance.acceleration",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "ft",
+      "max_age_s": null
+    },
+    "pilot_v1": {
+      "path": "pilot.performance.v1",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "kt",
+      "max_age_s": null
+    },
+    "pilot_vr": {
+      "path": "pilot.performance.vr",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "kt",
+      "max_age_s": null
+    },
+    "pilot_v2": {
+      "path": "pilot.performance.v2",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "kt",
+      "max_age_s": null
+    },
+    "pilot_flex": {
+      "path": "pilot.performance.flex",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "°C",
+      "max_age_s": null
+    },
+    "pilot_vapp": {
+      "path": "pilot.performance.vapp",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "kt",
+      "max_age_s": null
+    },
+    "pilot_takeoff_flaps": {
+      "path": "pilot.performance.takeoff_flaps",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_landing_flaps": {
+      "path": "pilot.performance.landing_flaps",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_cleared_altitude": {
+      "path": "pilot.clearance.cleared_altitude",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "ft",
+      "max_age_s": null
+    },
+    "pilot_cleared_runway": {
+      "path": "pilot.clearance.cleared_runway",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_cleared_sid": {
+      "path": "pilot.clearance.cleared_sid",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_squawk": {
+      "path": "pilot.clearance.squawk",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_frequency": {
+      "path": "pilot.clearance.frequency",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "MHz",
+      "max_age_s": null
+    },
+    "pilot_heading": {
+      "path": "pilot.clearance.heading",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "deg",
+      "max_age_s": null
+    },
+    "pilot_speed": {
+      "path": "pilot.clearance.speed",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "kt",
+      "max_age_s": null
+    },
+    "pilot_taxi_route": {
+      "path": "pilot.clearance.taxi_route",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_cleared_qnh": {
+      "path": "pilot.clearance.qnh",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "hPa",
+      "max_age_s": null
+    },
+    "pilot_station": {
+      "path": "pilot.radio.station",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_atis_heard": {
+      "path": "pilot.atis.heard_letter",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_approach_position": {
+      "path": "pilot.radio.approach_position",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_exit": {
+      "path": "pilot.arrival.exit",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "pilot_qnh": {
+      "path": "pilot.arrival.qnh",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "hPa",
+      "max_age_s": null
+    },
+    "published_qnh": {
+      "path": "publications.arrival.qnh",
+      "nature": "published",
+      "kind": "number",
+      "unit": "hPa",
+      "max_age_s": 1200
+    },
+    "pilot_temperature": {
+      "path": "pilot.arrival.temperature",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "°C",
+      "max_age_s": null
+    },
+    "published_temperature": {
+      "path": "publications.arrival.temperature",
+      "nature": "published",
+      "kind": "number",
+      "unit": "°C",
+      "max_age_s": 1200
+    },
+    "pilot_wind": {
+      "path": "pilot.arrival.wind",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
+    "published_wind": {
+      "path": "publications.arrival.wind",
+      "nature": "published",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": 1200
+    },
+    "pilot_departure_qnh": {
+      "path": "pilot.departure.qnh",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "hPa",
+      "max_age_s": null
+    },
+    "published_departure_qnh": {
+      "path": "publications.departure.qnh",
+      "nature": "published",
+      "kind": "number",
+      "unit": "hPa",
+      "max_age_s": 1200
+    },
+    "pilot_tod": {
+      "path": "pilot.tod.distance_nm",
+      "nature": "declared",
+      "kind": "number",
+      "unit": "NM",
+      "max_age_s": null
+    },
+    "on_ground": {
+      "path": "telemetry.position.on_ground",
+      "nature": "observed",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": 8
+    },
+    "vertical_speed": {
+      "path": "telemetry.speed.vertical_speed",
+      "nature": "observed",
+      "kind": "number",
+      "unit": "ft/min",
+      "max_age_s": 8
+    },
+    "ground_speed": {
+      "path": "telemetry.speed.ground_speed",
+      "nature": "observed",
+      "kind": "number",
+      "unit": "kt",
+      "max_age_s": 8
+    },
+    "altitude_agl": {
+      "path": "telemetry.position.altitude_agl",
+      "nature": "observed",
+      "kind": "number",
+      "unit": "ft",
+      "max_age_s": 8
+    },
+    "cruise_gap": {
+      "path": "computed.cruise_altitude_gap_ft",
+      "nature": "calculated",
+      "kind": "number",
+      "unit": "ft",
+      "max_age_s": 8
+    },
+    "destination_distance": {
+      "path": "computed.destination_distance_nm",
+      "nature": "calculated",
+      "kind": "number",
+      "unit": "NM",
+      "max_age_s": 8
+    },
+    "cruise_seen": {
+      "path": "computed.cruise_seen",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": 8
+    },
+    "arrival_seen": {
+      "path": "computed.arrival_seen",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": 8
+    },
+    "event_session_started": {
+      "path": "events.session_started",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_departure_ready": {
+      "path": "events.departure_ready",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_before_start": {
+      "path": "events.before_start",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_after_start": {
+      "path": "events.after_start",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_before_taxi": {
+      "path": "events.before_taxi",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_holding_point": {
+      "path": "events.holding_point",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_after_takeoff": {
+      "path": "events.after_takeoff",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_transition_up": {
+      "path": "events.transition_up",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_before_tod": {
+      "path": "events.before_tod",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_descent_clearance": {
+      "path": "events.descent_clearance",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_transition_down": {
+      "path": "events.transition_down",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_approach_ready": {
+      "path": "events.approach_ready",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_landing_ready": {
+      "path": "events.landing_ready",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_runway_vacated": {
+      "path": "events.runway_vacated",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_parked": {
+      "path": "events.parked",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_securing": {
+      "path": "events.securing",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_handoff": {
+      "path": "events.handoff",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_go_around": {
+      "path": "events.go_around",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_ready_pushback": {
+      "path": "events.ready_pushback",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "event_traffic_announcement": {
+      "path": "events.traffic_announcement",
+      "nature": "declared",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "phase_preflight": {
+      "path": "session.phase.preflight",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "phase_departure": {
+      "path": "session.phase.departure",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "phase_climb": {
+      "path": "session.phase.climb",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "phase_cruise": {
+      "path": "session.phase.cruise",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "phase_descent": {
+      "path": "session.phase.descent",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    },
+    "phase_arrival": {
+      "path": "session.phase.arrival",
+      "nature": "calculated",
+      "kind": "bool",
+      "unit": null,
+      "max_age_s": null
+    }
+  },
+  "values": {
+    "callsign": {
+      "label": "indicatif",
+      "unit": null,
+      "placeholder": "<indicatif>",
+      "purpose": "reference",
+      "sources": [
+        "plan_callsign"
+      ],
+      "literal": null
+    },
+    "origin": {
+      "label": "départ",
+      "unit": null,
+      "placeholder": "<départ>",
+      "purpose": "reference",
+      "sources": [
+        "plan_origin"
+      ],
+      "literal": null
+    },
+    "destination": {
+      "label": "destination",
+      "unit": null,
+      "placeholder": "<destination>",
+      "purpose": "reference",
+      "sources": [
+        "plan_destination"
+      ],
+      "literal": null
+    },
+    "alternate": {
+      "label": "dégagement",
+      "unit": null,
+      "placeholder": "<dégagement>",
+      "purpose": "reference",
+      "sources": [
+        "plan_alternate"
+      ],
+      "literal": null
+    },
+    "cruise_altitude": {
+      "label": "altitude de croisière prévue",
+      "unit": "ft",
+      "placeholder": "<altitude de croisière prévue>",
+      "purpose": "reference",
+      "sources": [
+        "plan_cruise_altitude"
+      ],
+      "literal": null
+    },
+    "cost_index": {
+      "label": "cost index",
+      "unit": null,
+      "placeholder": "<cost index>",
+      "purpose": "reference",
+      "sources": [
+        "plan_cost_index"
+      ],
+      "literal": null
+    },
+    "route": {
+      "label": "route prévue",
+      "unit": null,
+      "placeholder": "<route prévue>",
+      "purpose": "reference",
+      "sources": [
+        "plan_route"
+      ],
+      "literal": null
+    },
+    "sid": {
+      "label": "SID prévue",
+      "unit": null,
+      "placeholder": "<SID prévue>",
+      "purpose": "reference",
+      "sources": [
+        "plan_sid"
+      ],
+      "literal": null
+    },
+    "star": {
+      "label": "STAR prévue",
+      "unit": null,
+      "placeholder": "<STAR prévue>",
+      "purpose": "reference",
+      "sources": [
+        "plan_star"
+      ],
+      "literal": null
+    },
+    "block_fuel": {
+      "label": "carburant bloc",
+      "unit": "kg",
+      "placeholder": "<carburant bloc>",
+      "purpose": "reference",
+      "sources": [
+        "plan_block_fuel"
+      ],
+      "literal": null
+    },
+    "zfw": {
+      "label": "ZFW",
+      "unit": "kg",
+      "placeholder": "<ZFW>",
+      "purpose": "reference",
+      "sources": [
+        "plan_zfw"
+      ],
+      "literal": null
+    },
+    "reserve": {
+      "label": "réserve finale prévue",
+      "unit": "kg",
+      "placeholder": "<réserve finale prévue>",
+      "purpose": "reference",
+      "sources": [
+        "plan_reserve"
+      ],
+      "literal": null
+    },
+    "landing_fuel": {
+      "label": "carburant arrivée prévu",
+      "unit": "kg",
+      "placeholder": "<carburant arrivée prévu>",
+      "purpose": "reference",
+      "sources": [
+        "plan_landing_fuel"
+      ],
+      "literal": null
+    },
+    "departure_runway": {
+      "label": "piste départ",
+      "unit": null,
+      "placeholder": "<piste départ>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_departure_runway",
+        "plan_departure_runway"
+      ],
+      "literal": null
+    },
+    "arrival_runway": {
+      "label": "piste arrivée",
+      "unit": null,
+      "placeholder": "<piste arrivée>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_arrival_runway",
+        "plan_arrival_runway"
+      ],
+      "literal": null
+    },
+    "stand": {
+      "label": "poste",
+      "unit": null,
+      "placeholder": "<poste>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_stand"
+      ],
+      "literal": null
+    },
+    "zfwcg": {
+      "label": "ZFWCG",
+      "unit": "% MAC",
+      "placeholder": "<ZFWCG>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_zfwcg"
+      ],
+      "literal": null
+    },
+    "via": {
+      "label": "transition VIA",
+      "unit": null,
+      "placeholder": "<transition VIA>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_via"
+      ],
+      "literal": null
+    },
+    "approach": {
+      "label": "approche",
+      "unit": null,
+      "placeholder": "<approche>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_approach"
+      ],
+      "literal": null
+    },
+    "minima": {
+      "label": "minima BARO ou RADIO et référence",
+      "unit": null,
+      "placeholder": "<minima BARO ou RADIO et référence>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_minima"
+      ],
+      "literal": null
+    },
+    "navigation_aid": {
+      "label": "aide et fréquence vérifiées sur carte",
+      "unit": null,
+      "placeholder": "<aide et fréquence vérifiées sur carte>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_navigation_aid"
+      ],
+      "literal": null
+    },
+    "transition_altitude": {
+      "label": "altitude de transition",
+      "unit": "ft",
+      "placeholder": "<altitude de transition>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_transition_altitude"
+      ],
+      "literal": null
+    },
+    "transition_level": {
+      "label": "niveau de transition",
+      "unit": "FL",
+      "placeholder": "<niveau de transition>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_transition_level"
+      ],
+      "literal": null
+    },
+    "thrust_reduction": {
+      "label": "altitude THR RED",
+      "unit": "ft",
+      "placeholder": "<altitude THR RED>",
+      "purpose": "performance",
+      "sources": [
+        "pilot_thrust_reduction"
+      ],
+      "literal": null
+    },
+    "acceleration": {
+      "label": "altitude ACC",
+      "unit": "ft",
+      "placeholder": "<altitude ACC>",
+      "purpose": "performance",
+      "sources": [
+        "pilot_acceleration"
+      ],
+      "literal": null
+    },
+    "v1": {
+      "label": "V1",
+      "unit": "kt",
+      "placeholder": "<V1>",
+      "purpose": "performance",
+      "sources": [
+        "pilot_v1"
+      ],
+      "literal": null
+    },
+    "vr": {
+      "label": "VR",
+      "unit": "kt",
+      "placeholder": "<VR>",
+      "purpose": "performance",
+      "sources": [
+        "pilot_vr"
+      ],
+      "literal": null
+    },
+    "v2": {
+      "label": "V2",
+      "unit": "kt",
+      "placeholder": "<V2>",
+      "purpose": "performance",
+      "sources": [
+        "pilot_v2"
+      ],
+      "literal": null
+    },
+    "flex": {
+      "label": "FLEX",
+      "unit": "°C",
+      "placeholder": "<FLEX>",
+      "purpose": "performance",
+      "sources": [
+        "pilot_flex"
+      ],
+      "literal": null
+    },
+    "vapp": {
+      "label": "VAPP",
+      "unit": "kt",
+      "placeholder": "<VAPP>",
+      "purpose": "performance",
+      "sources": [
+        "pilot_vapp"
+      ],
+      "literal": null
+    },
+    "takeoff_flaps": {
+      "label": "configuration décollage",
+      "unit": null,
+      "placeholder": "<configuration décollage>",
+      "purpose": "performance",
+      "sources": [
+        "pilot_takeoff_flaps"
+      ],
+      "literal": null
+    },
+    "landing_flaps": {
+      "label": "configuration atterrissage",
+      "unit": null,
+      "placeholder": "<configuration atterrissage>",
+      "purpose": "performance",
+      "sources": [
+        "pilot_landing_flaps"
+      ],
+      "literal": null
+    },
+    "cleared_altitude": {
+      "label": "altitude autorisée",
+      "unit": "ft",
+      "placeholder": "<altitude autorisée>",
+      "purpose": "clearance",
+      "sources": [
+        "pilot_cleared_altitude"
+      ],
+      "literal": null
+    },
+    "cleared_runway": {
+      "label": "piste autorisée",
+      "unit": null,
+      "placeholder": "<piste autorisée>",
+      "purpose": "clearance",
+      "sources": [
+        "pilot_cleared_runway"
+      ],
+      "literal": null
+    },
+    "cleared_sid": {
+      "label": "SID autorisée",
+      "unit": null,
+      "placeholder": "<SID autorisée>",
+      "purpose": "clearance",
+      "sources": [
+        "pilot_cleared_sid"
+      ],
+      "literal": null
+    },
+    "squawk": {
+      "label": "code transpondeur",
+      "unit": null,
+      "placeholder": "<code transpondeur>",
+      "purpose": "clearance",
+      "sources": [
+        "pilot_squawk"
+      ],
+      "literal": null
+    },
+    "frequency": {
+      "label": "fréquence transférée",
+      "unit": "MHz",
+      "placeholder": "<fréquence transférée>",
+      "purpose": "clearance",
+      "sources": [
+        "pilot_frequency"
+      ],
+      "literal": null
+    },
+    "heading": {
+      "label": "cap autorisé",
+      "unit": "deg",
+      "placeholder": "<cap autorisé>",
+      "purpose": "clearance",
+      "sources": [
+        "pilot_heading"
+      ],
+      "literal": null
+    },
+    "speed": {
+      "label": "vitesse autorisée",
+      "unit": "kt",
+      "placeholder": "<vitesse autorisée>",
+      "purpose": "clearance",
+      "sources": [
+        "pilot_speed"
+      ],
+      "literal": null
+    },
+    "taxi_route": {
+      "label": "roulage autorisé",
+      "unit": null,
+      "placeholder": "<roulage autorisé>",
+      "purpose": "clearance",
+      "sources": [
+        "pilot_taxi_route"
+      ],
+      "literal": null
+    },
+    "cleared_qnh": {
+      "label": "QNH reçu",
+      "unit": "hPa",
+      "placeholder": "<QNH reçu>",
+      "purpose": "clearance",
+      "sources": [
+        "pilot_cleared_qnh"
+      ],
+      "literal": null
+    },
+    "station": {
+      "label": "station confirmée",
+      "unit": null,
+      "placeholder": "<station confirmée>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_station"
+      ],
+      "literal": null
+    },
+    "atis_heard": {
+      "label": "lettre ATIS écoutée",
+      "unit": null,
+      "placeholder": "<lettre ATIS écoutée>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_atis_heard"
+      ],
+      "literal": null
+    },
+    "approach_position": {
+      "label": "position approche confirmée",
+      "unit": null,
+      "placeholder": "<position approche confirmée>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_approach_position"
+      ],
+      "literal": null
+    },
+    "exit": {
+      "label": "sortie de piste",
+      "unit": null,
+      "placeholder": "<sortie de piste>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_exit"
+      ],
+      "literal": null
+    },
+    "qnh": {
+      "label": "QNH",
+      "unit": "hPa",
+      "placeholder": "<QNH>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_qnh",
+        "published_qnh"
+      ],
+      "literal": null
+    },
+    "temperature": {
+      "label": "température",
+      "unit": "°C",
+      "placeholder": "<température>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_temperature",
+        "published_temperature"
+      ],
+      "literal": null
+    },
+    "wind": {
+      "label": "vent",
+      "unit": null,
+      "placeholder": "<vent>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_wind",
+        "published_wind"
+      ],
+      "literal": null
+    },
+    "departure_qnh": {
+      "label": "QNH départ",
+      "unit": "hPa",
+      "placeholder": "<QNH départ>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_departure_qnh",
+        "published_departure_qnh"
+      ],
+      "literal": null
+    },
+    "tod": {
+      "label": "TOD MCDU déclaré",
+      "unit": "NM",
+      "placeholder": "<TOD MCDU déclaré>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_tod"
+      ],
+      "literal": null
+    },
+    "verified": {
+      "label": "vérifié",
+      "unit": null,
+      "placeholder": "<vérifié>",
+      "purpose": "procedure",
+      "sources": [],
+      "literal": "VÉRIFIÉ"
+    },
+    "completed": {
+      "label": "checklist effectuée",
+      "unit": null,
+      "placeholder": "<checklist effectuée>",
+      "purpose": "procedure",
+      "sources": [],
+      "literal": "EFFECTUÉE"
+    },
+    "on": {
+      "label": "ON",
+      "unit": null,
+      "placeholder": "<ON>",
+      "purpose": "procedure",
+      "sources": [],
+      "literal": "ON"
+    },
+    "std": {
+      "label": "STD",
+      "unit": null,
+      "placeholder": "<STD>",
+      "purpose": "procedure",
+      "sources": [],
+      "literal": "STD"
+    },
+    "up": {
+      "label": "train rentré",
+      "unit": null,
+      "placeholder": "<train rentré>",
+      "purpose": "procedure",
+      "sources": [],
+      "literal": "LEVIER UP — position du train à vérifier"
+    },
+    "down": {
+      "label": "train sorti",
+      "unit": null,
+      "placeholder": "<train sorti>",
+      "purpose": "procedure",
+      "sources": [],
+      "literal": "LEVIER DOWN — verrouillage à vérifier"
+    }
+  },
+  "phases": [
+    {
+      "id": "preflight",
+      "label": "Prévol",
+      "trigger": {
+        "label": "Suivi démarré au poste",
+        "any_of": [
+          [
+            {
+              "source": "event_session_started",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        ],
+        "hold_s": 0
+      },
+      "groups": [
+        {
+          "id": "preflight_mcdu",
+          "kind": "mcdu",
+          "label": "Préparation MCDU",
+          "steps": [
+            {
+              "id": "init_a",
+              "label": "INIT A : trajet, indicatif, dégagement, niveau et CI",
+              "expected": [
+                "origin",
+                "destination",
+                "callsign",
+                "alternate",
+                "cruise_altitude",
+                "cost_index"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "departure_plan",
+              "label": "F-PLN : piste et SID prévues ; route et discontinuités à vérifier",
+              "expected": [
+                "departure_runway",
+                "sid",
+                "route"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "init_b",
+              "label": "INIT B : masses, centrage, bloc et réserves",
+              "expected": [
+                "zfw",
+                "zfwcg",
+                "block_fuel",
+                "reserve"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "perf_takeoff",
+              "label": "PERF TAKE OFF : recopier les performances manuelles sourcées",
+              "expected": [
+                "v1",
+                "vr",
+                "v2",
+                "flex",
+                "takeoff_flaps",
+                "thrust_reduction",
+                "acceleration",
+                "transition_altitude"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "secondary_plan",
+              "label": "SEC F-PLN : vérifier une variante si nécessaire",
+              "expected": [
+                "verified"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "id": "preflight_fcu",
+          "kind": "fcu",
+          "label": "Préparation FCU",
+          "steps": [
+            {
+              "id": "initial_altitude",
+              "label": "Altitude autorisée ; rester en attente si inconnue",
+              "expected": [
+                "cleared_altitude"
+              ],
+              "priority": 90,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "departure_barometer",
+              "label": "Vérifier et régler le QNH départ sourcé",
+              "expected": [
+                "departure_qnh"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "flight_directors",
+              "label": "Flight directors",
+              "expected": [
+                "on"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "id": "preflight_checks",
+          "kind": "checklist",
+          "label": "Avant mise en route",
+          "steps": [
+            {
+              "id": "before_start_check",
+              "label": "Avant mise en route",
+              "expected": [
+                "completed"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Prêt à mettre en route",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_before_start",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        }
+      ],
+      "radio": [
+        {
+          "id": "radio_clearance",
+          "trigger": {
+            "label": "Au poste, avant mise en route",
+            "any_of": [
+              [
+                {
+                  "source": "event_before_start",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "DEL",
+            "GND",
+            "TWR",
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, A320 au poste {stand}, demandons clairance IFR vers {destination}, information {atis_heard}.",
+            "readback": "Piste {cleared_runway}, SID {cleared_sid}, altitude {cleared_altitude}, code {squawk}, QNH {cleared_qnh}, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, A320 stand {stand}, request IFR clearance to {destination}, information {atis_heard}.",
+            "readback": "Runway {cleared_runway}, SID {cleared_sid}, altitude {cleared_altitude}, squawk {squawk}, QNH {cleared_qnh}, {callsign}."
+          },
+          "unicom_en": null
+        }
+      ]
+    },
+    {
+      "id": "departure",
+      "label": "Départ",
+      "trigger": {
+        "label": "Pilote prêt pour mise en route, repoussage et roulage",
+        "any_of": [
+          [
+            {
+              "source": "event_departure_ready",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        ],
+        "hold_s": 0
+      },
+      "groups": [
+        {
+          "id": "departure_mcdu",
+          "kind": "mcdu",
+          "label": "Départ confirmé",
+          "steps": [
+            {
+              "id": "check_cleared_route",
+              "label": "Comparer la clairance au F-PLN ; modifier et vérifier manuellement",
+              "expected": [
+                "cleared_runway",
+                "cleared_sid",
+                "route"
+              ],
+              "priority": 90,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_departure",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "id": "departure_fcu",
+          "kind": "fcu",
+          "label": "Autorisations départ",
+          "steps": [
+            {
+              "id": "departure_altitude",
+              "label": "Régler l’altitude autorisée",
+              "expected": [
+                "cleared_altitude"
+              ],
+              "priority": 90,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_departure",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "transponder",
+              "label": "Régler le code reçu",
+              "expected": [
+                "squawk"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_departure",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "id": "departure_checks",
+          "kind": "checklist",
+          "label": "Mise en route et piste",
+          "steps": [
+            {
+              "id": "after_start_check",
+              "label": "Après mise en route",
+              "expected": [
+                "completed"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Mise en route terminée",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_after_start",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "before_taxi_check",
+              "label": "Avant roulage / roulage",
+              "expected": [
+                "completed"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Prêt à rouler",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_before_taxi",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "before_takeoff_check",
+              "label": "Avant décollage",
+              "expected": [
+                "completed"
+              ],
+              "priority": 90,
+              "trigger": {
+                "label": "Au point d’arrêt",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_holding_point",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        }
+      ],
+      "radio": [
+        {
+          "id": "radio_pushback",
+          "trigger": {
+            "label": "Prêt à repousser",
+            "any_of": [
+              [
+                {
+                  "source": "event_ready_pushback",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "GND",
+            "TWR",
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, poste {stand}, demandons mise en route et repoussage.",
+            "readback": "<instruction effectivement reçue>, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, stand {stand}, request start-up and pushback.",
+            "readback": "<actual instruction received>, {callsign}."
+          },
+          "unicom_en": "{origin} pushing back stand {stand} {origin}"
+        },
+        {
+          "id": "radio_taxi",
+          "trigger": {
+            "label": "Prêt à rouler",
+            "any_of": [
+              [
+                {
+                  "source": "event_before_taxi",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "GND",
+            "TWR",
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, demandons roulage.",
+            "readback": "{taxi_route}, piste {cleared_runway}, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, request taxi.",
+            "readback": "{taxi_route}, runway {cleared_runway}, {callsign}."
+          },
+          "unicom_en": "{origin} taxiing to holding point runway {departure_runway} {origin}"
+        },
+        {
+          "id": "radio_takeoff",
+          "trigger": {
+            "label": "Au point d’arrêt, prêt",
+            "any_of": [
+              [
+                {
+                  "source": "event_holding_point",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "TWR",
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, prêt au départ piste {cleared_runway}.",
+            "readback": "<autorisation effectivement reçue>, piste {cleared_runway}, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, ready for departure runway {cleared_runway}.",
+            "readback": "<actual clearance received>, runway {cleared_runway}, {callsign}."
+          },
+          "unicom_en": "{origin} departing runway {departure_runway} {sid} {origin}"
+        }
+      ]
+    },
+    {
+      "id": "climb",
+      "label": "Montée",
+      "trigger": {
+        "label": "En vol, montée persistante",
+        "any_of": [
+          [
+            {
+              "source": "on_ground",
+              "op": "eq",
+              "value": false
+            },
+            {
+              "source": "vertical_speed",
+              "op": "gt",
+              "value": 300
+            }
+          ]
+        ],
+        "hold_s": 8
+      },
+      "groups": [
+        {
+          "id": "climb_fcu",
+          "kind": "fcu",
+          "label": "Montée",
+          "steps": [
+            {
+              "id": "climb_std",
+              "label": "Passer en STD à l’altitude de transition déclarée",
+              "expected": [
+                "std",
+                "transition_altitude"
+              ],
+              "priority": 80,
+              "trigger": {
+                "label": "Franchissement de l’altitude de transition",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_transition_up",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "observed",
+                "automatic": {
+                  "signal": "baro_std",
+                  "equals": true
+                }
+              }
+            },
+            {
+              "id": "climb_clearance",
+              "label": "Respecter l’altitude autorisée, distincte de la croisière prévue",
+              "expected": [
+                "cleared_altitude",
+                "cruise_altitude"
+              ],
+              "priority": 90,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_climb",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "id": "climb_checks",
+          "kind": "checklist",
+          "label": "Après décollage",
+          "steps": [
+            {
+              "id": "gear_up",
+              "label": "Levier de train rentré ; vérifier séparément la position réelle",
+              "expected": [
+                "up"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_climb",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "observed",
+                "automatic": {
+                  "signal": "gear_handle_down",
+                  "equals": false
+                }
+              }
+            },
+            {
+              "id": "after_takeoff_check",
+              "label": "Après décollage",
+              "expected": [
+                "completed"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Après décollage",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_after_takeoff",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        }
+      ],
+      "radio": [
+        {
+          "id": "radio_departure_contact",
+          "trigger": {
+            "label": "Sur transfert reçu après décollage",
+            "any_of": [
+              [
+                {
+                  "source": "event_handoff",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "DEP",
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, <altitude actuelle>, en montée vers {cleared_altitude}.",
+            "readback": "{frequency}, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, <current altitude>, climbing to {cleared_altitude}.",
+            "readback": "{frequency}, {callsign}."
+          },
+          "unicom_en": null
+        }
+      ]
+    },
+    {
+      "id": "cruise",
+      "label": "Croisière",
+      "trigger": {
+        "label": "Proche du niveau prévu et vario stable",
+        "any_of": [
+          [
+            {
+              "source": "on_ground",
+              "op": "eq",
+              "value": false
+            },
+            {
+              "source": "vertical_speed",
+              "op": "gte",
+              "value": -300
+            },
+            {
+              "source": "vertical_speed",
+              "op": "lte",
+              "value": 300
+            },
+            {
+              "source": "cruise_gap",
+              "op": "gte",
+              "value": -1000
+            },
+            {
+              "source": "cruise_gap",
+              "op": "lte",
+              "value": 1000
+            }
+          ]
+        ],
+        "hold_s": 30
+      },
+      "groups": [
+        {
+          "id": "cruise_mcdu",
+          "kind": "mcdu",
+          "label": "Préparer l’arrivée avant le TOD",
+          "steps": [
+            {
+              "id": "arrival_plan",
+              "label": "F-PLN : piste, STAR, VIA et approche ; confirmer la proposition",
+              "expected": [
+                "arrival_runway",
+                "star",
+                "via",
+                "approach"
+              ],
+              "priority": 80,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_cruise",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "perf_approach",
+              "label": "PERF APPR : météo publiée ou déclarée, minima et performances sourcées",
+              "expected": [
+                "qnh",
+                "temperature",
+                "wind",
+                "minima",
+                "landing_flaps",
+                "vapp"
+              ],
+              "priority": 80,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_cruise",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "rad_nav",
+              "label": "RAD NAV : vérifier les aides sur les cartes citées",
+              "expected": [
+                "navigation_aid"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_cruise",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "tod_fuel",
+              "label": "Vérifier le TOD MCDU déclaré et le carburant prévu à l’arrivée",
+              "expected": [
+                "tod",
+                "landing_fuel"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_cruise",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "approach_briefing",
+              "label": "Briefing : piste, approche, minima, remise des gaz, sortie",
+              "expected": [
+                "arrival_runway",
+                "approach",
+                "minima",
+                "exit"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_cruise",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "id": "cruise_fcu",
+          "kind": "fcu",
+          "label": "Croisière et autorisation de descente",
+          "steps": [
+            {
+              "id": "descent_altitude",
+              "label": "Au TOD, utiliser uniquement l’altitude autorisée",
+              "expected": [
+                "cleared_altitude"
+              ],
+              "priority": 90,
+              "trigger": {
+                "label": "Clairance de descente reçue",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_descent_clearance",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        }
+      ],
+      "radio": [
+        {
+          "id": "radio_descent_request",
+          "trigger": {
+            "label": "Avant TOD fourni, si descente nécessaire",
+            "any_of": [
+              [
+                {
+                  "source": "event_before_tod",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "CTR",
+            "APP"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, demandons descente quand prêt.",
+            "readback": "<instruction effectivement reçue>, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, request descent when ready.",
+            "readback": "<actual instruction received>, {callsign}."
+          },
+          "unicom_en": null
+        },
+        {
+          "id": "radio_enroute",
+          "trigger": {
+            "label": "Annonce utile à proximité d’un trafic ou aérodrome",
+            "any_of": [
+              [
+                {
+                  "source": "event_traffic_announcement",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, <position et niveau actuels>.",
+            "readback": "<instruction effectivement reçue>, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, <current position and level>.",
+            "readback": "<actual instruction received>, {callsign}."
+          },
+          "unicom_en": "<area> <position, level and intention> <area>"
+        }
+      ]
+    },
+    {
+      "id": "descent",
+      "label": "Descente",
+      "trigger": {
+        "label": "Descente persistante après croisière",
+        "any_of": [
+          [
+            {
+              "source": "on_ground",
+              "op": "eq",
+              "value": false
+            },
+            {
+              "source": "cruise_seen",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "source": "vertical_speed",
+              "op": "lt",
+              "value": -300
+            }
+          ]
+        ],
+        "hold_s": 15
+      },
+      "groups": [
+        {
+          "id": "descent_mcdu",
+          "kind": "mcdu",
+          "label": "Arrivée",
+          "steps": [
+            {
+              "id": "update_arrival",
+              "label": "Revoir piste, météo et minima après toute modification",
+              "expected": [
+                "arrival_runway",
+                "qnh",
+                "wind",
+                "minima"
+              ],
+              "priority": 80,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_descent",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "activate_approach_phase",
+              "label": "Vérifier / activer la phase approche MCDU quand approprié",
+              "expected": [
+                "verified"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_descent",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "id": "descent_fcu",
+          "kind": "fcu",
+          "label": "Descente",
+          "steps": [
+            {
+              "id": "descent_qnh",
+              "label": "Passer au QNH au niveau de transition déclaré",
+              "expected": [
+                "qnh",
+                "transition_level"
+              ],
+              "priority": 80,
+              "trigger": {
+                "label": "Franchissement du niveau de transition",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_transition_down",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "descent_constraints",
+              "label": "Vérifier les contraintes et valeurs autorisées",
+              "expected": [
+                "cleared_altitude",
+                "speed"
+              ],
+              "priority": 90,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_descent",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "id": "descent_checks",
+          "kind": "checklist",
+          "label": "Approche",
+          "steps": [
+            {
+              "id": "approach_check",
+              "label": "Approche",
+              "expected": [
+                "completed"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Prêt pour l’approche",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_approach_ready",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        }
+      ],
+      "radio": [
+        {
+          "id": "radio_approach_contact",
+          "trigger": {
+            "label": "Sur transfert vers l’approche",
+            "any_of": [
+              [
+                {
+                  "source": "event_handoff",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, <altitude actuelle>, descente vers {cleared_altitude}, information {atis_heard}.",
+            "readback": "<instruction effectivement reçue>, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, <current altitude>, descending to {cleared_altitude}, information {atis_heard}.",
+            "readback": "<actual instruction received>, {callsign}."
+          },
+          "unicom_en": "{destination} <position> inbound runway {arrival_runway} {destination}"
+        }
+      ]
+    },
+    {
+      "id": "arrival",
+      "label": "Arrivée",
+      "trigger": {
+        "label": "Proche destination en descente, ou arrivée déjà atteinte au sol",
+        "any_of": [
+          [
+            {
+              "source": "cruise_seen",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "source": "on_ground",
+              "op": "eq",
+              "value": false
+            },
+            {
+              "source": "destination_distance",
+              "op": "lte",
+              "value": 60
+            },
+            {
+              "source": "altitude_agl",
+              "op": "lte",
+              "value": 10000
+            },
+            {
+              "source": "vertical_speed",
+              "op": "lte",
+              "value": 0
+            }
+          ],
+          [
+            {
+              "source": "arrival_seen",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "source": "on_ground",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        ],
+        "hold_s": 8
+      },
+      "groups": [
+        {
+          "id": "arrival_mcdu",
+          "kind": "mcdu",
+          "label": "Approche confirmée",
+          "steps": [
+            {
+              "id": "final_approach_data",
+              "label": "Confirmer piste, approche et minima dans le MCDU",
+              "expected": [
+                "arrival_runway",
+                "approach",
+                "minima"
+              ],
+              "priority": 80,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_arrival",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        },
+        {
+          "id": "arrival_fcu",
+          "kind": "fcu",
+          "label": "Approche",
+          "steps": [
+            {
+              "id": "appr_button",
+              "label": "Vérifier le bouton APPR si nécessaire ; vérifier le FMA séparément",
+              "expected": [
+                "verified"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_arrival",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "second_ap",
+              "label": "Vérifier le second AP si approprié à l’approche",
+              "expected": [
+                "verified"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_arrival",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "gear_down",
+              "label": "Levier de train sorti ; vérifier séparément le verrouillage",
+              "expected": [
+                "down"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Pendant la phase visible",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_arrival",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "observed",
+                "automatic": {
+                  "signal": "gear_handle_down",
+                  "equals": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "arrival_checks",
+          "kind": "checklist",
+          "label": "Atterrissage et parking",
+          "steps": [
+            {
+              "id": "landing_check",
+              "label": "Atterrissage",
+              "expected": [
+                "completed"
+              ],
+              "priority": 90,
+              "trigger": {
+                "label": "Avant atterrissage",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_landing_ready",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "after_landing_check",
+              "label": "Après atterrissage",
+              "expected": [
+                "completed"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Piste dégagée",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_runway_vacated",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "parking_check",
+              "label": "Parking",
+              "expected": [
+                "completed"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Au poste",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_parked",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "securing_check",
+              "label": "Sécurisation",
+              "expected": [
+                "completed"
+              ],
+              "priority": 50,
+              "trigger": {
+                "label": "Prêt à sécuriser",
+                "any_of": [
+                  [
+                    {
+                      "source": "event_securing",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            }
+          ]
+        }
+      ],
+      "radio": [
+        {
+          "id": "radio_landing",
+          "trigger": {
+            "label": "Sur transfert vers la tour",
+            "any_of": [
+              [
+                {
+                  "source": "event_handoff",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "TWR",
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, {approach_position}, piste {arrival_runway}.",
+            "readback": "<autorisation effectivement reçue>, piste {cleared_runway}, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, {approach_position}, runway {arrival_runway}.",
+            "readback": "<actual clearance received>, runway {cleared_runway}, {callsign}."
+          },
+          "unicom_en": "{destination} <distance> final runway {arrival_runway} {destination}"
+        },
+        {
+          "id": "radio_go_around",
+          "trigger": {
+            "label": "Remise des gaz déclarée par le pilote",
+            "any_of": [
+              [
+                {
+                  "source": "event_go_around",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "TWR",
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, remise des gaz.",
+            "readback": "<instruction effectivement reçue>, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, going around.",
+            "readback": "<actual instruction received>, {callsign}."
+          },
+          "unicom_en": "{destination} going around runway {arrival_runway} {destination}"
+        },
+        {
+          "id": "radio_vacated",
+          "trigger": {
+            "label": "Piste dégagée",
+            "any_of": [
+              [
+                {
+                  "source": "event_runway_vacated",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 70,
+          "station_roles": [
+            "GND",
+            "TWR",
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, piste dégagée par {exit}, demandons roulage au poste {stand}.",
+            "readback": "{taxi_route}, poste {stand}, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, runway vacated via {exit}, request taxi to stand {stand}.",
+            "readback": "{taxi_route}, stand {stand}, {callsign}."
+          },
+          "unicom_en": "{destination} vacated runway {arrival_runway} {destination}"
+        }
+      ]
+    }
+  ]
+}

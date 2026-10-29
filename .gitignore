@@ -52,6 +52,11 @@
 !/src/glareshield/aibridge/presets.py
 !/src/glareshield/aibridge/ivao.py
 !/src/glareshield/aibridge/demo_ofp.json
+!/src/glareshield/copilot/
+/src/glareshield/copilot/*
+!/src/glareshield/copilot/__init__.py
+!/src/glareshield/copilot/contract.py
+!/src/glareshield/copilot/a320.json
 !/src/glareshield/drivers/
 /src/glareshield/drivers/*
 !/src/glareshield/drivers/__init__.py
@@ -65,6 +70,7 @@
 /examples/*
 !/examples/demo.yaml
 !/examples/fenix-a320.yaml
+!/examples/copilot-six-phases.json
 !/scripts/
 /scripts/*
 !/scripts/discover.py
@@ -96,6 +102,7 @@
 !/tests/test_telemetry_source.py
 !/tests/test_fenix.py
 !/tests/test_ivao.py
+!/tests/test_copilot_contract.py
 !/docs/
 /docs/*
 !/docs/architecture.md
@@ -105,6 +112,8 @@
 !/docs/ai-bridge.md
 !/docs/SKILL.md
 !/docs/fenix-a320.md
+!/docs/copilot-contract.md
+!/docs/copilot-mockup.md
 
 # Private installation data must never enter Git.
 /local/
