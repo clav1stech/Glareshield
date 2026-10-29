@@ -181,8 +181,9 @@ function flightPendingView(view) {
   action('Prêt pour le départ', () => sessionAction('declarations', 'PUT', { declaration: {
     kind: 'event', field: 'event.departure_ready', value: true, reference: 'Geste explicite du pilote', context: { stage: 'departure' },
   } }), phaseActions).disabled = effectivePhase !== 'preflight';
+  flightNetworkView(view, data.network);
   declarationForms(view, session);
-  let current = card(view, 'Déclarations du pilote', 'Saisies explicites, datées et révisées ; aucune interprétation des notes libres. L’ATIS est déclaré consulté à l’heure saisie.');
+  let current = card(view, 'Déclarations du pilote', 'Saisies explicites, datées et révisées ; aucune interprétation des notes libres. Consultation et annonce ATIS sont déclarées séparément, à l’heure saisie.');
   if (!session.declarations.length) current.append(el('p', 'Aucune déclaration.'));
   for (let d of session.declarations) {
     let line = el('div', null, { className: 'card' });
@@ -232,9 +233,10 @@ async function sessionAction(path, method = 'POST', values = {}) {
 
 let declarationDrafts = {};
 const DECLARATION_LABELS = {
-  clearance:'Clairance', selection:'Choix', atis:'ATIS consulté', performance:'Performance',
+  clearance:'Clairance', selection:'Choix', atis:'ATIS déclaré', performance:'Performance',
   altitude:'Altitude autorisée', heading:'Cap autorisé', speed:'Vitesse autorisée', squawk:'Code transpondeur', instruction:'Instruction reçue',
-  runway:'Piste', approach:'Approche', sid:'SID', star:'STAR', heard_letter:'Lettre écoutée',
+  runway:'Piste', approach:'Approche', sid:'SID', star:'STAR', heard_letter:'Lettre écoutée', announced_letter:'Lettre annoncée', callsign:'Indicatif utilisé',
+  preflight:'Prévol', cruise:'Croisière',
   v1:'V1', vr:'VR', v2:'V2', flex:'FLEX', vapp:'VAPP', thr_red:'THR RED', acc:'ACC',
   departure:'Départ', arrival:'Arrivée', climb:'Montée', descent:'Descente', taxi:'Roulage', transfer:'Transfert',
   type:'Type', station:'Station', stage:'Départ / arrivée', airport:'Aérodrome', version:'Version ATIS',
@@ -242,7 +244,7 @@ const DECLARATION_LABELS = {
 };
 function declarationLabel(value) {
   let text = String(value), parts = text.split('.');
-  return parts.length === 2 && ['clearance','selection','atis','performance'].includes(parts[0])
+  return parts.length === 2 && ['clearance','selection','atis','performance','station'].includes(parts[0])
     ? parts.map(key => DECLARATION_LABELS[key] || key).join(' · ') : DECLARATION_LABELS[text] || text;
 }
 function declarationForms(view, session) {
@@ -250,10 +252,13 @@ function declarationForms(view, session) {
   for (let [kind, title, fields, contextFields] of [
     ['clearance', 'Déclarer une clairance', ['altitude', 'heading', 'speed', 'squawk', 'instruction'], [['type','Type de clairance', ['departure','climb','descent','approach','runway','taxi','transfer']], ['station','Station / origine']]],
     ['selection', 'Déclarer la piste ou l’approche retenue', ['runway','approach','sid','star'], [['stage','Départ / arrivée', ['departure','arrival']]]],
-    ['atis', 'Déclarer un ATIS effectivement consulté', ['heard_letter'], [['airport','Aérodrome OACI'], ['version','Version / référence du bulletin']]],
+    ['atis', 'Déclarer un ATIS consulté ou annoncé', ['heard_letter','announced_letter'], [['airport','Aérodrome OACI'], ['version','Version / référence du bulletin']]],
+    ['station', 'Déclarer la station réellement utilisée', ['callsign'], [['stage','Phase de déclaration', ['preflight','departure','climb','cruise','descent','arrival']]]],
     ['performance', 'Déclarer une performance manuelle', ['v1','vr','v2','flex','vapp','thr_red','acc'], [['aircraft','Appareil'], ['runway','Piste'], ['mass','Masse et unité'], ['configuration','Configuration'], ['weather','Météo associée']]],
   ]) {
     let draft = declarationDrafts[kind] ||= {}, details = el('details', null);
+    details.open = !!draft.open;
+    details.ontoggle = () => { draft.open = details.open; };
     details.append(el('summary', title)); view.append(details);
     let c = card(details, title, 'Référence et contexte obligatoires. Une nouvelle saisie remplace le même champ ; l’historique est conservé.');
     const draftField = (key, label, choices = null) => {
@@ -266,7 +271,7 @@ function declarationForms(view, session) {
     let getTime = null;
     if (kind === 'atis') {
       let now = new Date(), local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0,16);
-      getTime = field(c, 'ATIS consulté le', draft.time || local, 'datetime-local');
+      getTime = field(c, 'ATIS consulté ou annoncé le', draft.time || local, 'datetime-local');
       c.lastChild.querySelector('input').oninput = () => { draft.time = getTime(); };
     }
     let getters = contextFields.map(([key,label,choices]) => [key, draftField(key,label,choices)]);
@@ -280,6 +285,49 @@ function declarationForms(view, session) {
       render();
     }, cardActions(c), 'primary');
   }
+}
+let networkDetailsOpen = false;
+function flightNetworkView(view, network) {
+  if (!network) return;
+  const states = { disabled:'Intégration désactivée', unknown:'Flux inconnu', stale:'Données périmées', empty:'Aucune position candidate en ligne', current:'Cache disponible' };
+  const sourceLabel = source => {
+    if (!source) return 'Source inconnue';
+    const status = { current:'actuel', stale:'périmé', unavailable:'inconnu' }[source.status] || source.status;
+    return source.source + ' · ' + status + (source.age_s == null ? ' · âge inconnu' : ' · âge ' + Math.floor(source.age_s) + ' s');
+  };
+  let c = card(view, 'Réseau pour le suivi', states[network.state] || 'État inconnu');
+  c.append(el('p', network.notice, { className: 'muted' }));
+  if (connectionLost) c.append(el('p', 'Connexion à Glareshield perdue : état réseau non confirmé.', { className: 'banner warn' }));
+  if (network.used_station) c.append(el('p', 'Station utilisée : ' + network.used_station.value + ' · déclarée par le pilote · ' + Math.floor(network.used_station.age_s) + ' s · ' + ({ disabled:'intégration désactivée', unknown:'présence inconnue', stale:'présence non confirmée, flux périmé', online:'position publiée en ligne', offline:'position absente du dernier flux' }[network.used_station_state]) + '. Cette déclaration ne confirme pas la couverture.'));
+  else c.append(el('p', 'Station utilisée : <station à déclarer>.'));
+  if (network.state === 'disabled') return;
+  c.append(el('p', sourceLabel(network.feeds.whazzup), { className: 'muted' }));
+  let positions = (network.positions || []).filter(p => p.useful_for.length || p.pilot_selected);
+  if (!positions.length && network.positions !== null) c.append(el('p', 'Aucune position candidate pour la phase courante ou suivante. La couverture reste à vérifier.'));
+  for (let p of positions) {
+    let matches = p.matched_by.map(m => ({ callsign_prefix:'Préfixe OACI', distance_to_airport:'Proximité aérodrome', distance_to_aircraft:'Proximité appareil', published_range:'Portée publiée' }[m.basis] || m.basis) + (m.airport ? ' ' + m.airport : '')).join(', ');
+    c.append(el('p', p.callsign + (p.frequency_mhz == null ? ' · fréquence inconnue' : ' · ' + p.frequency_mhz.toFixed(3) + ' MHz publiée') + ' · ' + p.useful_for.map(slot => slot === 'current' ? 'phase courante' : 'phase suivante').join(', ') + ' · ' + (matches || 'Déclaration pilote') + ' · couverture non confirmée' + (p.pilot_selected ? ' · station déclarée utilisée' : '')));
+  }
+  let details = el('details', null);
+  details.open = networkDetailsOpen;
+  details.ontoggle = () => { networkDetailsOpen = details.open; };
+  details.append(el('summary', 'ATIS et météo publiés')); c.append(details);
+  for (let a of network.atis) {
+    details.append(el('h4', a.station + ' · ATIS téléchargé ' + (a.revision || '<lettre inconnue>')));
+    details.append(el('p', sourceLabel(a.provenance) + ' · texte non interprété · référence ' + a.reference, { className: 'muted' }));
+    details.append(el('pre', a.lines.join('\n')));
+  }
+  if (!network.atis.length) details.append(el('p', 'Aucun ATIS téléchargé pour les positions candidates.'));
+  for (let w of network.weather) for (let kind of ['metar', 'taf']) {
+    let bulletin = w[kind];
+    details.append(el('h4', w.icao + ' · ' + kind.toUpperCase() + ' IVAO'));
+    details.append(el('p', sourceLabel(bulletin.provenance), { className: 'muted' }));
+    details.append(el('pre', bulletin.raw || ({ feed_unavailable:'Flux inconnu', not_published:'Bulletin non publié' }[bulletin.status] || 'Inconnu')));
+    if (bulletin.values) for (let [key, value] of Object.entries(bulletin.values)) {
+      details.append(el('p', ({ qnh:'QNH', temperature:'Température', wind:'Vent' }[key]) + ' : ' + (value.value ?? '<inconnu>') + (value.unit ? ' ' + value.unit : '') + ' · ' + ({ available:'publié', stale:'périmé', unavailable:'inconnu' }[value.status]) + ' · lecture ' + ({ parsed:'réussie', ambiguous:'ambiguë', missing:'absente', unsupported:'format non pris en charge', truncated:'texte tronqué' }[value.reading_status])));
+    }
+  }
+  for (let a of network.pilot_atis) c.append(el('p', (a.field === 'atis.announced_letter' ? 'ATIS annoncé' : 'ATIS consulté') + ' : ' + a.context.airport + ' ' + a.value + ' · déclaré à ' + new Date(a.occurred_at * 1000).toLocaleString('fr-FR') + ' · ' + ({ same_letter:'même lettre publiée ; vérifier aussi le texte', different_letter:'lettre publiée différente : nouvelle consultation à confirmer', unknown:'comparaison non confirmée' }[a.comparison] || 'comparaison non confirmée'), { className: a.comparison === 'different_letter' ? 'banner warn' : 'muted' }));
 }
 function settingsHome(view) {
   for (let [category, names] of SETTINGS) {

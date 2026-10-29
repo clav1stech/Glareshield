@@ -2,6 +2,25 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.4] - 2026-10-29
+
+- Issue #15 : contexte IVAO partagé pour le suivi, provenance, événements et déclarations pilote
+- Vol et les futurs moteurs de rappels/radio disposent du même adaptateur du
+  cache IVAO existant : positions utiles aux phases courante/suivante, fréquences,
+  ATIS et météo, avec provenance et âges de récupération et de publication.
+- Intégration désactivée, flux inconnu, absence de positions candidates et
+  données périmées restent distincts. Le rapprochement géographique et le
+  préfixe OACI ne confirment jamais la couverture ATC ; station réellement
+  utilisée déclarable, persistante et révocable, sans réglage radio.
+- Flux d’événements partagé, borné et non consommant, produit par les mécanismes
+  existants de présence et de suivi ATIS, sans doubler les notifications.
+- ATIS téléchargé, consulté et annoncé restent séparés. Extraction limitée aux
+  groupes METAR reconnus, avec texte source et statut de lecture ; ambiguïtés
+  et formats non pris en charge restent inconnus. Météos IVAO, OFP et MSFS distinctes.
+- Documentation du raccordement de la PR #9 à #10 et des limites pour #18/#19.
+  Tests sur fixtures fictives, racines isolées et parcours Edge, sans requête
+  IVAO au rendu ni commande cockpit. Panneaux et brouillons préservés au rafraîchissement.
+
 ## [1.2.3] - 2026-10-29
 
 - Issue #14 : moteur indépendant des six phases de vol, indices, méthode,

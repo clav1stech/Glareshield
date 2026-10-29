@@ -11,8 +11,11 @@ import math
 import re
 import time
 import unicodedata
+from collections import deque
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import httpx
 
@@ -409,6 +412,10 @@ class IVAOService:
         # Presence watch: callsigns online at the last retrieval and the watched positions among them.
         self.online: set[str] | None = None
         self.watched: dict[str, dict] = {}
+        # One bounded, non-consuming stream for reminders; the overlay remains the only notifier.
+        self.event_stream = uuid4().hex
+        self.event_sequence = 0
+        self.events = deque(maxlen=256)
         # Set by the bridge: returns (airports, aircraft position or None, route points) of the current flight.
         self.context = None
         # Set by the runtime: callable(lines, seconds) showing a notice outside the web interface.
@@ -435,6 +442,7 @@ class IVAOService:
                 feed.reset()
             self.atis_seen, self.atis_changes, self.baseline = {}, {}, False
             self.online, self.watched = None, {}
+            self.events.clear()
         self.apply()
 
     def attach(self) -> None:
@@ -552,11 +560,14 @@ class IVAOService:
                 previous = self.atis_seen.get(callsign)
                 if previous is None:
                     self.atis_changes[callsign] = {'kind': 'new', 'detected_at': now}
+                    self.record_event('atis_new', callsign, now, revision=signature[0])
                 elif previous != signature:
                     change = {'kind': 'revision' if previous[0] != signature[0] else 'text', 'detected_at': now}
                     if change['kind'] == 'revision' and previous[0]:
                         change['previous_revision'] = previous[0]
                     self.atis_changes[callsign] = change
+                    self.record_event('atis_changed', callsign, now, revision=signature[0],
+                                      previous_revision=previous[0], change=change['kind'])
         self.atis_seen, self.baseline = current, True
         self.atis_changes = {key: value for key, value in self.atis_changes.items()
                              if key in current and now-value['detected_at'] <= CHANGE_KEEP_S}
@@ -577,7 +588,8 @@ class IVAOService:
                     for lat, lon in route):
                 reasons.append('sur la route')
             if reasons:
-                result[station['callsign']] = {'station': station, 'reasons': list(dict.fromkeys(reasons))}
+                result[station['callsign']] = {'station': station, 'matched_by': matches,
+                                               'reasons': list(dict.fromkeys(reasons))}
         return result
 
     def track_presence(self, stations: list[dict]) -> None:
@@ -587,6 +599,15 @@ class IVAOService:
         from the whole network is announced if it was watched at the previous retrieval."""
         online = {station['callsign'] for station in stations if station['kind'] == 'atc'}
         watched = self.watch(stations)
+        if self.online is not None:
+            for kind, entries in (
+                    ('connected', {key: item for key, item in watched.items() if key not in self.online}),
+                    ('disconnected', {key: item for key, item in self.watched.items() if key not in online})):
+                for callsign, item in entries.items():
+                    station = item['station']
+                    self.record_event(kind, callsign, self.clock(), position=station['position'],
+                                      frequency_mhz=station['frequency_mhz'], matched_by=item['matched_by'],
+                                      reasons=item['reasons'])
         if self.online is not None and self.settings.notifications and self.notifier:
             lines = [notice('connecté', item) for callsign, item in watched.items() if callsign not in self.online]
             lines += [notice('déconnecté', item) for callsign, item in self.watched.items() if callsign not in online]
@@ -598,6 +619,18 @@ class IVAOService:
                 except Exception:
                     pass
         self.online, self.watched = online, watched
+
+    def record_event(self, kind: str, callsign: str, now: float, **details) -> None:
+        self.event_sequence += 1
+        self.events.append({'sequence': self.event_sequence, 'kind': kind, 'callsign': callsign,
+                            'detected_utc': iso(now), **deepcopy(details)})
+
+    def event_view(self, after: int = 0) -> dict:
+        """Read without consuming, notifying or fetching; cursor is scoped to this process's stream."""
+        oldest = self.events[0]['sequence'] if self.events else self.event_sequence+1
+        return {'stream_id': self.event_stream, 'latest_sequence': self.event_sequence,
+                'oldest_sequence': oldest, 'gap': after < oldest-1,
+                'events': deepcopy([event for event in self.events if event['sequence'] > after])}
 
     # Read-only views
 

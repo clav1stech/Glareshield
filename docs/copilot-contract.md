@@ -83,6 +83,11 @@ arbitraire à un objet ou HTML issu d’un profil n’est autorisé.
 
 ## Sources et valeurs qualifiées
 
+Le [contexte réseau livré en 1.2.4](copilot-network.md) raccorde désormais les
+publications METAR structurées, les positions candidates et les événements IVAO
+à la session. Il précise les limites et remplace les mentions prospectives de
+#15 ci-dessous ; les moteurs de rappels #18 et de radio #19 restent à raccorder.
+
 Une source décrit un chemin d’adaptateur, sa nature, son type (`number`, `bool`,
 `string`), l’unité **normalisée** et
 son éventuel âge maximal. Les chemins sont des données, pas des expressions.

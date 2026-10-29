@@ -36,7 +36,7 @@ def plan_identity(plan: dict) -> str:
 
 
 class DeclarationInput(StrictModel):
-    kind: Literal['clearance', 'selection', 'atis', 'performance', 'event']
+    kind: Literal['clearance', 'selection', 'atis', 'performance', 'event', 'station']
     field: Annotated[str, Field(pattern=r'^[a-z][a-z0-9_.]{0,79}$')]
     value: Scalar
     unit: Text | None = None
@@ -52,6 +52,7 @@ class DeclarationInput(StrictModel):
             'atis': ('airport', 'version'),
             'performance': ('aircraft', 'runway', 'mass', 'configuration', 'weather'),
             'event': ('stage',),
+            'station': ('stage',),
         }[self.kind]
         if not self.field.startswith(self.kind+'.') or any(
                 key not in self.context or self.context[key] in ('', None) or (
@@ -76,6 +77,13 @@ class DeclarationInput(StrictModel):
             import re
             if not re.fullmatch(r'[A-Z]{4}', str(self.context['airport'])):
                 raise ValueError('Aérodrome ATIS : quatre lettres OACI.')
+        if self.kind == 'station':
+            import re
+            if self.field != 'station.callsign' or not isinstance(self.value, str) or not re.fullmatch(
+                    r'[A-Z0-9][A-Z0-9_-]{1,23}', self.value):
+                raise ValueError('Indicatif de station explicite requis (majuscules).')
+            if self.context['stage'] not in ('preflight', 'departure', 'climb', 'cruise', 'descent', 'arrival'):
+                raise ValueError('Phase de déclaration inconnue.')
         return self
 
 
@@ -457,6 +465,7 @@ class SessionService:
                 groups.append({'phase': phase.id, 'phase_label': phase.label, 'label': group.label, 'steps': steps})
         return {'universe': self.universe, 'session': session.model_dump() if session else None,
                 'phase': phase_view,
+                'network': self.bridge.flight_network.view(phase_view, session),
                 'warnings': warnings, 'storage_blocked': self.universe in self.errors,
                 'archived_count': max(0, len(document.sessions)-1), 'groups': groups,
                 'phases': [{'id': p.id, 'label': p.label} for p in self.profile.phases]}

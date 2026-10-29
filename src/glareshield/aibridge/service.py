@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ..config import atomic_write
 from ..copilot.session import SessionService
+from ..copilot.network import NetworkContext
 from .catalog import GROUPS, STANDARD, Entry
 from .config import AIBridgeSettings, load_settings, save_settings
 from .context import LEVELS, build_context, chat_text, iso, serialize
@@ -42,6 +43,7 @@ class AIBridge:
         self.ivao = IVAOService(clock, network_transport, self.settings.ivao)
         self.ivao.context = self.watch_context
         self.sessions = SessionService(self)
+        self.flight_network = NetworkContext(self)
 
     # Catalogue
 

@@ -7,7 +7,8 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ALLOWED = {'src/glareshield/copilot/phases.py','tests/test_copilot_phases.py','docs/copilot-phases.md',
+ALLOWED = {'src/glareshield/copilot/network.py','tests/test_copilot_network.py','docs/copilot-network.md',
+           'src/glareshield/copilot/phases.py','tests/test_copilot_phases.py','docs/copilot-phases.md',
            'src/glareshield/static/copilot.js','tests/test_preparation.py','tests/test_preparation_ui.cjs',
            'src/glareshield/copilot/session.py','src/glareshield/copilot/web.py',
            'tests/test_copilot_session.py','docs/copilot-session.md',
