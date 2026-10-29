@@ -126,7 +126,7 @@
       "max_age_s": null
     },
     "pilot_stand": {
-      "path": "pilot.stand",
+      "path": "pilot.radio.stand",
       "nature": "declared",
       "kind": "string",
       "unit": null,
@@ -329,7 +329,7 @@
       "max_age_s": null
     },
     "pilot_exit": {
-      "path": "pilot.arrival.exit",
+      "path": "pilot.radio.exit",
       "nature": "declared",
       "kind": "string",
       "unit": null,
@@ -1814,18 +1814,18 @@
           "steps": [
             {
               "id": "climb_std",
-              "label": "Passer en STD à l’altitude de transition déclarée",
+              "label": "Sélecteur de calage CDB en STD ; transition à confirmer séparément",
               "expected": [
                 "std",
                 "transition_altitude"
               ],
               "priority": 80,
               "trigger": {
-                "label": "Franchissement de l’altitude de transition",
+                "label": "Pendant la phase visible",
                 "any_of": [
                   [
                     {
-                      "source": "event_transition_up",
+                      "source": "phase_climb",
                       "op": "eq",
                       "value": true
                     }
@@ -2228,7 +2228,8 @@
             "pilot": "{station}, {callsign}, <current position and level>.",
             "readback": "<actual instruction received>, {callsign}."
           },
-          "unicom_en": "<area> <position, level and intention> <area>"
+          "unicom_en": "<area> <position, level and intention> <area>",
+          "unicom_requires_trigger": true
         }
       ]
     },
@@ -2802,7 +2803,133 @@
             "readback": "{taxi_route}, stand {stand}, {callsign}."
           },
           "unicom_en": "{destination} vacated runway {arrival_runway} {destination}"
+        },
+        {
+          "id": "radio_parked",
+          "trigger": {
+            "label": "Au poste, avant de quitter la fréquence",
+            "any_of": [
+              [
+                {
+                  "source": "event_parked",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            ],
+            "hold_s": 0
+          },
+          "priority": 60,
+          "station_roles": [
+            "GND",
+            "TWR",
+            "APP",
+            "CTR"
+          ],
+          "voice_fr": {
+            "pilot": "{station}, {callsign}, au poste {stand}, demandons à quitter la fréquence.",
+            "readback": "<autorisation effectivement reçue>, {callsign}."
+          },
+          "voice_en": {
+            "pilot": "{station}, {callsign}, parked stand {stand}, request frequency change.",
+            "readback": "<actual clearance received>, {callsign}."
+          },
+          "unicom_en": "{destination} parked stand {stand} {destination}"
         }
+      ]
+    }
+  ],
+  "reminders": [
+    {
+      "id": "prepare_arrival",
+      "kind": "arrival_preparation",
+      "label": "Préparer l’arrivée : F-PLN, PERF APPR, RAD NAV et briefing",
+      "priority": 85,
+      "phases": [
+        "cruise"
+      ],
+      "distance_nm": 180,
+      "tod_lead_s": 900,
+      "hold_s": 5
+    },
+    {
+      "id": "descent_started",
+      "kind": "descent",
+      "label": "Descente : confirmer clairance, arrivée et ATIS consulté",
+      "priority": 90,
+      "phases": [
+        "descent"
+      ],
+      "hold_s": 3
+    },
+    {
+      "id": "altitude_10000_up",
+      "kind": "altitude_crossing",
+      "label": "Franchissement montant de 10 000 ft MSL",
+      "priority": 80,
+      "phases": [
+        "departure",
+        "climb"
+      ],
+      "direction": "up",
+      "altitude_ft": 10000,
+      "hysteresis_ft": 200,
+      "hold_s": 3
+    },
+    {
+      "id": "altitude_10000_down",
+      "kind": "altitude_crossing",
+      "label": "Franchissement descendant de 10 000 ft MSL",
+      "priority": 90,
+      "phases": [
+        "descent",
+        "arrival"
+      ],
+      "direction": "down",
+      "altitude_ft": 10000,
+      "hysteresis_ft": 200,
+      "hold_s": 3
+    },
+    {
+      "id": "atis_available",
+      "kind": "atis_acquired",
+      "label": "ATIS disponible à consulter",
+      "priority": 40,
+      "phases": [
+        "preflight",
+        "departure",
+        "climb",
+        "cruise",
+        "descent",
+        "arrival"
+      ]
+    },
+    {
+      "id": "atis_update",
+      "kind": "atis_changed",
+      "label": "Nouvel ATIS : consulter avant de l’annoncer",
+      "priority": 85,
+      "phases": [
+        "preflight",
+        "departure",
+        "climb",
+        "cruise",
+        "descent",
+        "arrival"
+      ]
+    },
+    {
+      "id": "atc_presence",
+      "kind": "atc_presence",
+      "label": "Présence ATC à vérifier",
+      "priority": 80,
+      "phases": [
+        "preflight",
+        "departure",
+        "climb",
+        "cruise",
+        "descent",
+        "arrival"
       ]
     }
   ]

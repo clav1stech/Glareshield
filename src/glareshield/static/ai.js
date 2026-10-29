@@ -122,7 +122,7 @@ function modeBanner(view) {
   }
 }
 async function startScenario(phase = null) {
-  await api('ai/scenario', 'POST', { active: true, phase });
+  await api('ai/scenario', 'POST', { active: true, phase, offline_network: true });
   message('Démonstration lancée : données fictives.');
   await reloadAI();
 }

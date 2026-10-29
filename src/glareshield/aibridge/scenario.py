@@ -8,11 +8,11 @@ from .telemetry import TelemetryStore
 
 ORIGIN = (48.7233, 2.3794, 291)
 DESTINATION = (43.6584, 7.2159, 13)
-DURATION_S = 1500
+DURATION_S = 1560
 PHASES = (
     ('parking', 0, 90), ('taxi_out', 90, 210), ('takeoff', 210, 260), ('climb', 260, 700),
     ('cruise', 700, 1000), ('descent', 1000, 1300), ('approach', 1300, 1420),
-    ('landing', 1420, 1470), ('taxi_in', 1470, DURATION_S),
+    ('landing', 1420, 1470), ('taxi_in', 1470, 1500), ('parking_in', 1500, DURATION_S),
 )
 
 
@@ -43,7 +43,7 @@ def values(t: float) -> dict:
     progress = ramp(t, 210, 1450, 0, 1)
     latitude = ORIGIN[0]+(DESTINATION[0]-ORIGIN[0])*progress
     longitude = ORIGIN[1]+(DESTINATION[1]-ORIGIN[1])*progress
-    on_ground = name in ('parking', 'taxi_out', 'takeoff', 'landing', 'taxi_in') and not (name == 'takeoff' and t > 255)
+    on_ground = name in ('parking', 'taxi_out', 'takeoff', 'landing', 'taxi_in', 'parking_in') and not (name == 'takeoff' and t > 255)
     if name == 'climb':
         altitude = ramp(t, 260, 700, ORIGIN[2], 35000)
     elif name == 'cruise':
@@ -59,7 +59,7 @@ def values(t: float) -> dict:
     vertical = {'climb': ramp(t, 260, 700, 2800, 900), 'descent': -2200, 'approach': -800}.get(name, 0)
     speed = {'parking': 0, 'taxi_out': 15, 'takeoff': ramp(t, 210, 255, 0, 150), 'climb': ramp(t, 260, 700, 160, 280),
              'cruise': 270, 'descent': ramp(t, 1000, 1300, 280, 250), 'approach': ramp(t, 1300, 1420, 210, 137),
-             'landing': ramp(t, 1420, 1470, 137, 20), 'taxi_in': 12}[name]
+             'landing': ramp(t, 1420, 1470, 137, 20), 'taxi_in': 12, 'parking_in': 0}[name]
     temperature = max(-56.5, 15-altitude/1000*1.98)
     mach = speed*(1+altitude/1000*.02)/(38.967854*math.sqrt(temperature+273.15))
     wind = ramp(altitude, 0, 35000, 8, 45)
@@ -83,7 +83,7 @@ def values(t: float) -> dict:
         'flaps_handle_index': float(flaps),
         'spoilers_handle': 0.0,
         'parking_brake': t < 85 or t >= 1495,
-        'engine_1_running': t >= 50, 'engine_2_running': t >= 65,
+        'engine_1_running': 50 <= t < 1520, 'engine_2_running': 65 <= t < 1525,
         'fuel_total': 6200-burnt, 'total_weight': 66500-burnt,
         'wind_direction': 280.0, 'wind_speed': wind,
         'outside_temperature': temperature,

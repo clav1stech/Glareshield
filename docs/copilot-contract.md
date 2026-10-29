@@ -68,12 +68,15 @@ n’utilise jamais les index de tableau pour persister une case.
 Un déclencheur est un OU de clauses ET (`any_of`), composées de comparaisons
 `eq`, `lt`, `lte`, `gt`, `gte`, et d’un maintien continu `hold_s`. Une entrée
 inconnue ou périmée ne satisfait aucune comparaison, y compris `eq false`.
-Le moteur évalue les déclencheurs et choisit l’action « Maintenant » parmi les
-étapes déclenchées non terminées : priorité décroissante, puis ordre du profil.
+Dans la version 1.2.9, le moteur choisit l’action « Maintenant » parmi les
+étapes non terminées de la phase courante : priorité décroissante, puis ordre
+du profil. Les déclencheurs d’étape restent du contexte à confirmer ; les
+validations observables, rappels et messages radio évaluent leurs règles
+prises en charge. Un rappel admissible peut prendre la priorité dans Maintenant.
 Une valeur manquante garde l’étape visible avec son emplacement, sans question.
 Le prochain déclencheur est affiché avec son libellé, sans inventer d’échéance.
 
-Le futur modèle de vue transmet au rendu : phase effective et sa qualification,
+Le modèle de vue transmet au rendu : phase effective et sa qualification,
 action Maintenant et contexte, prochain déclencheur, groupes d’étapes résolues
 (valeur, unité, source, état et raison), messages déjà sélectionnés, situation,
 conflits et avertissements. Le moteur porte toute logique de procédure,
@@ -86,18 +89,20 @@ arbitraire à un objet ou HTML issu d’un profil n’est autorisé.
 Le [contexte réseau livré en 1.2.4](copilot-network.md) raccorde désormais les
 publications METAR structurées, les positions candidates et les événements IVAO
 à la session. Il précise les limites et remplace les mentions prospectives de
-#15 ci-dessous ; les moteurs de rappels #18 et de radio #19 restent à raccorder.
+#15 ci-dessous. Les moteurs de [rappels #18](copilot-reminders.md) et de
+[radio #19](copilot-radio.md) consomment désormais cette même section.
 
 Une source décrit un chemin d’adaptateur, sa nature, son type (`number`, `bool`,
 `string`), l’unité **normalisée** et
 son éventuel âge maximal. Les chemins sont des données, pas des expressions.
 `flight_plan.*` et `telemetry.*` désignent le contexte existant ; `pilot.*`,
 `publications.*`, `events.*`, `computed.*` et `session.*` sont des espaces internes
-à créer par les adaptateurs, pas des champs déjà exportés. Par exemple,
+aux adaptateurs, pas des champs du document d’export `/3`. Par exemple,
 `flight_plan.alternates.primary.icao` désigne le premier dégagement (l’export
 conserve sa liste), et `publications.arrival.qnh` reste inconnu tant qu’aucune
-valeur structurée et vérifiée n’existe : les textes ATIS/METAR ne sont pas
-interprétés par ce lot. Aucun second client IVAO ou SimConnect n’est créé.
+valeur structurée et vérifiée n’existe. Le lecteur METAR reste borné aux groupes
+reconnus ; le texte ATIS libre n’est pas interprété. Aucun second client réel
+IVAO ou SimConnect n’est créé.
 
 | Donnée | Source existante / future | Nature, qualification et limite |
 | --- | --- | --- |
@@ -142,7 +147,7 @@ météo invalident les valeurs concernées et demandent une nouvelle confirmatio
 
 ## Déclarations et conflits
 
-Les futurs formulaires de #13 stockent sous `local/` une déclaration identifiée,
+Les formulaires de #13 stockent sous `local/` une déclaration identifiée,
 horodatée et révisée, avec champ, valeur, unité, référence, contexte et éventuelle
 révocation. Leur enveloppe résolue est `QualifiedValue(nature="declared", …)`.
 
@@ -214,7 +219,7 @@ le moteur/rappels (#14/#18), pas par le profil ni le rendu. Les seuils de rappel
 ## Validation des étapes
 
 `manual` est la règle par défaut. `observed` donne un signal sémantique et une
-égalité attendue ; le futur adaptateur #17 ne le lie qu’à une source dont le sens
+égalité attendue ; l’adaptateur #17 ne le lie qu’à une source dont le sens
 a été validé localement pour l’appareil. Une SimVar SDK acceptée ne suffit pas.
 La source doit être actuelle, connectée, non en pause et du bon univers de
 session. Un signal `simulated` ne valide qu’une session de démonstration.
@@ -232,6 +237,53 @@ ni stabilité d’une approche. Les FMA, ECAM, pages MCDU, FCU sélectionné et
 clairances ne disposent d’aucune règle d’auto-validation. Les identifiants des
 signaux admissibles sont bornés par le schéma ; un profil ne peut ajouter du
 code ou un signal FMA à la liste.
+
+Depuis la version 1.2.6, le service métier évalue ces règles dans la phase
+courante. Les déclencheurs supplémentaires non observables et les temporisations
+de procédure restent manuels ; seuls les déclencheurs de phase simples sont
+pris en charge. La ligne STD confirme exclusivement la position du sélecteur CDB,
+jamais le franchissement de l’altitude de transition. Le rendu n’évalue aucune
+règle et n’envoie aucune commande au cockpit.
+
+En SimConnect, la case « Validée » du catalogue ne suffit pas : ajouter une
+correspondance `copilot_bindings` dans `local/ai-bridge.yaml`, uniquement après
+avoir confirmé la source et son sens pour le titre exact de l’appareil. Exemple
+**fictif**, à adapter localement sans le recopier comme validation du Fenix :
+
+```yaml
+copilot_bindings:
+  - signal: gear_handle_down
+    key: gear_handle_down
+    variable: GEAR HANDLE POSITION
+    origin: simvar
+    aircraft_title: A320 fictif
+    values: {"0": false, "1": true}
+```
+
+Le champ doit aussi être marqué validé dans les réglages AI Bridge (`validated`
+pour une SimVar, `validated: true` sur la LVar). Une LVar STD peut être reliée à
+`baro_std` avec sa propre correspondance numérique ; une clé portant un nom
+familier ne prouve jamais son sens. La source exacte, son origine et le titre
+récent doivent correspondre ; une mesure antérieure à la dernière observation
+du titre est refusée. Plusieurs correspondances pour le même signal/appareil
+suspendent la détection. Les SimVars standard de volets et d’aérofreins connues
+comme incorrectes restent exclues, même marquées validées. Le profil embarqué
+ne contient aucune auto-validation des volets ni du voyant APPR.
+
+La démonstration utilise exclusivement son propre magasin de télémétrie et
+ses correspondances connues pour les leviers/frein ; elle n’exige et ne crée
+aucune validation d’une source réelle. Ses preuves portent l’origine
+`scenario`, distincte de `simconnect`. Les tests d’éclairage sont exclus.
+
+Une condition devenue fausse retire la coche automatique et crée une
+observation contradictoire ; une source perdue/périmée ou une sortie de phase
+retire la confirmation actuelle. La dernière preuve et chaque transition
+restent dans l’historique privé. Le rafraîchissement d’une mesure identique
+n’ajoute pas d’événement et ne réécrit pas le suivi. Après reprise, une preuve
+persistée attend de nouvelles données fiables. Un geste manuel, coché ou
+décoché, reste prioritaire ; une observation contraire est signalée sans le
+modifier. L’interface présente l’origine, la source, l’heure de détection,
+l’heure de mesure et les raisons d’une confirmation suspendue.
 
 ## Radio
 
@@ -265,9 +317,8 @@ une référence/unité invalide ou un signal automatique interdit est signalé p
 `errors`. Le profil entier est refusé. Le dernier profil validé fourni par
 l’appelant reste utilisé ; à défaut, le profil embarqué. Supprimer le fichier
 revient au profil embarqué. Rien n’est écrit par le chargeur. Une personnalisation
-ne désactive ni l’application ni les éclairages. Le futur écran devra afficher
-ces erreurs, sans publier le contenu privé. Ce lot expose ce résultat au code
-appelant ; son raccordement à l’interface appartient à #12/#16.
+ne désactive ni l’application ni les éclairages. L’interface affiche les erreurs
+sans publier le contenu privé et conserve le dernier profil valide.
 
 `glareshield.flight_context/3` conserve strictement son sens et ses champs ;
 le contrat de profil et l’enveloppe copilote sont séparés. Les exports briefing,
@@ -285,20 +336,17 @@ MCDU demeure absent ; **aucune estimation TOD n’est ajoutée en première vers
 Un futur TOD estimé exigera formule, hypothèses, incertitude et un identifiant
 distinct du TOD fourni. Aucun FMA/ECAM ou autre état de système absent n’est déduit.
 
-## Points ouverts et vérification
+## État livré et limites
 
-- #12/#16 : raccorder les modèles de vue et erreurs aux écrans de la maquette.
-- #13 : préciser l’identité de session, la révocation des déclarations, la reprise
-  et les migrations de progression ; un nouveau plan n’est pas défini par son
-  seul horodatage de téléchargement.
-- #14/#18 : implémenter et éprouver temporisations, événements et rappels hors
-  réseau, notamment vols courts et reprise en vol ; pas de TOD estimé implicite.
-- #15/#19 : nom des stations, couverture incertaine et éventuelle extraction
-  structurée de publications ; un texte ATIS reste externe et non exécutable.
-- #17 : sources fiables de calage/volets et validation par appareil ; TOD MCDU,
-  FCU sélectionné et performances restent absents de la télémétrie actuelle.
-- #20 : recette de bout en bout ; le profil embarqué ne prouve pas la fiabilité
-  des signaux du cockpit réel et ne lance aucune commande pour la vérifier.
+Les interfaces, sessions, phases, adaptation IVAO, observations, rappels et radio
+sont raccordés. Le [guide](copilot-guide.md) et la [matrice de recette](copilot-acceptance.md)
+décrivent leur vérification de bout en bout sur fixtures hors réseau.
+Les correspondances réelles de calage/volets restent à valider par appareil.
+TOD MCDU, FCU sélectionné et performances restent absents de la télémétrie
+actuelle ; aucun état FMA/ECAM n’est déduit. Nom parlé de station inconnu :
+`<station>`, même si son indicatif technique est publié. Le profil embarqué et
+les fixtures ne prouvent pas la fiabilité des signaux du cockpit réel et ne
+lancent aucune commande pour la vérifier.
 
 Les tests de ce lot valident le profil, ses références, la consommation par
 parcours générique, les six exemples, les qualifications, les rejets et le repli

@@ -99,13 +99,14 @@ comme pour les écritures. Chaque geste précise l’identifiant de suivi et
 l’univers affichés : un ancien onglet reçoit un conflit HTTP 409 si le suivi
 a changé, au lieu d’affecter le nouveau vol.
 
-Le service expose aux futurs adaptateurs internes `record_detection` et
-`remember` (référence et horodatage de rappel). Aucune API publique ne permet
-de fabriquer une détection. Seules les étapes `observed` du profil et le même
-univers acceptent une preuve interne. Les preuves persistent comme historique ;
-elles exigent une reconfirmation après redémarrage, une connexion récente hors
-pause et un âge inférieur ou égal à 8 s pour être présentées comme actuelles.
-Le futur adaptateur doit encore vérifier le sens et la fraîcheur du signal.
+Le service évalue les règles `observed` du profil depuis la version 1.2.6 ;
+voir les [conditions de validation par appareil](copilot-contract.md#validation-des-étapes).
+L’ancien point d’injection interne `record_detection` est remplacé par cette
+évaluation des données qualifiées. Aucune API publique ne permet de fabriquer
+une détection. `remember` conserve les références et horodatages des rappels.
+Les preuves persistent comme historique ; elles exigent une reconfirmation
+après redémarrage, une connexion récente hors pause et un âge inférieur ou
+égal à 8 s (ou le délai plus court du champ) pour être présentées comme actuelles.
 
 Le lot initial 1.2.2 ne calculait ni phase, ni performances, ni validation automatique
 à partir de la télémétrie. Le moteur de phases est raccordé depuis la 1.2.3.

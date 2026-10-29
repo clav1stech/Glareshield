@@ -18,7 +18,8 @@ METAR = re.compile(r'^(?:(?:METAR|SPECI) )?([A-Z0-9]{4}) (\d{6}Z) (?:AUTO |COR )
 
 def provenance(service, feed, now, moment=None, max_age_s=None):
     info = feed.describe(now, service.interval(feed), detailed=True)
-    info.update(source='ivao.'+feed.name, nature='published', age_s=None, source_age_s=None)
+    info.update(source=('scenario.' if getattr(service, 'simulation', False) else '')+'ivao.'+feed.name,
+                nature='published', age_s=None, source_age_s=None)
     ages = []
     if feed.fetched_at is not None:
         ages.append(max(0, now-feed.fetched_at))
@@ -107,7 +108,7 @@ class NetworkContext:
 
     def view(self, phase, session=None, after=0):
         bridge, now = self.bridge, self.bridge.clock()
-        service = bridge.ivao
+        service = bridge.network_cache()
         current = (phase or {}).get('effective', {}).get('value')
         following = PHASE_IDS[PHASE_IDS.index(current)+1] if current in PHASE_IDS[:-1] else None
         declarations = [d for d in session.declarations if d.revoked_at is None
@@ -117,6 +118,7 @@ class NetworkContext:
                       if d.kind == 'atis']
         feeds = {feed.name: provenance(service, feed, now) for feed in service.feeds}
         result = {'schema_version': 'glareshield.copilot_network/1', 'generated_utc': iso(now),
+                  'simulation': bool(getattr(service, 'simulation', False)),
                   'state': 'disabled', 'feeds': feeds, 'phase': current, 'next_phase': following,
                   'phase_status': (phase or {}).get('effective', {}).get('status', 'unavailable'),
                   'positions': None, 'atis': [], 'weather': [], 'publications': {},
@@ -127,6 +129,8 @@ class NetworkContext:
                   'notice': 'Positions candidates : rapprochement technique, couverture ATC non confirmée. '
                             'IVAO publié, météo OFP, conditions MSFS et déclarations pilote restent distincts. '
                             'ATIS téléchargé ≠ consulté ≠ annoncé. Aucun choix UNICOM automatique.'}
+        if result['simulation']:
+            result['notice'] = 'DÉMONSTRATION IVAO fictive, aucun téléchargement. '+result['notice']
         if not service.settings.enabled:
             return result
         plan = bridge.sessions.current_plan()

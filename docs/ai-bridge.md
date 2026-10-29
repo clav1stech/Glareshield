@@ -38,12 +38,12 @@ API.
   démonstration alimente un stockage distinct et marque l'export
   `data_origin: simulation_scenario`.
 - **Déductions bornées et explicites.** Aucun mode FMA ou état ECAM n’est déduit,
-  notamment depuis les voyants AP/LOC/APPR. Seules la phase opérationnelle du futur
+  notamment depuis les voyants AP/LOC/APPR. Seules la phase opérationnelle du
   copilote et les estimations décrites dans le [contrat copilote](copilot-contract.md)
   sont autorisées, étiquetées `derived`, avec méthode, entrées et fraîcheur :
   distances géométriques, avancement OFP, écart au niveau prévu, franchissements
-  documentés et comparaison de carburant. Ce lot de contrat n’ajoute aucun calcul
-  aux exports. Le TOD réel du MCDU reste absent, sans estimation TOD en première
+  documentés et comparaison de carburant. Le suivi Copilote et ses services sont
+  décrits dans le [guide utilisateur](copilot-guide.md). Le TOD réel du MCDU reste absent, sans estimation TOD en première
   version. La route SimBrief demeure `planned`, jamais route active ou clairance.
   Une correction manuelle de phase est une déclaration, pas une observation.
   Le profil `glareshield.copilot_profile/1` est indépendant du contexte `/3`, qui

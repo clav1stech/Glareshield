@@ -12,7 +12,7 @@ Le contrat #11 et la session #13 sont réutilisés ; les phases viennent de #14.
 `SessionService.view()` l’appelle avec la phase effective et les déclarations de
 la session. `GET /api/ai/session` expose cette vue dans `network`, schéma
 `glareshield.copilot_network/1`. Vol lit cette section. Les moteurs de rappels #18
-et de radio #19 doivent consommer la même section, ou appeler ce même service
+et de radio #19 consomment la même section, ou appellent ce même service
 avec les mêmes phase et session, sans client réseau ni copie persistante du cache.
 Ces moteurs ne sont pas encore livrés ; ce lot établit leur point d’accès commun.
 Les exports `glareshield.flight_context/3` et la page Réseau IVAO restent compatibles.
@@ -114,7 +114,7 @@ rafale de connexions. Un échec de téléchargement ne crée pas de déconnexion
 Un contrôleur déjà en ligne qui entre seulement dans le rayon n’est pas annoncé
 comme nouvellement connecté. Présence : positions suivies par le mécanisme
 existant, y compris les centres sur la route ; ATIS : changements du cache global.
-Les futurs rappels doivent filtrer par position/contexte et vérifier la fraîcheur.
+Les rappels filtrent par position/contexte et vérifient la fraîcheur.
 
 Chaque événement porte une séquence et une date de détection. `stream_id` change
 au redémarrage ; `latest_sequence`, `oldest_sequence` et `gap` permettent à chaque
@@ -126,7 +126,7 @@ impose de repartir de l’état courant, sans supposer que tous les événements
 
 La lecture ne consomme rien et renvoie des copies. Elle ne déclenche aucune
 notification. L’overlay existant garde ses préférences et reste l’unique mécanisme
-de notification de présence ; le futur moteur ne doit pas le doubler pour le même
+de notification de présence ; le moteur ne le double pas pour le même
 événement. Le flux existe même si les notifications overlay sont désactivées.
 
 Les tests hors réseau couvrent les quatre états d’indisponibilité, la fraîcheur

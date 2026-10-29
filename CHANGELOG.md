@@ -2,6 +2,56 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.9] - 2026-10-29
+
+- Issue #20 : démonstration complète hors réseau, recette du copilote et guide de livraison
+- Cache IVAO fictif distinct, réutilisant les adaptateurs existants sans
+  téléchargement : présence ATC, changements de lettre/texte ATIS et panne de flux.
+  Le scénario atteint le parking final ; réglages et cache réels préservés.
+- Recette reproductible des six phases, rappels avant descente, validations,
+  reprise, gestes manuels et séparation des univers. Guide utilisateur,
+  architecture et matrice de couverture des critères de #10 actualisés.
+- Radio et rappels conservent leurs contrôles au rafraîchissement ; nouvelle
+  phase ouverte sans fermer les autres, acquittement et copie vérifiés dans Edge.
+  Publication préparée en patch selon la demande ; aucun tag ni push automatique.
+
+## [1.2.8] - 2026-10-29
+
+- Issue #19 : séquences radio voix et UNICOM copiables, valeurs déclarées et couverture explicite
+- Gabarits des six phases jusqu’au parking ; voix française ou anglaise selon
+  la position, variantes UNICOM conditionnelles en anglais sur une ligne.
+- Station déclarée ou candidate, fréquence seulement publiée et actuelle,
+  clairances/ATIS consulté distincts du plan et des publications.
+- Copie individuelle sans émission ni coche automatique ; confirmations de
+  déclencheurs et postes/positions radio déclarables. Tests fictifs des variantes.
+
+## [1.2.7] - 2026-10-29
+
+- Issue #18 : rappels persistants, seuils explicites et événements IVAO partagés
+- Préparation arrivée à partir d’une distance documentée ou d’un TOD explicitement
+  fourni ; seuils MSL distincts de FL100, temporisations et hystérésis.
+- Rappels maintenus jusqu’à acquittement, dédupliqués par session et intégrés à
+  Maintenant. Affichage réduit en phase critique, sans nouvelle notification externe.
+- Première acquisition ATIS, changement de lettre/texte et panne réseau distincts.
+  Tests sur horloge contrôlée et racines isolées.
+
+## [1.2.6] - 2026-10-29
+
+- Issue #17 : validation des étapes observables, sources confirmées par appareil et priorité au pilote
+- Évaluation dans le service métier : phase courante, fraîcheur, origine et
+  correspondance explicite du signal avec une source validée pour l’appareil.
+  Les SimVars de volets/aérofreins connues comme incorrectes restent exclues.
+- Détection du levier de train et du sélecteur STD uniquement selon leur sens
+  mesuré ; aucune preuve de verrouillage, de transition altimétrique ou de FMA.
+  APPR reste manuel. Correspondances réelles privées sous `local/`.
+- Origine et heures visibles ; contradictions, pertes de confirmation et
+  preuves historiques conservées. Les gestes manuels restent prioritaires.
+  Démonstration séparée, sans lecture des valeurs de test d’éclairage.
+
+## [1.2.5] - 2026-10-29
+
+- Issue #16 : page Vol, bloc Maintenant et situation en direct sans perte des interactions
+
 ## [1.2.4] - 2026-10-29
 
 - Issue #15 : contexte IVAO partagé pour le suivi, provenance, événements et déclarations pilote

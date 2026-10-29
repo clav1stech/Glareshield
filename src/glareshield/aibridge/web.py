@@ -30,6 +30,7 @@ class NotesRequest(StrictModel):
 class ScenarioRequest(StrictModel):
     active: bool
     phase: Literal[PHASE_NAMES] | None = None
+    offline_network: bool = False
 
 
 def create_router(bridge, changed=None) -> APIRouter:
@@ -126,7 +127,7 @@ def create_router(bridge, changed=None) -> APIRouter:
     @router.post('/ivao/refresh')
     async def refresh_network():
         try:
-            results = await bridge().ivao.refresh()
+            results = await bridge().network_cache().refresh()
         except IVAOError as error:
             raise HTTPException(400, str(error)) from None
         return {'results': results, **bridge().network_page()}
@@ -146,7 +147,7 @@ def create_router(bridge, changed=None) -> APIRouter:
 
     @router.post('/scenario')
     async def scenario(payload: ScenarioRequest):
-        bridge().set_scenario(payload.active, payload.phase)
+        bridge().set_scenario(payload.active, payload.phase, payload.offline_network)
         return {'ok': True}
 
     @router.post('/export')

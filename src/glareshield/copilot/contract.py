@@ -125,6 +125,7 @@ class Radio(StrictModel):
     voice_fr: Voice
     voice_en: Voice
     unicom_en: Text | None = None
+    unicom_requires_trigger: bool = False
 
 
 class Phase(StrictModel):
@@ -133,6 +134,20 @@ class Phase(StrictModel):
     trigger: Trigger
     groups: list[Group] = Field(min_length=1, max_length=12)
     radio: list[Radio] = Field(default_factory=list, max_length=30)
+
+
+class ReminderRule(StrictModel):
+    id: Identifier
+    kind: Literal['arrival_preparation', 'descent', 'altitude_crossing', 'atis_acquired', 'atis_changed', 'atc_presence']
+    label: Text
+    priority: int = Field(ge=0, le=100)
+    phases: list[PhaseId] = Field(min_length=1, max_length=6)
+    hold_s: float = Field(default=3, ge=0, le=120)
+    distance_nm: float = Field(default=180, gt=0, le=1000)
+    tod_lead_s: float = Field(default=900, gt=0, le=7200)
+    altitude_ft: float = Field(default=10000, gt=0, le=60000)
+    hysteresis_ft: float = Field(default=200, gt=0, le=1000)
+    direction: Literal['up', 'down'] = 'down'
 
 
 class Profile(StrictModel):
@@ -145,12 +160,13 @@ class Profile(StrictModel):
     sources: dict[Identifier, Source] = Field(min_length=1, max_length=300)
     values: dict[Identifier, ExpectedValue] = Field(min_length=1, max_length=300)
     phases: list[Phase] = Field(min_length=6, max_length=6)
+    reminders: list[ReminderRule] = Field(default_factory=list, max_length=50)
 
     @model_validator(mode='after')
     def references(self):
         if tuple(phase.id for phase in self.phases) != PHASE_IDS:
             raise ValueError('Les six phases doivent être présentes dans l’ordre contractuel.')
-        identifiers = [self.id]
+        identifiers = [self.id, *(rule.id for rule in self.reminders)]
         for value in self.values.values():
             if len(value.sources) != len(set(value.sources)):
                 raise ValueError('Sources de valeur dupliquées.')
@@ -286,7 +302,7 @@ def load_profile(root: Path, previous: Profile | None = None) -> ProfileLoad:
             # Keep model field locations but mask private dictionary keys and all input values.
             public_fields = set().union(*(model.model_fields for model in (
                 Profile, Phase, Group, Step, Radio, Voice, Trigger, Predicate,
-                Validation, AutoValidation, ExpectedValue, Source)))
+                Validation, AutoValidation, ExpectedValue, Source, ReminderRule)))
             errors = tuple('Personnalisation invalide ('+('.'.join(
                 str(part) if isinstance(part, int) or part in public_fields else '<clé>'
                 for part in item['loc']) or 'profil')+f') : {item["type"]}.'

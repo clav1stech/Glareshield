@@ -11,6 +11,7 @@ from pydantic import Field, field_validator, model_validator
 from ..config import ConfigurationLoader, atomic_write
 from ..model import StrictModel
 from .catalog import GROUPS, STANDARD_KEYS, Entry
+from ..copilot.observations import ObservationBinding
 
 KEY_PATTERN = r'^[a-z][a-z0-9_]{0,47}$'
 
@@ -67,6 +68,7 @@ class AIBridgeSettings(StrictModel):
     disabled: list[str] = Field(default_factory=list)
     validated: list[str] = Field(default_factory=list)
     lvars: list[LVarEntry] = Field(default_factory=list)
+    copilot_bindings: list[ObservationBinding] = Field(default_factory=list, max_length=100)
     ivao: IVAOSettings = Field(default_factory=IVAOSettings)
 
     @model_validator(mode='after')

@@ -68,6 +68,11 @@ L’application s’ouvre sur **Initialisation** : états du simulateur, d’AI 
 
 Les pages d’éclairage permettent de gérer appareils, contrôleurs, groupes, portées, sources, effets, règles et paramètres. Les modifications sont validées puis appliquées sans relancer l’application. Le tableau de bord affiche connexions, pause, variables, niveaux audio, règles actives et erreurs. Les tests de source sont temporaires et ne modifient aucune commande du simulateur.
 
+Le [guide Copilote](docs/copilot-guide.md) décrit le parcours complet, les
+[rappels](docs/copilot-reminders.md), les [messages radio copiables](docs/copilot-radio.md)
+et la démonstration hors réseau avec IVAO fictif. La [matrice de recette](docs/copilot-acceptance.md)
+relie les critères du suivi de vol aux vérifications et précise leurs limites.
+
 Dans **Affectations**, chaque fonction dispose de sa propre sélection : choisir des appareils individuellement, ou combiner groupes, portée active et exclusions. L’aperçu affiche les appareils réellement concernés. Une sélection individuelle reste indépendante de la portée active ; un groupe suit les changements de ses membres. La copie reprend les appareils actuellement sélectionnés par une autre fonction. Une sélection vide ne pilote aucun appareil. Désactiver une fonction conserve ses affectations pour la réactiver ensuite.
 
 Les priorités s’appliquent séparément sur chaque lampe. Une lampe affectée aux alertes et au DOME reçoit le fond DOME entre les flashes ; une autre affectée aux alertes et à l’ATC reçoit le fond ATC. Les appareils retirés d’une fonction sont restaurés si aucune autre fonction ne les utilise. Modifier affectations, groupes, portées, règles, effets ou réglages conserve les connexions des sources. Modifier appareils, contrôleurs ou sources redémarre les composants de Glareshield après restauration des lampes.

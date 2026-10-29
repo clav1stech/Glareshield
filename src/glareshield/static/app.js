@@ -1481,7 +1481,8 @@ async function refresh() {
   $('#rulesState').textContent = state.suspended ? 'Règles suspendues' : 'Règles actives';
   $('#rulesDot').className = 'dot ' + (state.suspended ? 'warn' : 'ok');
   for (let hook of REFRESH_HOOKS) await hook();
-  if (VIEWS[tab]?.live && !isEditing()) render();
+  if (VIEWS[tab]?.update) VIEWS[tab].update();
+  else if (VIEWS[tab]?.live && !isEditing()) render();
   else renderNav();
 }
 const REFRESH_HOOKS = [];

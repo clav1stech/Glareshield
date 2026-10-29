@@ -15,6 +15,7 @@ from .config import AIBridgeSettings, load_settings, save_settings
 from .context import LEVELS, build_context, chat_text, iso, serialize
 from .ivao import ICAO, IVAOError, IVAOService, airports_of_interest
 from .scenario import PHASES, ScenarioPlayer, phase
+from .demo_network import DemoNetwork
 from .simbrief import FlightPlanStore, parse_ofp
 from .telemetry import TelemetryStore, qualify
 
@@ -36,6 +37,7 @@ class AIBridge:
             self.settings_error = type(error).__name__
         self.live = TelemetryStore('simconnect', clock)
         self.scenario: ScenarioPlayer | None = None
+        self.demo_ivao: DemoNetwork | None = None
         self.plan = FlightPlanStore(root/'local/state/simbrief-ofp.json', clock, transport)
         self.notes_path = root/'local/state/pilot-notes.json'
         self.notes = self.load_notes()
@@ -65,6 +67,12 @@ class AIBridge:
         if not self.settings.enabled:
             self.live.clear()
         if self.definitions() != previous:
+            # Never reinterpret a cached sample using a newly configured source.
+            current = self.definitions()
+            for key in previous.keys() | current.keys():
+                if previous.get(key) != current.get(key):
+                    self.live.samples.pop(key, None)
+                    self.live.errors.pop(key, None)
             for listener in self.listeners:
                 listener()
         return self.settings
@@ -80,10 +88,15 @@ class AIBridge:
                 except (OSError, ValueError):
                     self.sessions.phase_error = 'Phase non enregistrée ; dernier suivi conservé.'
 
-    def set_scenario(self, active: bool, start_phase: str | None = None) -> None:
+    def set_scenario(self, active: bool, start_phase: str | None = None, offline_network=False) -> None:
         offset = next((start for name, start, _ in PHASES if name == start_phase), 0)
         self.scenario = ScenarioPlayer(self.clock, offset) if active else None
+        self.demo_ivao = DemoNetwork(self.clock, self.scenario) if active and offline_network else None
+        if self.demo_ivao:
+            self.demo_ivao.context = self.watch_context
         self.sessions.phase_engines.clear()
+        self.sessions.reminder_engines.clear()
+        self.sessions.radio_engines.clear()
 
     def store(self) -> TelemetryStore:
         return self.scenario.tick() if self.scenario else self.live
@@ -165,13 +178,19 @@ class AIBridge:
 
     def network(self, level: str, now: float | None = None) -> dict | None:
         now = self.clock() if now is None else now
-        return self.ivao.view(level, airports_of_interest(self.plan.plan, self.settings.ivao.airports),
-                              self.aircraft_position(now), now)
+        service = self.network_cache()
+        plan = self.sessions.current_plan() if self.demo_ivao else self.plan.plan
+        view = service.view(level, airports_of_interest(plan, service.settings.airports),
+                            self.aircraft_position(now), now)
+        return {**view, 'simulation': True} if self.demo_ivao and view else view
+
+    def network_cache(self):
+        return self.demo_ivao.tick() if self.demo_ivao else self.ivao
 
     def network_page(self) -> dict:
         """get_network_context: IVAO data for the interface, with full provenance."""
         now = self.clock()
-        return {**self.ivao.summary(now), 'settings': self.settings.ivao.model_dump(mode='json'),
+        return {**self.network_cache().summary(now), 'settings': self.settings.ivao.model_dump(mode='json'),
                 'view': self.network('full', now)}
 
     def lookup_airport(self, icao: str) -> dict:
@@ -179,14 +198,15 @@ class AIBridge:
         icao = icao.strip().upper()
         if not ICAO.match(icao):
             raise ValueError('Code OACI attendu (4 caractères).')
-        if not self.settings.ivao.enabled:
+        service = self.network_cache()
+        if not service.settings.enabled:
             raise IVAOError('Activer l’intégration IVAO pour consulter un aérodrome.')
         known = next((item for item in airports_of_interest(self.plan.plan, []) if item['icao'] == icao), {})
         airport = {'icao': icao, 'roles': ['manual']}
         if 'latitude' in known:
             airport['latitude'], airport['longitude'] = known['latitude'], known['longitude']
         now = self.clock()
-        return self.ivao.view('full', [airport], {'status': 'unavailable', 'reason': 'Consultation d’un aérodrome'}, now)
+        return service.view('full', [airport], {'status': 'unavailable', 'reason': 'Consultation d’un aérodrome'}, now)
 
     # Read-only views, intended to back future MCP tools one to one
 
@@ -241,5 +261,5 @@ class AIBridge:
                 'sizes': {level: len(serialize(self.snapshot(level))) for level in LEVELS},
                 'notes': self.notes,
                 'simbrief_configured': bool(self.settings.simbrief_user),
-                'ivao': self.ivao.summary(),
+                'ivao': self.network_cache().summary(),
                 'plan': self.plan.describe(self.settings.ofp_max_age_h)}

@@ -118,21 +118,19 @@ def test_manual_uncheck_overrides_detection_and_preserves_conflict(tmp_path):
     bridge = demo(tmp_path, lambda: now[0])
     service = bridge.sessions
     service.start()
-    step = first_step(service, observed=True)
-    service.record_detection(step, True, 'fictional-measurement', 'demo')
+    step = 'gear_down'
+    service.force_phase('arrival')
     assert shown(service, step)['provenance'] == 'detected'
     service.set_step(step, False)
     service.force_phase('arrival')
-    service.record_detection(step, True, 'fictional-measurement-2', 'demo')
     result = shown(service, step)
     assert not result['checked'] and result['provenance'] == 'manual' and result['conflict']
     assert result['detected']['checked']
-    with pytest.raises(ValueError):
-        service.record_detection(step, True, 'foreign-universe', 'simconnect')
-    with pytest.raises(ValueError):
-        service.record_detection(first_step(service), True, 'manual-only', 'demo')
     restarted = AIBridge(tmp_path, clock=lambda: now[0])
     restarted.set_scenario(True)
+    store = restarted.store()
+    store.clear()
+    restarted.store = lambda: store
     result = shown(restarted.sessions, step)
     assert not result['checked'] and result['manual'] and result['detected']
     assert not result['detection_current']
@@ -143,13 +141,16 @@ def test_detection_is_history_after_restart_or_loss_of_fresh_data(tmp_path):
     bridge = demo(tmp_path, lambda: now[0])
     service = bridge.sessions
     service.start()
-    step = first_step(service, observed=True)
-    service.record_detection(step, True, 'fictional-measurement', 'demo')
+    step = 'gear_down'
+    service.force_phase('arrival')
+    store = bridge.store()
+    bridge.store = lambda: store
     now[0] += 9
     assert not shown(service, step)['checked']
     assert shown(service, step)['detected']['checked']
     restarted = AIBridge(tmp_path, clock=lambda: now[0])
     restarted.set_scenario(True)
+    restarted.store = lambda: store
     assert not shown(restarted.sessions, step)['checked']
 
 

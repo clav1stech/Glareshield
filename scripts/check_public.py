@@ -8,6 +8,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED = {'src/glareshield/copilot/network.py','tests/test_copilot_network.py','docs/copilot-network.md',
+           'src/glareshield/copilot/flight.py','tests/test_copilot_flight.py',
+           'src/glareshield/copilot/observations.py','tests/test_copilot_observations.py',
+           'src/glareshield/copilot/reminders.py','tests/test_copilot_reminders.py','docs/copilot-reminders.md',
+           'src/glareshield/copilot/radio.py','tests/test_copilot_radio.py','docs/copilot-radio.md',
+           'src/glareshield/aibridge/demo_network.py','tests/test_copilot_acceptance.py',
+           'docs/copilot-guide.md','docs/copilot-acceptance.md',
            'src/glareshield/copilot/phases.py','tests/test_copilot_phases.py','docs/copilot-phases.md',
            'src/glareshield/static/copilot.js','tests/test_preparation.py','tests/test_preparation_ui.cjs',
            'src/glareshield/copilot/session.py','src/glareshield/copilot/web.py',

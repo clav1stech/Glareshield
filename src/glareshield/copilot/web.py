@@ -67,4 +67,8 @@ def create_session_router(bridge):
     async def revoke(declaration_id: str, payload: SessionAction):
         return execute(payload, lambda service: service.revoke(declaration_id))
 
+    @router.post('/reminders/{reminder_id}/acknowledge')
+    async def acknowledge(reminder_id: str, payload: SessionAction):
+        return execute(payload, lambda service: service.acknowledge_reminder(reminder_id))
+
     return router

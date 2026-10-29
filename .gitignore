@@ -46,6 +46,7 @@
 !/src/glareshield/aibridge/config.py
 !/src/glareshield/aibridge/context.py
 !/src/glareshield/aibridge/scenario.py
+!/src/glareshield/aibridge/demo_network.py
 !/src/glareshield/aibridge/service.py
 !/src/glareshield/aibridge/simbrief.py
 !/src/glareshield/aibridge/telemetry.py
@@ -60,6 +61,10 @@
 !/src/glareshield/copilot/session.py
 !/src/glareshield/copilot/phases.py
 !/src/glareshield/copilot/network.py
+!/src/glareshield/copilot/flight.py
+!/src/glareshield/copilot/observations.py
+!/src/glareshield/copilot/reminders.py
+!/src/glareshield/copilot/radio.py
 !/src/glareshield/copilot/web.py
 !/src/glareshield/copilot/a320.json
 !/src/glareshield/drivers/
@@ -113,6 +118,11 @@
 !/tests/test_copilot_session.py
 !/tests/test_copilot_phases.py
 !/tests/test_copilot_network.py
+!/tests/test_copilot_flight.py
+!/tests/test_copilot_observations.py
+!/tests/test_copilot_reminders.py
+!/tests/test_copilot_radio.py
+!/tests/test_copilot_acceptance.py
 !/docs/
 /docs/*
 !/docs/architecture.md
@@ -127,6 +137,10 @@
 !/docs/copilot-session.md
 !/docs/copilot-phases.md
 !/docs/copilot-network.md
+!/docs/copilot-reminders.md
+!/docs/copilot-radio.md
+!/docs/copilot-guide.md
+!/docs/copilot-acceptance.md
 
 # Private installation data must never enter Git.
 /local/

@@ -15,6 +15,10 @@ from ..config import atomic_write
 from ..model import StrictModel
 from .contract import Identifier, PhaseId, Scalar, Text, load_profile
 from .phases import PhaseEngine, PhaseState
+from .flight import flight_view, priority_step
+from .observations import Observation, evaluate as evaluate_observations
+from .reminders import ReminderEngine, ReminderState
+from .radio import RadioEngine
 from ..aibridge.telemetry import qualify
 
 Universe = Literal['simconnect', 'demo']
@@ -36,7 +40,7 @@ def plan_identity(plan: dict) -> str:
 
 
 class DeclarationInput(StrictModel):
-    kind: Literal['clearance', 'selection', 'atis', 'performance', 'event', 'station']
+    kind: Literal['clearance', 'selection', 'atis', 'performance', 'event', 'station', 'radio']
     field: Annotated[str, Field(pattern=r'^[a-z][a-z0-9_.]{0,79}$')]
     value: Scalar
     unit: Text | None = None
@@ -53,6 +57,7 @@ class DeclarationInput(StrictModel):
             'performance': ('aircraft', 'runway', 'mass', 'configuration', 'weather'),
             'event': ('stage',),
             'station': ('stage',),
+            'radio': ('stage',),
         }[self.kind]
         if not self.field.startswith(self.kind+'.') or any(
                 key not in self.context or self.context[key] in ('', None) or (
@@ -70,6 +75,9 @@ class DeclarationInput(StrictModel):
             raise ValueError('Valeur numérique obligatoire pour une performance.')
         if self.kind == 'selection' and self.context['stage'] not in ('departure', 'arrival'):
             raise ValueError('Choisir départ ou arrivée.')
+        if self.kind in ('event', 'radio') and self.context['stage'] not in (
+                'preflight', 'departure', 'climb', 'cruise', 'descent', 'arrival'):
+            raise ValueError('Phase de déclaration inconnue.')
         if self.kind == 'clearance' and self.context['type'] not in (
                 'departure', 'climb', 'descent', 'approach', 'runway', 'taxi', 'transfer'):
             raise ValueError('Type de clairance inconnu.')
@@ -107,6 +115,7 @@ class Progress(StrictModel):
     detected: Gesture | None = None
     # Persist evidence, but require this process's trusted adapter to reconfirm it.
     detection_epoch: str | None = None
+    observation: Observation | None = None
 
 
 class FlightSession(StrictModel):
@@ -127,6 +136,7 @@ class FlightSession(StrictModel):
     forced_phase: PhaseId | None = None
     phase_state: PhaseState = Field(default_factory=PhaseState)
     reminders: dict[Identifier, Gesture] = Field(default_factory=dict)
+    reminder_state: ReminderState = Field(default_factory=ReminderState)
     history: list[dict] = Field(default_factory=list)
 
 
@@ -156,6 +166,8 @@ class SessionService:
         self.documents = {}
         self.errors = {}
         self.phase_engines = {}
+        self.reminder_engines = {}
+        self.radio_engines = {}
         self.phase_error = None
         for universe in ('simconnect', 'demo'):
             try:
@@ -313,23 +325,48 @@ class SessionService:
             session.history.append({'event': 'manual_step', 'step': step_id, **progress.manual.model_dump()})
         return self.change(apply)
 
-    def record_detection(self, step_id, checked, reference, universe, reason=None):
-        """Trusted adapter hook only; detection algorithms and public detection API are out of scope."""
-        step = next((s for p in self.profile.phases for g in p.groups for s in g.steps if s.id == step_id), None)
-        if universe != self.universe or not step or step.validation.mode != 'observed':
-            raise ValueError('Détection incompatible avec le suivi ou le profil.')
-        def apply(session):
-            progress = session.steps.setdefault(step_id, Progress())
-            progress.detected = Gesture(checked=checked, recorded_at=self.clock(), reference=reference, reason=reason)
-            progress.detection_epoch = self.epoch
-            session.history.append({'event': 'detected_step', 'step': step_id, **progress.detected.model_dump()})
-        return self.change(apply)
+    def refresh_observations(self, phase_view):
+        document = self.documents[self.universe]
+        if self.universe in self.errors or not document.sessions:
+            return {}
+        session = document.sessions[-1]
+        if session.status != 'active' or (session.profile_id, session.profile_revision) != (
+                self.profile.id, self.profile.revision):
+            return {}
+        observations = evaluate_observations(self.bridge, self.profile,
+            (phase_view or {}).get('effective', {}).get('value'), self.universe)
+        candidate = None
+        for step_id, observation in observations.items():
+            old = session.steps.get(step_id)
+            # Missing sources do not create empty progress on a new flight.
+            if old is None and observation.checked is None:
+                continue
+            changed = old is None or old.observation is None or old.observation.signature() != observation.signature()
+            reconfirm = observation.checked is not None and (old is None or old.detection_epoch != self.epoch)
+            if not changed and not reconfirm:
+                continue
+            if candidate is None:
+                candidate = self._copy()
+            target = candidate.sessions[-1]
+            progress = target.steps.setdefault(step_id, Progress())
+            progress.observation = observation
+            if observation.checked is not None:
+                progress.detected = Gesture(checked=observation.checked, recorded_at=self.clock(),
+                    reference=observation.reference, reason=observation.reason)
+                progress.detection_epoch = self.epoch
+            target.history.append({'event': 'observation_changed', 'step': step_id,
+                                   'at': self.clock(), **observation.model_dump()})
+        if candidate is not None:
+            self._save(candidate)
+        return observations
 
     def force_phase(self, phase):
         def apply(session):
             session.forced_phase = phase
             session.history.append({'event': 'phase', 'phase': phase, 'at': self.clock()})
             self.phase_engines.pop(session.id, None)
+            self.reminder_engines.pop(session.id, None)
+            self.radio_engines.pop(session.id, None)
         return self.change(apply)
 
     def refresh_phase(self, persist=True):
@@ -418,14 +455,42 @@ class SessionService:
             session.reminders[key] = Gesture(checked=True, recorded_at=self.clock(), reference=reference)
         return self.change(apply)
 
+    def acknowledge_reminder(self, reminder_id):
+        def apply(session):
+            reminder = session.reminder_state.events.get(reminder_id)
+            if reminder is None:
+                raise ValueError('Rappel inconnu de ce suivi.')
+            if reminder.acknowledged_at is None:
+                reminder.acknowledged_at = self.clock()
+                session.history.append({'event': 'reminder_acknowledged', 'id': reminder_id, 'at': self.clock()})
+        return self.change(apply)
+
+    def refresh_reminders(self, session, phase, flight, network):
+        engine = self.reminder_engines.setdefault(session.id, ReminderEngine())
+        active = session.status == 'active' and (session.profile_id, session.profile_revision) == (
+            self.profile.id, self.profile.revision) and self.universe not in self.errors
+        state, view = engine.evaluate(session.reminder_state, self.profile.reminders, session,
+                                     phase, flight, network, self.clock(), active=active)
+        if active and state != session.reminder_state:
+            candidate = self._copy()
+            target = candidate.sessions[-1]
+            for key, event in state.events.items():
+                if key not in target.reminder_state.events:
+                    target.history.append({'event': 'reminder_triggered', **event.model_dump()})
+            target.reminder_state = state
+            self._save(candidate)
+        return view
+
     def view(self):
         warnings = list(self.profile_load.errors)
         phase_view = None
+        observations = {}
         try:
             self.synchronize()
             phase_view = self.refresh_phase()
+            observations = self.refresh_observations(phase_view)
         except (OSError, ValueError):
-            warnings.append('Enregistrement du plan ou de la phase impossible ; dernier suivi conservé. Réessayer avant toute action.')
+            warnings.append('Enregistrement du plan, de la phase ou des observations impossible ; dernier suivi conservé. Réessayer avant toute action.')
             phase_view = self.refresh_phase(persist=False)
         if self.phase_error:
             warnings.append(self.phase_error)
@@ -443,8 +508,6 @@ class SessionService:
             warnings.append('Nouveau plan : un nouveau suivi a été ouvert.')
         if len(document.sessions) > 1 and document.sessions[-2].end_reason == 'new_plan':
             warnings.append('Nouveau plan : suivi précédent archivé, nouvelles cases vides.')
-        store = self.bridge.store()
-        fresh = store.connected and not store.paused and store.last_message is not None and self.clock()-store.last_message <= 8
         groups = []
         for phase in self.profile.phases:
             for group in phase.groups:
@@ -452,20 +515,47 @@ class SessionService:
                 for step in group.steps:
                     progress = session.steps.get(step.id, Progress()) if session else Progress()
                     manual, detected = progress.manual, progress.detected
-                    current = bool(detected is not None and progress.detection_epoch == self.epoch
-                                   and fresh and self.clock()-detected.recorded_at <= 8)
+                    observation = observations.get(step.id)
+                    current = bool(observation and observation.checked is not None)
                     effective = manual if manual is not None else detected if current else None
                     steps.append({'id': step.id, 'label': step.label,
+                                  'priority': step.priority, 'trigger': step.trigger.label,
+                                  'expected': step.expected,
                                   'checked': effective.checked if effective else False,
                                   'provenance': 'manual' if manual else 'detected' if current else 'pending',
                                   'manual': manual.model_dump() if manual else None,
                                   'detected': detected.model_dump() if detected else None,
                                   'detection_current': current,
+                                  'observation': observation.model_dump() if observation else (
+                                      {**progress.observation.model_dump(), 'checked': None, 'status': 'unavailable',
+                                       'reason': 'Preuve historique ; nouvelle confirmation requise.'}
+                                      if progress.observation else None),
                                   'conflict': bool(manual and current and manual.checked != detected.checked)})
-                groups.append({'phase': phase.id, 'phase_label': phase.label, 'label': group.label, 'steps': steps})
+                groups.append({'id': group.id, 'kind': group.kind, 'phase': phase.id, 'phase_label': phase.label, 'label': group.label, 'steps': steps})
+        network = self.bridge.flight_network.view(phase_view, session)
+        flight = flight_view(self, session, phase_view, network)
+        flight['now'] = priority_step(groups, (phase_view or {}).get('effective', {}).get('value'))
+        if session:
+            try:
+                reminders = self.refresh_reminders(session, phase_view, flight, network)
+                session = self.documents[self.universe].sessions[-1]
+            except (OSError, ValueError):
+                self.reminder_engines.pop(session.id, None)
+                warnings.append('Rappels non enregistrés ; réessayer avant acquittement.')
+                reminders = {'active': [], 'upcoming': [], 'pending_count': 0, 'deferred_count': 0,
+                             'critical': False, 'suspended': True, 'tod': None}
+            flight['reminder_status'] = reminders
+            flight['reminders'] = reminders['active']
+            if (session.profile_id, session.profile_revision) == (self.profile.id, self.profile.revision):
+                flight['radio'] = self.radio_engines.setdefault(session.id, RadioEngine()).view(
+                    self.profile, session, phase_view, flight, network, self.clock())
+            if flight['reminders']:
+                first = flight['reminders'][0]
+                if flight['now'] is None or first['priority'] >= flight['now']['priority']:
+                    flight['now'] = {**first, 'kind': 'reminder', 'trigger': first['method'], 'expected': []}
         return {'universe': self.universe, 'session': session.model_dump() if session else None,
                 'phase': phase_view,
-                'network': self.bridge.flight_network.view(phase_view, session),
+                'network': network, 'flight': flight,
                 'warnings': warnings, 'storage_blocked': self.universe in self.errors,
                 'archived_count': max(0, len(document.sessions)-1), 'groups': groups,
                 'phases': [{'id': p.id, 'label': p.label} for p in self.profile.phases]}
