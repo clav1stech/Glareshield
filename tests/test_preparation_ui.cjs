@@ -76,16 +76,15 @@ async function browserPass() {
     await page.getByText('OFP importé.', { exact: true }).waitFor();
     await page.locator('.route').first().waitFor();
     await page.getByRole('button', { name: 'Démarrer le suivi du vol', exact: true }).click();
-    await page.getByRole('heading', { name: 'Suivi du vol', exact: true }).waitFor();
-    const firstStep = page.locator('#view input[type=checkbox]').first();
+    await page.locator('#flightDashboard').waitFor();
+    const firstStep = page.locator('#flightDashboard input[type=checkbox]').first();
     const stepLabel = await firstStep.getAttribute('aria-label');
     await firstStep.check();
-    await page.getByText('Manuel', { exact: false }).first().waitFor();
-    // Vol updates live text while keeping controls, focus and pointer targets mounted.
-    await firstStep.evaluate(el => { window.flightStepNode = el; el.focus(); });
+    await page.waitForFunction(label => ai.session.groups.some(g => g.steps.some(s => s.label === label && s.checked)), stepLabel);
+    // Polling rebuilds Vol but keeps keyboard focus and never moves a target during a click.
+    await firstStep.focus();
     await page.evaluate(() => refresh());
-    assert.equal(await firstStep.evaluate(el => el === window.flightStepNode && el === document.activeElement), true);
-    assert.equal(await firstStep.isChecked(), true);
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), stepLabel);
     const box = await firstStep.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
@@ -94,102 +93,65 @@ async function browserPass() {
     await page.mouse.up();
     await firstStep.uncheck();
     await firstStep.check();
-    // Observable demo evidence is labelled and cannot override a pilot uncheck.
+    // Unknown values are typed in place; a poll does not interrupt typing.
+    await page.locator('[data-key="val-cleared_altitude"]').first().click();
+    const typed = page.locator('.fl-edit');
+    await typed.fill('5000');
+    await page.evaluate(() => refresh());
+    assert.equal(await typed.inputValue(), '5000');
+    await typed.press('Enter');
+    await page.waitForFunction(() => ai.session.flight.values.cleared_altitude.value === 5000);
+    assert.match(await page.locator('[data-key="val-cleared_altitude"]').first().textContent(), /5.000 ft/);
+    // Demo flight in cruise: stage-driven guidance, radio copied without emission.
     await page.evaluate(async () => {
-      await api('ai/scenario', 'POST', {active:true, offline_network:true});
+      await api('ai/scenario', 'POST', {active:true, phase:'cruise', offline_network:true});
       await api('ai/simbrief/demo', 'POST', {});
       let state = await api('ai/session');
-      state = await api('ai/session/start', 'POST', {session_id:state.session?.id || null, universe:state.universe});
-      await api('ai/session/phase', 'PUT', {session_id:state.session.id, universe:state.universe, phase:'arrival'});
+      await api('ai/session/start', 'POST', {session_id:state.session?.id || null, universe:state.universe});
       await reloadAI();
     });
-    const gear = page.locator('[data-step="gear_down"]');
-    await gear.getByRole('checkbox').waitFor();
-    assert.equal(await gear.getByRole('checkbox').isChecked(), true);
-    assert.match(await gear.locator('.step-status').textContent(), /Détecté.*Démonstration.*mesure du/);
-    await gear.getByRole('checkbox').uncheck();
-    await page.evaluate(() => refresh());
-    assert.equal(await gear.getByRole('checkbox').isChecked(), false);
-    assert.match(await gear.locator('.step-status').textContent(), /Manuel.*contradictoire/);
-    await page.screenshot({path:'local/ui-test/observations.png', animations:'disabled'});
-    const landing = page.locator('[data-radio="radio_landing"]');
-    assert.match(await landing.locator('.radio-station').textContent(), /Démonstration/);
+    await page.waitForFunction(() => ai.session?.cockpit?.stage === 'cruise' && $('#flightDashboard'), null, { timeout: 15000 });
+    await page.waitForFunction(() => document.querySelector('.fl-leg[aria-current="step"] .fl-legname')?.textContent === 'Croisière');
+    assert.equal(await page.locator('.fl-big').textContent(), 'Préparer l’arrivée avant le TOD');
     assert.equal(await page.locator('#ivaoState').textContent(), 'IVAO · Démonstration');
-    const copyVoice = landing.locator('[data-variant="voice"] button');
     const beforeCopy = await page.evaluate(async () => (await api('ai/session')).session.history);
-    await copyVoice.click();
-    assert.equal(await page.evaluate(() => window.testCopiedText), await landing.locator('[data-variant="voice"] pre').textContent());
-    await page.evaluate(() => refresh());
-    assert.equal(await copyVoice.evaluate(el => el === document.activeElement), true, 'Copy control keeps focus during polling');
-    await landing.locator('[data-variant="unicom"] button').click();
-    const copiedUnicom = await page.evaluate(() => window.testCopiedText);
-    assert.equal(copiedUnicom, await landing.locator('[data-variant="unicom"] pre').textContent());
-    assert.equal(copiedUnicom.includes('\n'), false);
-    assert.deepEqual(await page.evaluate(async () => (await api('ai/session')).session.history), beforeCopy, 'Copy does not emit, check or acknowledge');
+    await page.locator('[data-key^="copy-"]').first().click();
+    assert.equal(await page.evaluate(() => window.testCopiedText), await page.locator('.fl-msg').first().textContent());
+    assert.deepEqual(await page.evaluate(async () => (await api('ai/session')).session.history), beforeCopy, 'Copy does not emit or check');
     await page.screenshot({path:'local/ui-test/radio-copy.png', animations:'disabled'});
-    await page.evaluate(() => sessionAction('phase', 'PUT', {phase:'cruise'}));
-    assert.equal(await page.locator('[data-phase-group="cruise"]').evaluate(el => el.open), true);
-    assert.deepEqual(await page.locator('[data-radio]').evaluateAll(rows => rows.map(row => row.dataset.radio)), ['radio_descent_request','radio_enroute']);
-    const reminder = page.locator('[data-reminder]').first();
-    const reminderId = await reminder.getAttribute('data-reminder');
-    const pending = await page.locator('[data-reminder]').count();
-    await reminder.getByRole('button').click();
-    await page.evaluate(() => refresh());
-    assert.equal(await page.locator('[data-reminder]').count(), pending - 1);
-    assert.ok(await page.evaluate(async id => (await api('ai/session')).session.reminder_state.events[id].acknowledged_at, reminderId));
-    await page.evaluate(async () => {
-      await api('ai/scenario', 'POST', {active:false});
-      await reloadAI();
-    });
-    assert.equal(await page.getByRole('checkbox', {name:stepLabel, exact:true}).isChecked(), true);
+    // Another phase is previewed first; the correction is an explicit second gesture.
+    await page.locator('[data-key="leg-descent"]').click();
+    await page.getByText('Aperçu de la phase Descente', { exact: false }).waitFor();
+    assert.equal(await page.evaluate(() => ai.session.phase.phase), 'cruise');
+    await page.getByRole('button', { name: 'Je suis en Descente', exact: true }).click();
+    await page.waitForFunction(() => ai.session.phase.phase === 'descent' && ai.session.phase.mode === 'manual');
     for (const theme of ['light', 'dark']) {
       await page.evaluate(theme => saveDisplay({ theme, text_size: 'standard' }), theme);
       await page.evaluate(() => window.scrollTo(0, 0));
-      await page.screenshot({ path: 'local/ui-test/flight-'+theme+'.png', animations: 'disabled' });
+      await page.screenshot({ path: 'local/ui-test/flight-'+theme+'.png', fullPage: true, animations: 'disabled' });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     }
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.screenshot({ path: 'local/ui-test/flight-1920.png', animations: 'disabled' });
     await page.setViewportSize({ width: 1440, height: 1080 });
-    await page.getByLabel('Phase', { exact: true }).selectOption('cruise');
-    // The draft must survive a poll or unrelated render before explicit save.
-    await page.evaluate(() => render());
-    assert.equal(await page.getByLabel('Phase', { exact: true }).inputValue(), 'cruise');
-    await page.getByRole('button', { name: 'Enregistrer la phase', exact: true }).click();
-    const selection = page.locator('details').filter({ has: page.locator('summary', { hasText: 'Déclarer la piste ou l’approche retenue' }) });
-    await selection.locator('summary').click();
-    await selection.getByLabel('Valeur déclarée', { exact: true }).fill('27');
-    const draftInput = selection.getByLabel('Valeur déclarée', { exact: true });
-    await draftInput.evaluate(el => { window.flightDraftNode = el; });
-    await page.evaluate(() => refresh());
-    assert.equal(await draftInput.inputValue(), '27');
-    assert.equal(await draftInput.evaluate(el => el === window.flightDraftNode && el === document.activeElement), true);
-    await selection.getByLabel('Référence (EFB, ATC ou bulletin)', { exact: true }).fill('Briefing fictif');
-    await selection.getByRole('button', { name: 'Enregistrer : Déclarer la piste ou l’approche retenue', exact: true }).click();
-    await page.getByText('Choix · Piste : 27', { exact: false }).waitFor();
-    await page.screenshot({ path: 'local/ui-test/flight-session.png', fullPage: true, animations: 'disabled' });
+    await page.evaluate(async () => {
+      await api('ai/scenario', 'POST', {active:false});
+      await reloadAI();
+    });
+    // Back to the SimConnect universe: gestures persisted across reload, end and resume.
     await page.reload();
     await page.locator('#nav').getByRole('button', { name: 'Vol', exact: true }).click();
-    await page.getByRole('heading', { name: 'Suivi du vol', exact: true }).waitFor();
-    assert.equal(await page.getByLabel('Phase', { exact: true }).inputValue(), 'cruise');
-    await page.locator('summary').filter({ hasText: 'Prévol' }).click();
+    await page.locator('#flightDashboard').waitFor();
     assert.equal(await page.getByRole('checkbox', { name: stepLabel, exact: true }).isChecked(), true);
     await page.getByRole('checkbox', { name: stepLabel, exact: true }).uncheck();
+    await page.waitForFunction(label => ai.session.groups.some(g => g.steps.some(s => s.label === label && !s.checked)), stepLabel);
     await page.getByRole('button', { name: 'Terminer le suivi', exact: true }).click();
     await page.getByRole('button', { name: 'Reprendre le suivi', exact: true }).click();
-    await page.locator('summary').filter({ hasText: 'Prévol' }).click();
+    await page.locator('#flightDashboard').waitFor();
     assert.equal(await page.getByRole('checkbox', { name: stepLabel, exact: true }).isChecked(), false);
-    await page.getByText('Choix · Piste : 27', { exact: false }).waitFor();
+    assert.match(await page.locator('[data-key="val-cleared_altitude"]').first().textContent(), /5.000 ft/);
+    await page.screenshot({ path: 'local/ui-test/flight-session.png', fullPage: true, animations: 'disabled' });
     const names = await page.evaluate(() => SETTINGS.flatMap(([, pages]) => pages));
-    await page.waitForTimeout(1200);
-    assert.match(await page.locator('#flightPhase').textContent(), /Croisière.*Déclarée/);
-    await page.getByRole('button', { name: 'Revenir en automatique', exact: true }).click();
-    await page.waitForFunction(() => document.querySelector('#flightPhase').textContent.includes('Prévol'));
-    assert.match(await page.locator('#flightPhase').textContent(), /Prévol.*Calculée/);
-    assert.equal(await page.getByLabel('Phase', { exact: true }).inputValue(), 'automatic');
-    assert.equal(await page.getByRole('checkbox', { name: stepLabel, exact: true }).isChecked(), false);
-    await page.getByText('Prochain déclencheur :', { exact: false }).first().waitFor();
-    await page.screenshot({ path: 'local/ui-test/flight-phase-automatic.png', fullPage: true, animations: 'disabled' });
     await page.locator('#nav').getByRole('button', { name: 'Réglages', exact: true }).click();
     for (const name of names) {
       await page.locator('#settingsNav').getByRole('button', { name, exact: true }).click();
@@ -230,18 +192,21 @@ async function browserPass() {
     await page.waitForTimeout(1800);
     assert.equal(await flight.evaluate(el => el === document.activeElement), true);
     await page.keyboard.press('Enter');
-    await page.getByRole('heading', { name: 'Suivi du vol', exact: true }).waitFor();
+    await page.locator('#flightDashboard').waitFor();
     assert.equal(await page.locator('#pageTitle').evaluate(el => el === document.activeElement), true);
-    await page.getByRole('button', { name: 'Retour à l’initialisation', exact: true }).click();
+    await page.locator('#nav').getByRole('button', { name: 'Initialisation', exact: true }).click();
     await notes.fill('Brouillon fictif non enregistré.');
     await page.locator('#nav').getByRole('button', { name: 'Vol', exact: true }).click();
-    await page.getByRole('button', { name: 'Retour à l’initialisation', exact: true }).click();
+    await page.locator('#nav').getByRole('button', { name: 'Initialisation', exact: true }).click();
     assert.equal(await notes.inputValue(), 'Brouillon fictif non enregistré.');
     await page.setViewportSize({ width: 780, height: 1000 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     await page.screenshot({ path: 'local/ui-test/preparation-mobile.png', fullPage: true, animations: 'disabled' });
     await page.locator('#nav').getByRole('button', { name: 'Vol', exact: true }).click();
-    await page.getByRole('button', { name: 'Retour à l’initialisation', exact: true }).click();
+    await page.locator('#flightDashboard').waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await page.screenshot({ path: 'local/ui-test/flight-mobile.png', fullPage: true, animations: 'disabled' });
+    await page.locator('#nav').getByRole('button', { name: 'Initialisation', exact: true }).click();
     await page.route('**/api/status', route => route.abort());
     await page.locator('#connectionNotice').waitFor({ state: 'visible' });
     await page.getByRole('heading', { name: 'Simulateur', exact: true }).locator('../..').getByText('Indisponible', { exact: true }).waitFor();
@@ -251,6 +216,9 @@ async function browserPass() {
     assert.deepEqual(after, before, 'Mode, display, imports and notes preserve runtime resources');
     assert.deepEqual(errors, []);
     console.log('Browser navigation, notes, import, display, keyboard and runtime preservation passed.');
+  } catch (error) {
+    await page.screenshot({ path: 'local/ui-test/failure.png', fullPage: true }).catch(() => {});
+    throw error;
   } finally { await browser.close(); }
 }
 if (process.argv.includes('--browser')) browserPass().catch(error => { console.error(error); process.exitCode = 1; });

@@ -95,8 +95,6 @@ class AIBridge:
         if self.demo_ivao:
             self.demo_ivao.context = self.watch_context
         self.sessions.phase_engines.clear()
-        self.sessions.reminder_engines.clear()
-        self.sessions.radio_engines.clear()
 
     def store(self) -> TelemetryStore:
         return self.scenario.tick() if self.scenario else self.live

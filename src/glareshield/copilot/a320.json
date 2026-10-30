@@ -1,7 +1,7 @@
 {
   "schema_version": "glareshield.copilot_profile/1",
   "id": "a320_normal",
-  "revision": 1,
+  "revision": 2,
   "aircraft": "A320 / Fenix — procédures normales génériques de simulation",
   "scope": "simulation_only",
   "procedure_reference": "docs/SKILL.md sections 4, 5, 7 ; docs/copilot-contract.md",
@@ -1191,6 +1191,14 @@
       "purpose": "procedure",
       "sources": [],
       "literal": "LEVIER DOWN — verrouillage à vérifier"
+    },
+    "speed_limit": {
+      "label": "limitation",
+      "unit": null,
+      "placeholder": "<limitation>",
+      "purpose": "procedure",
+      "sources": [],
+      "literal": "250 kt"
     }
   },
   "phases": [
@@ -1214,22 +1222,44 @@
         {
           "id": "preflight_mcdu",
           "kind": "mcdu",
-          "label": "Préparation MCDU",
+          "label": "MCDU",
           "steps": [
             {
               "id": "init_a",
-              "label": "INIT A : trajet, indicatif, dégagement, niveau et CI",
+              "label": "INIT A · trajet et indicatif",
               "expected": [
                 "origin",
                 "destination",
-                "callsign",
-                "alternate",
+                "callsign"
+              ],
+              "priority": 90,
+              "trigger": {
+                "label": "Pendant la phase",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "init_cruise",
+              "label": "INIT A · niveau et cost index",
+              "expected": [
                 "cruise_altitude",
                 "cost_index"
               ],
-              "priority": 50,
+              "priority": 89,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1247,15 +1277,14 @@
             },
             {
               "id": "departure_plan",
-              "label": "F-PLN : piste et SID prévues ; route et discontinuités à vérifier",
+              "label": "F-PLN · piste et SID",
               "expected": [
                 "departure_runway",
-                "sid",
-                "route"
+                "sid"
               ],
-              "priority": 50,
+              "priority": 88,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1273,16 +1302,38 @@
             },
             {
               "id": "init_b",
-              "label": "INIT B : masses, centrage, bloc et réserves",
+              "label": "INIT B · ZFW / ZFWCG",
               "expected": [
                 "zfw",
-                "zfwcg",
-                "block_fuel",
-                "reserve"
+                "zfwcg"
               ],
-              "priority": 50,
+              "priority": 87,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "init_fuel",
+              "label": "INIT B · carburant bloc",
+              "expected": [
+                "block_fuel"
+              ],
+              "priority": 86,
+              "trigger": {
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1300,20 +1351,15 @@
             },
             {
               "id": "perf_takeoff",
-              "label": "PERF TAKE OFF : recopier les performances manuelles sourcées",
+              "label": "PERF TAKE OFF · V1 / VR / V2",
               "expected": [
                 "v1",
                 "vr",
-                "v2",
-                "flex",
-                "takeoff_flaps",
-                "thrust_reduction",
-                "acceleration",
-                "transition_altitude"
+                "v2"
               ],
-              "priority": 50,
+              "priority": 85,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1330,14 +1376,40 @@
               }
             },
             {
-              "id": "secondary_plan",
-              "label": "SEC F-PLN : vérifier une variante si nécessaire",
+              "id": "perf_flex",
+              "label": "PERF TAKE OFF · FLEX et volets",
               "expected": [
-                "verified"
+                "flex",
+                "takeoff_flaps"
               ],
-              "priority": 50,
+              "priority": 84,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_preflight",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "perf_thr",
+              "label": "PERF TAKE OFF · THR RED / ACC",
+              "expected": [
+                "thrust_reduction",
+                "acceleration"
+              ],
+              "priority": 83,
+              "trigger": {
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1358,17 +1430,17 @@
         {
           "id": "preflight_fcu",
           "kind": "fcu",
-          "label": "Préparation FCU",
+          "label": "FCU",
           "steps": [
             {
               "id": "initial_altitude",
-              "label": "Altitude autorisée ; rester en attente si inconnue",
+              "label": "Altitude initiale",
               "expected": [
                 "cleared_altitude"
               ],
               "priority": 90,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1386,13 +1458,13 @@
             },
             {
               "id": "departure_barometer",
-              "label": "Vérifier et régler le QNH départ sourcé",
+              "label": "QNH départ",
               "expected": [
                 "departure_qnh"
               ],
-              "priority": 50,
+              "priority": 89,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1410,13 +1482,13 @@
             },
             {
               "id": "flight_directors",
-              "label": "Flight directors",
+              "label": "Flight directors ON",
               "expected": [
                 "on"
               ],
-              "priority": 50,
+              "priority": 88,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1437,7 +1509,7 @@
         {
           "id": "preflight_checks",
           "kind": "checklist",
-          "label": "Avant mise en route",
+          "label": "Checklists",
           "steps": [
             {
               "id": "before_start_check",
@@ -1445,7 +1517,7 @@
               "expected": [
                 "completed"
               ],
-              "priority": 50,
+              "priority": 90,
               "trigger": {
                 "label": "Prêt à mettre en route",
                 "any_of": [
@@ -1522,19 +1594,18 @@
         {
           "id": "departure_mcdu",
           "kind": "mcdu",
-          "label": "Départ confirmé",
+          "label": "MCDU",
           "steps": [
             {
               "id": "check_cleared_route",
-              "label": "Comparer la clairance au F-PLN ; modifier et vérifier manuellement",
+              "label": "F-PLN conforme à la clairance",
               "expected": [
                 "cleared_runway",
-                "cleared_sid",
-                "route"
+                "cleared_sid"
               ],
               "priority": 90,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1555,17 +1626,17 @@
         {
           "id": "departure_fcu",
           "kind": "fcu",
-          "label": "Autorisations départ",
+          "label": "FCU",
           "steps": [
             {
               "id": "departure_altitude",
-              "label": "Régler l’altitude autorisée",
+              "label": "Altitude autorisée",
               "expected": [
                 "cleared_altitude"
               ],
               "priority": 90,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1583,13 +1654,13 @@
             },
             {
               "id": "transponder",
-              "label": "Régler le code reçu",
+              "label": "Squawk",
               "expected": [
                 "squawk"
               ],
-              "priority": 50,
+              "priority": 89,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1610,7 +1681,7 @@
         {
           "id": "departure_checks",
           "kind": "checklist",
-          "label": "Mise en route et piste",
+          "label": "Checklists",
           "steps": [
             {
               "id": "after_start_check",
@@ -1618,7 +1689,7 @@
               "expected": [
                 "completed"
               ],
-              "priority": 50,
+              "priority": 90,
               "trigger": {
                 "label": "Mise en route terminée",
                 "any_of": [
@@ -1638,11 +1709,11 @@
             },
             {
               "id": "before_taxi_check",
-              "label": "Avant roulage / roulage",
+              "label": "Avant roulage",
               "expected": [
                 "completed"
               ],
-              "priority": 50,
+              "priority": 89,
               "trigger": {
                 "label": "Prêt à rouler",
                 "any_of": [
@@ -1666,7 +1737,7 @@
               "expected": [
                 "completed"
               ],
-              "priority": 90,
+              "priority": 88,
               "trigger": {
                 "label": "Au point d’arrêt",
                 "any_of": [
@@ -1810,18 +1881,17 @@
         {
           "id": "climb_fcu",
           "kind": "fcu",
-          "label": "Montée",
+          "label": "FCU",
           "steps": [
             {
               "id": "climb_std",
-              "label": "Sélecteur de calage CDB en STD ; transition à confirmer séparément",
+              "label": "Calage STD à l’altitude de transition",
               "expected": [
-                "std",
                 "transition_altitude"
               ],
-              "priority": 80,
+              "priority": 90,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1843,14 +1913,13 @@
             },
             {
               "id": "climb_clearance",
-              "label": "Respecter l’altitude autorisée, distincte de la croisière prévue",
+              "label": "Niveau autorisé",
               "expected": [
-                "cleared_altitude",
-                "cruise_altitude"
+                "cleared_altitude"
               ],
-              "priority": 90,
+              "priority": 89,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1871,17 +1940,17 @@
         {
           "id": "climb_checks",
           "kind": "checklist",
-          "label": "Après décollage",
+          "label": "Checklists",
           "steps": [
             {
               "id": "gear_up",
-              "label": "Levier de train rentré ; vérifier séparément la position réelle",
+              "label": "Train rentré",
               "expected": [
                 "up"
               ],
-              "priority": 50,
+              "priority": 90,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -1907,7 +1976,7 @@
               "expected": [
                 "completed"
               ],
-              "priority": 50,
+              "priority": 89,
               "trigger": {
                 "label": "Après décollage",
                 "any_of": [
@@ -2002,20 +2071,19 @@
         {
           "id": "cruise_mcdu",
           "kind": "mcdu",
-          "label": "Préparer l’arrivée avant le TOD",
+          "label": "MCDU",
           "steps": [
             {
               "id": "arrival_plan",
-              "label": "F-PLN : piste, STAR, VIA et approche ; confirmer la proposition",
+              "label": "F-PLN · piste, STAR et approche",
               "expected": [
                 "arrival_runway",
                 "star",
-                "via",
                 "approach"
               ],
-              "priority": 80,
+              "priority": 90,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2033,18 +2101,40 @@
             },
             {
               "id": "perf_approach",
-              "label": "PERF APPR : météo publiée ou déclarée, minima et performances sourcées",
+              "label": "PERF APPR · QNH / température / vent",
               "expected": [
                 "qnh",
                 "temperature",
-                "wind",
+                "wind"
+              ],
+              "priority": 89,
+              "trigger": {
+                "label": "Pendant la phase",
+                "any_of": [
+                  [
+                    {
+                      "source": "phase_cruise",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                ],
+                "hold_s": 0
+              },
+              "validation": {
+                "mode": "manual"
+              }
+            },
+            {
+              "id": "perf_minima",
+              "label": "PERF APPR · minima et VAPP",
+              "expected": [
                 "minima",
-                "landing_flaps",
                 "vapp"
               ],
-              "priority": 80,
+              "priority": 88,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2062,13 +2152,13 @@
             },
             {
               "id": "rad_nav",
-              "label": "RAD NAV : vérifier les aides sur les cartes citées",
+              "label": "RAD NAV · aide d’approche",
               "expected": [
                 "navigation_aid"
               ],
-              "priority": 50,
+              "priority": 87,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2086,14 +2176,13 @@
             },
             {
               "id": "tod_fuel",
-              "label": "Vérifier le TOD MCDU déclaré et le carburant prévu à l’arrivée",
+              "label": "Vérifier TOD et carburant à l’arrivée",
               "expected": [
-                "tod",
                 "landing_fuel"
               ],
-              "priority": 50,
+              "priority": 86,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2111,16 +2200,13 @@
             },
             {
               "id": "approach_briefing",
-              "label": "Briefing : piste, approche, minima, remise des gaz, sortie",
+              "label": "Briefing approche",
               "expected": [
-                "arrival_runway",
-                "approach",
-                "minima",
-                "exit"
+                "verified"
               ],
-              "priority": 50,
+              "priority": 85,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2141,11 +2227,11 @@
         {
           "id": "cruise_fcu",
           "kind": "fcu",
-          "label": "Croisière et autorisation de descente",
+          "label": "FCU",
           "steps": [
             {
               "id": "descent_altitude",
-              "label": "Au TOD, utiliser uniquement l’altitude autorisée",
+              "label": "Altitude de descente autorisée",
               "expected": [
                 "cleared_altitude"
               ],
@@ -2263,20 +2349,18 @@
         {
           "id": "descent_mcdu",
           "kind": "mcdu",
-          "label": "Arrivée",
+          "label": "MCDU",
           "steps": [
             {
               "id": "update_arrival",
-              "label": "Revoir piste, météo et minima après toute modification",
+              "label": "Piste et QNH à jour avec l’ATIS",
               "expected": [
                 "arrival_runway",
-                "qnh",
-                "wind",
-                "minima"
+                "qnh"
               ],
-              "priority": 80,
+              "priority": 90,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2294,13 +2378,13 @@
             },
             {
               "id": "activate_approach_phase",
-              "label": "Vérifier / activer la phase approche MCDU quand approprié",
+              "label": "Activer la phase approche",
               "expected": [
                 "verified"
               ],
-              "priority": 50,
+              "priority": 89,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2321,16 +2405,15 @@
         {
           "id": "descent_fcu",
           "kind": "fcu",
-          "label": "Descente",
+          "label": "FCU",
           "steps": [
             {
               "id": "descent_qnh",
-              "label": "Passer au QNH au niveau de transition déclaré",
+              "label": "Calage QNH au niveau de transition",
               "expected": [
-                "qnh",
                 "transition_level"
               ],
-              "priority": 80,
+              "priority": 90,
               "trigger": {
                 "label": "Franchissement du niveau de transition",
                 "any_of": [
@@ -2349,15 +2432,14 @@
               }
             },
             {
-              "id": "descent_constraints",
-              "label": "Vérifier les contraintes et valeurs autorisées",
+              "id": "descent_speed",
+              "label": "250 kt sous FL100",
               "expected": [
-                "cleared_altitude",
-                "speed"
+                "speed_limit"
               ],
-              "priority": 90,
+              "priority": 89,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2378,7 +2460,7 @@
         {
           "id": "descent_checks",
           "kind": "checklist",
-          "label": "Approche",
+          "label": "Checklists",
           "steps": [
             {
               "id": "approach_check",
@@ -2386,7 +2468,7 @@
               "expected": [
                 "completed"
               ],
-              "priority": 50,
+              "priority": 90,
               "trigger": {
                 "label": "Prêt pour l’approche",
                 "any_of": [
@@ -2490,52 +2572,19 @@
       },
       "groups": [
         {
-          "id": "arrival_mcdu",
-          "kind": "mcdu",
-          "label": "Approche confirmée",
-          "steps": [
-            {
-              "id": "final_approach_data",
-              "label": "Confirmer piste, approche et minima dans le MCDU",
-              "expected": [
-                "arrival_runway",
-                "approach",
-                "minima"
-              ],
-              "priority": 80,
-              "trigger": {
-                "label": "Pendant la phase visible",
-                "any_of": [
-                  [
-                    {
-                      "source": "phase_arrival",
-                      "op": "eq",
-                      "value": true
-                    }
-                  ]
-                ],
-                "hold_s": 0
-              },
-              "validation": {
-                "mode": "manual"
-              }
-            }
-          ]
-        },
-        {
           "id": "arrival_fcu",
           "kind": "fcu",
-          "label": "Approche",
+          "label": "FCU",
           "steps": [
             {
               "id": "appr_button",
-              "label": "Vérifier le bouton APPR si nécessaire ; vérifier le FMA séparément",
+              "label": "APPR armé",
               "expected": [
                 "verified"
               ],
-              "priority": 50,
+              "priority": 90,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2553,13 +2602,13 @@
             },
             {
               "id": "second_ap",
-              "label": "Vérifier le second AP si approprié à l’approche",
+              "label": "Second AP",
               "expected": [
                 "verified"
               ],
-              "priority": 50,
+              "priority": 89,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2577,13 +2626,13 @@
             },
             {
               "id": "gear_down",
-              "label": "Levier de train sorti ; vérifier séparément le verrouillage",
+              "label": "Train sorti",
               "expected": [
                 "down"
               ],
-              "priority": 50,
+              "priority": 88,
               "trigger": {
-                "label": "Pendant la phase visible",
+                "label": "Pendant la phase",
                 "any_of": [
                   [
                     {
@@ -2608,7 +2657,7 @@
         {
           "id": "arrival_checks",
           "kind": "checklist",
-          "label": "Atterrissage et parking",
+          "label": "Checklists",
           "steps": [
             {
               "id": "landing_check",
@@ -2640,7 +2689,7 @@
               "expected": [
                 "completed"
               ],
-              "priority": 50,
+              "priority": 89,
               "trigger": {
                 "label": "Piste dégagée",
                 "any_of": [
@@ -2664,7 +2713,7 @@
               "expected": [
                 "completed"
               ],
-              "priority": 50,
+              "priority": 88,
               "trigger": {
                 "label": "Au poste",
                 "any_of": [
@@ -2688,7 +2737,7 @@
               "expected": [
                 "completed"
               ],
-              "priority": 50,
+              "priority": 87,
               "trigger": {
                 "label": "Prêt à sécuriser",
                 "any_of": [
@@ -2839,98 +2888,5 @@
       ]
     }
   ],
-  "reminders": [
-    {
-      "id": "prepare_arrival",
-      "kind": "arrival_preparation",
-      "label": "Préparer l’arrivée : F-PLN, PERF APPR, RAD NAV et briefing",
-      "priority": 85,
-      "phases": [
-        "cruise"
-      ],
-      "distance_nm": 180,
-      "tod_lead_s": 900,
-      "hold_s": 5
-    },
-    {
-      "id": "descent_started",
-      "kind": "descent",
-      "label": "Descente : confirmer clairance, arrivée et ATIS consulté",
-      "priority": 90,
-      "phases": [
-        "descent"
-      ],
-      "hold_s": 3
-    },
-    {
-      "id": "altitude_10000_up",
-      "kind": "altitude_crossing",
-      "label": "Franchissement montant de 10 000 ft MSL",
-      "priority": 80,
-      "phases": [
-        "departure",
-        "climb"
-      ],
-      "direction": "up",
-      "altitude_ft": 10000,
-      "hysteresis_ft": 200,
-      "hold_s": 3
-    },
-    {
-      "id": "altitude_10000_down",
-      "kind": "altitude_crossing",
-      "label": "Franchissement descendant de 10 000 ft MSL",
-      "priority": 90,
-      "phases": [
-        "descent",
-        "arrival"
-      ],
-      "direction": "down",
-      "altitude_ft": 10000,
-      "hysteresis_ft": 200,
-      "hold_s": 3
-    },
-    {
-      "id": "atis_available",
-      "kind": "atis_acquired",
-      "label": "ATIS disponible à consulter",
-      "priority": 40,
-      "phases": [
-        "preflight",
-        "departure",
-        "climb",
-        "cruise",
-        "descent",
-        "arrival"
-      ]
-    },
-    {
-      "id": "atis_update",
-      "kind": "atis_changed",
-      "label": "Nouvel ATIS : consulter avant de l’annoncer",
-      "priority": 85,
-      "phases": [
-        "preflight",
-        "departure",
-        "climb",
-        "cruise",
-        "descent",
-        "arrival"
-      ]
-    },
-    {
-      "id": "atc_presence",
-      "kind": "atc_presence",
-      "label": "Présence ATC à vérifier",
-      "priority": 80,
-      "phases": [
-        "preflight",
-        "departure",
-        "climb",
-        "cruise",
-        "descent",
-        "arrival"
-      ]
-    }
-  ]
+  "reminders": []
 }

@@ -85,7 +85,10 @@ async def test_all_readers_share_cache_and_page_renders_never_fetch(tmp_path):
 async def test_current_and_next_phase_positions_keep_matching_and_published_frequencies(tmp_path):
     bridge, clock, network = setup(tmp_path)
     await bridge.ivao.refresh()
-    data = view(bridge)
+    assert view(bridge)['phase'] is None  # Placed only after a few stable seconds of measurements.
+    for _ in range(4):
+        clock.now += 1
+        data = view(bridge)
     assert data['phase'] == 'preflight' and data['next_phase'] == 'departure'
     ground = next(p for p in data['positions'] if p['callsign'] == 'XXPO_GND')
     assert 'current' in ground['useful_for'] or 'next' in ground['useful_for']

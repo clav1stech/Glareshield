@@ -13,16 +13,17 @@ from pydantic import Field, model_validator
 
 from ..config import atomic_write
 from ..model import StrictModel
-from .contract import Identifier, PhaseId, Scalar, Text, load_profile
-from .phases import PhaseEngine, PhaseState
-from .flight import flight_view, priority_step
+from .contract import Identifier, Scalar, Text, load_profile
+from .phases import PhaseEngine, PhaseState, read_sample
+from .flight import flight_view
+from .cockpit import cockpit_view
 from .observations import Observation, evaluate as evaluate_observations
-from .reminders import ReminderEngine, ReminderState
-from .radio import RadioEngine
 from ..aibridge.telemetry import qualify
 
 Universe = Literal['simconnect', 'demo']
 MAX_BYTES = 8_388_608
+PHASE_INPUTS = {'on_ground', 'ground_speed', 'vertical_speed', 'altitude_msl', 'altitude_indicated',
+                'altitude_agl', 'latitude', 'longitude', 'engine_1_running', 'engine_2_running'}
 
 
 def digest(value) -> str:
@@ -110,6 +111,12 @@ class Gesture(StrictModel):
     reason: Text | None = None
 
 
+class PilotValue(StrictModel):
+    """A value typed by the pilot on the Vol screen; it takes precedence over the plan."""
+    value: Annotated[str, Field(min_length=1, max_length=80)]
+    recorded_at: float
+
+
 class Progress(StrictModel):
     manual: Gesture | None = None
     detected: Gesture | None = None
@@ -133,11 +140,17 @@ class FlightSession(StrictModel):
     plan_revision: int = 0
     steps: dict[Identifier, Progress] = Field(default_factory=dict)
     declarations: list[Declaration] = Field(default_factory=list)
-    forced_phase: PhaseId | None = None
+    pilot_values: dict[Identifier, PilotValue] = Field(default_factory=dict)
     phase_state: PhaseState = Field(default_factory=PhaseState)
-    reminders: dict[Identifier, Gesture] = Field(default_factory=dict)
-    reminder_state: ReminderState = Field(default_factory=ReminderState)
     history: list[dict] = Field(default_factory=list)
+
+    @model_validator(mode='before')
+    @classmethod
+    def legacy(cls, data):
+        """1.2.x sessions kept a frozen manual phase and acknowledgeable reminders."""
+        if isinstance(data, dict) and {'forced_phase', 'reminders', 'reminder_state'} & data.keys():
+            data = {k: v for k, v in data.items() if k not in ('forced_phase', 'reminders', 'reminder_state')}
+        return data
 
 
 class SessionFile(StrictModel):
@@ -166,8 +179,6 @@ class SessionService:
         self.documents = {}
         self.errors = {}
         self.phase_engines = {}
-        self.reminder_engines = {}
-        self.radio_engines = {}
         self.phase_error = None
         for universe in ('simconnect', 'demo'):
             try:
@@ -257,8 +268,10 @@ class SessionService:
         if not candidate.sessions or candidate.sessions[-1].status != 'active':
             raise ValueError('Démarrer ou reprendre un suivi avant cette action.')
         session = candidate.sessions[-1]
-        if (session.profile_id, session.profile_revision) != (self.profile.id, self.profile.revision):
-            raise ValueError('Profil modifié : ancien suivi conservé ; réinitialiser explicitement.')
+        if session.profile_id != self.profile.id:
+            raise ValueError('Profil d’appareil différent : ancien suivi conservé ; réinitialiser explicitement.')
+        # Steps are keyed by stable ids: a revised profile keeps every gesture still known.
+        session.profile_revision = self.profile.revision
         return session
 
     def start(self):
@@ -330,8 +343,7 @@ class SessionService:
         if self.universe in self.errors or not document.sessions:
             return {}
         session = document.sessions[-1]
-        if session.status != 'active' or (session.profile_id, session.profile_revision) != (
-                self.profile.id, self.profile.revision):
+        if session.status != 'active' or session.profile_id != self.profile.id:
             return {}
         observations = evaluate_observations(self.bridge, self.profile,
             (phase_view or {}).get('effective', {}).get('value'), self.universe)
@@ -361,16 +373,34 @@ class SessionService:
         return observations
 
     def force_phase(self, phase):
+        """Pilot correction; automatic tracking continues from the corrected phase."""
+        if phase is None:
+            return self.view()
+
         def apply(session):
-            session.forced_phase = phase
+            engine = self.phase_engines.setdefault(session.id, PhaseEngine())
+            session.phase_state = engine.correct(session.phase_state, phase, self.clock())
             session.history.append({'event': 'phase', 'phase': phase, 'at': self.clock()})
-            self.phase_engines.pop(session.id, None)
-            self.reminder_engines.pop(session.id, None)
-            self.radio_engines.pop(session.id, None)
+        return self.change(apply)
+
+    def set_value(self, key, value):
+        expected = self.profile.values.get(key)
+        if expected is None or expected.literal is not None:
+            raise ValueError('Valeur inconnue du profil.')
+        text = value.strip() if isinstance(value, str) else None
+        if text and (len(text) > 80 or any(ord(c) < 32 for c in text)):
+            raise ValueError('Valeur trop longue ou invalide.')
+
+        def apply(session):
+            if text:
+                session.pilot_values[key] = PilotValue(value=text, recorded_at=self.clock())
+            else:
+                session.pilot_values.pop(key, None)
+            session.history.append({'event': 'pilot_value', 'key': key, 'value': text or None, 'at': self.clock()})
         return self.change(apply)
 
     def refresh_phase(self, persist=True):
-        """Use the existing store only. Persist transitions, never polling timers."""
+        """Use the existing store only. Persist stage changes, never polling timers."""
         if persist:
             self.synchronize()
         document = self.documents[self.universe]
@@ -379,44 +409,38 @@ class SessionService:
         session = document.sessions[-1]
         engine = self.phase_engines.setdefault(session.id, PhaseEngine())
         store, now = self.bridge.store(), self.clock()
-        keys = {'on_ground', 'ground_speed', 'vertical_speed', 'altitude_msl',
-                'latitude', 'longitude', 'altitude_agl'}
-        fields = {entry.key: qualify(entry, store, now) for entry in self.bridge.entries()
-                  if entry.key in keys and entry.origin == 'simvar'}
-        for key in store.errors.keys() & fields.keys():
-            fields[key] = {**fields[key], 'value': None, 'status': 'unavailable'}
-        ready = any(d.kind == 'event' and d.field == 'event.departure_ready' and d.value is True
-                    and d.revoked_at is None and d.invalidated_reason is None for d in session.declarations)
-        compatible = (session.profile_id, session.profile_revision) == (self.profile.id, self.profile.revision)
-        forced_at = next((event['at'] for event in reversed(session.history)
-                          if event.get('event') == 'phase'), session.started_at)
+        fields = {}
+        for entry in self.bridge.entries():
+            if entry.key in PHASE_INPUTS and entry.origin == 'simvar':
+                field = qualify(entry, store, now)
+                fields[entry.key] = ({**field, 'value': None, 'status': 'unavailable'}
+                                     if entry.key in store.errors else field)
         plan = self.current_plan()
+        live = (persist and store.connected and not store.paused and store.last_message is not None
+                and 0 <= now-store.last_message <= 8)
+        state, view = engine.evaluate(session.phase_state, read_sample(fields, plan), plan, now,
+                                      live=live, active=session.status == 'active')
+        previous = session.phase_state
+        if state == previous:
+            return view
+        significant = (state.model_dump(exclude={'peak_ft'}) != previous.model_dump(exclude={'peak_ft'})
+                       or (state.peak_ft or 0)-(previous.peak_ft or 0) >= 500)
+        if not significant or not persist:
+            # Altitude peaks move every second in climb: keep them in memory between real changes.
+            session.phase_state = state
+            return view
+        candidate = self._copy()
+        target = candidate.sessions[-1]
+        if state.stage != previous.stage:
+            target.history.append({'event': 'stage', 'stage': state.stage, 'phase': state.phase,
+                                   'at': now, 'evidence': state.evidence})
+        target.phase_state = state
         try:
-            generated = datetime.fromisoformat(plan['generated_utc'].replace('Z', '+00:00'))
-            plan_current = generated.tzinfo is not None and 0 <= now-generated.timestamp() <= self.bridge.settings.ofp_max_age_h*3600
-        except (KeyError, TypeError, ValueError):
-            plan_current = False
-        state, view = engine.evaluate(session.phase_state, fields, plan, now,
-                                      connected=store.connected, paused=store.paused,
-                                      last_message=store.last_message, forced=session.forced_phase,
-                                      forced_at=forced_at,
-                                      plan_current=plan_current,
-                                      suspension_reason=None if persist else 'Écriture impossible : dernière phase conservée, transitions suspendues.',
-                                      active=session.status == 'active' and compatible, departure_ready=ready)
-        if state != session.phase_state:
-            candidate = self._copy()
-            target = candidate.sessions[-1]
-            if state.phase != target.phase_state.phase:
-                target.history.append({'event': 'derived_phase', 'phase': state.phase,
-                                       'at': now, 'evidence': state.evidence})
-            target.phase_state = state
-            try:
-                self._save(candidate)
-            except (OSError, ValueError):
-                engine.reset()
-                raise
-        if persist:
-            self.phase_error = None
+            self._save(candidate)
+        except (OSError, ValueError):
+            engine.reset()
+            raise
+        self.phase_error = None
         return view
 
     def declare(self, payload):
@@ -450,37 +474,6 @@ class SessionService:
             declaration.revoked_at = self.clock()
         return self.change(apply)
 
-    def remember(self, key, reference):
-        def apply(session):
-            session.reminders[key] = Gesture(checked=True, recorded_at=self.clock(), reference=reference)
-        return self.change(apply)
-
-    def acknowledge_reminder(self, reminder_id):
-        def apply(session):
-            reminder = session.reminder_state.events.get(reminder_id)
-            if reminder is None:
-                raise ValueError('Rappel inconnu de ce suivi.')
-            if reminder.acknowledged_at is None:
-                reminder.acknowledged_at = self.clock()
-                session.history.append({'event': 'reminder_acknowledged', 'id': reminder_id, 'at': self.clock()})
-        return self.change(apply)
-
-    def refresh_reminders(self, session, phase, flight, network):
-        engine = self.reminder_engines.setdefault(session.id, ReminderEngine())
-        active = session.status == 'active' and (session.profile_id, session.profile_revision) == (
-            self.profile.id, self.profile.revision) and self.universe not in self.errors
-        state, view = engine.evaluate(session.reminder_state, self.profile.reminders, session,
-                                     phase, flight, network, self.clock(), active=active)
-        if active and state != session.reminder_state:
-            candidate = self._copy()
-            target = candidate.sessions[-1]
-            for key, event in state.events.items():
-                if key not in target.reminder_state.events:
-                    target.history.append({'event': 'reminder_triggered', **event.model_dump()})
-            target.reminder_state = state
-            self._save(candidate)
-        return view
-
     def view(self):
         warnings = list(self.profile_load.errors)
         phase_view = None
@@ -490,7 +483,7 @@ class SessionService:
             phase_view = self.refresh_phase()
             observations = self.refresh_observations(phase_view)
         except (OSError, ValueError):
-            warnings.append('Enregistrement du plan, de la phase ou des observations impossible ; dernier suivi conservé. Réessayer avant toute action.')
+            warnings.append('Enregistrement du suivi impossible ; dernier état conservé. Réessayer avant toute action.')
             phase_view = self.refresh_phase(persist=False)
         if self.phase_error:
             warnings.append(self.phase_error)
@@ -498,12 +491,8 @@ class SessionService:
             warnings.append(self.errors[self.universe])
         document = self.documents[self.universe]
         session = document.sessions[-1] if document.sessions else None
-        if session and (session.profile_id, session.profile_revision) != (self.profile.id, self.profile.revision):
-            warnings.append('Profil modifié : progression conservée, réinitialisation explicite requise.')
         if self.bridge.plan.plan and self.current_plan() is None:
             warnings.append('Plan de l’autre univers exclu de ce suivi.')
-        if session and session.plan_revision > 1:
-            warnings.append('OFP corrigé : cases conservées ; déclarations à vérifier.')
         if session and session.end_reason == 'new_plan':
             warnings.append('Nouveau plan : un nouveau suivi a été ouvert.')
         if len(document.sessions) > 1 and document.sessions[-2].end_reason == 'new_plan':
@@ -518,9 +507,7 @@ class SessionService:
                     observation = observations.get(step.id)
                     current = bool(observation and observation.checked is not None)
                     effective = manual if manual is not None else detected if current else None
-                    steps.append({'id': step.id, 'label': step.label,
-                                  'priority': step.priority, 'trigger': step.trigger.label,
-                                  'expected': step.expected,
+                    steps.append({'id': step.id, 'label': step.label, 'expected': step.expected,
                                   'checked': effective.checked if effective else False,
                                   'provenance': 'manual' if manual else 'detected' if current else 'pending',
                                   'manual': manual.model_dump() if manual else None,
@@ -531,31 +518,16 @@ class SessionService:
                                        'reason': 'Preuve historique ; nouvelle confirmation requise.'}
                                       if progress.observation else None),
                                   'conflict': bool(manual and current and manual.checked != detected.checked)})
-                groups.append({'id': group.id, 'kind': group.kind, 'phase': phase.id, 'phase_label': phase.label, 'label': group.label, 'steps': steps})
+                groups.append({'id': group.id, 'kind': group.kind, 'phase': phase.id, 'label': group.label,
+                               'steps': steps})
         network = self.bridge.flight_network.view(phase_view, session)
         flight = flight_view(self, session, phase_view, network)
-        flight['now'] = priority_step(groups, (phase_view or {}).get('effective', {}).get('value'))
-        if session:
-            try:
-                reminders = self.refresh_reminders(session, phase_view, flight, network)
-                session = self.documents[self.universe].sessions[-1]
-            except (OSError, ValueError):
-                self.reminder_engines.pop(session.id, None)
-                warnings.append('Rappels non enregistrés ; réessayer avant acquittement.')
-                reminders = {'active': [], 'upcoming': [], 'pending_count': 0, 'deferred_count': 0,
-                             'critical': False, 'suspended': True, 'tod': None}
-            flight['reminder_status'] = reminders
-            flight['reminders'] = reminders['active']
-            if (session.profile_id, session.profile_revision) == (self.profile.id, self.profile.revision):
-                flight['radio'] = self.radio_engines.setdefault(session.id, RadioEngine()).view(
-                    self.profile, session, phase_view, flight, network, self.clock())
-            if flight['reminders']:
-                first = flight['reminders'][0]
-                if flight['now'] is None or first['priority'] >= flight['now']['priority']:
-                    flight['now'] = {**first, 'kind': 'reminder', 'trigger': first['method'], 'expected': []}
+        flight['checked'] = {s['id']: s['checked'] for g in groups for s in g['steps']}
+        flight['progress'] = {s['id']: {'provenance': s['provenance']} for g in groups for s in g['steps']}
+        cockpit = cockpit_view(self.profile, session, phase_view, flight, network, self.clock()) if session else None
         return {'universe': self.universe, 'session': session.model_dump() if session else None,
-                'phase': phase_view,
-                'network': network, 'flight': flight,
+                'phase': phase_view, 'cockpit': cockpit, 'network': network,
+                'flight': {k: v for k, v in flight.items() if k != 'plan'},
                 'warnings': warnings, 'storage_blocked': self.universe in self.errors,
                 'archived_count': max(0, len(document.sessions)-1), 'groups': groups,
                 'phases': [{'id': p.id, 'label': p.label} for p in self.profile.phases]}

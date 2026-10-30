@@ -1,57 +1,161 @@
-"""Read-only flight phase inference. No UI, scenario labels or cockpit commands."""
+"""Read-only flight stage detection: where the aircraft is, never what the pilot did.
+
+Thirteen stages refine the six contractual phases. Each stage only lists the
+transitions that make sense from it, held for a few seconds to ignore noise.
+Missing inputs simply prevent the transitions that need them; a pilot
+correction re-anchors the automatic tracking, which then continues from there.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
-from ..aibridge.context import derived
+from ..aibridge.context import distance_nm
 from ..model import StrictModel
-from .contract import PHASE_IDS, PhaseId, QualifiedValue
+from .contract import PHASE_IDS, PhaseId
+
+StageId = Literal['parked', 'pushback', 'taxi_out', 'takeoff', 'climb', 'cruise', 'descent',
+                  'approach', 'final', 'go_around', 'rollout', 'taxi_in', 'parked_in']
+
+# id, phase, label, what the tracker waits for next
+STAGES = (
+    ('parked', 'preflight', 'Au poste', 'Repoussage, mise en route ou roulage'),
+    ('pushback', 'preflight', 'Repoussage · mise en route', 'Roulage au-delà de 6 kt'),
+    ('taxi_out', 'departure', 'Roulage', 'Décollage : 40 kt de vitesse sol'),
+    ('takeoff', 'departure', 'Décollage', 'Montée au-dessus de 1 500 ft sol'),
+    ('climb', 'climb', 'Montée', 'Croisière : palier stable près du niveau prévu'),
+    ('cruise', 'cruise', 'Croisière', 'Descente : vario sous −500 ft/min'),
+    ('descent', 'descent', 'Descente', 'Approche : 30 NM de la destination ou sous 3 000 ft sol'),
+    ('approach', 'arrival', 'Approche', 'Finale sous 1 500 ft sol'),
+    ('final', 'arrival', 'Finale', 'Toucher des roues'),
+    ('go_around', 'arrival', 'Remise des gaz', 'Nouvelle approche en descente'),
+    ('rollout', 'arrival', 'Atterrissage', 'Piste dégagée sous 30 kt'),
+    ('taxi_in', 'arrival', 'Roulage', 'Arrêt au poste'),
+    ('parked_in', 'arrival', 'Au poste', None),
+)
+STAGE_IDS = tuple(stage[0] for stage in STAGES)
+STAGE_PHASE = {stage[0]: stage[1] for stage in STAGES}
+STAGE_LABEL = {stage[0]: stage[2] for stage in STAGES}
+STAGE_NEXT = {stage[0]: stage[3] for stage in STAGES}
+# Stage chosen when the pilot corrects the phase.
+PHASE_ENTRY = {'preflight': 'parked', 'departure': 'taxi_out', 'climb': 'climb', 'cruise': 'cruise',
+               'descent': 'descent', 'arrival': 'approach'}
+GROUND_STAGES = ('parked', 'pushback', 'taxi_out', 'rollout', 'taxi_in', 'parked_in')
+# Older consumers (network, radio wording) still read the coarse substate.
+SUBSTATE = {'pushback': 'parking', 'parked': 'parking', 'parked_in': 'parking', 'taxi_out': 'taxi',
+            'taxi_in': 'taxi', 'takeoff': 'takeoff', 'approach': 'approach', 'final': 'approach',
+            'go_around': 'go_around', 'rollout': 'landing'}
 
 
 @dataclass(frozen=True)
 class PhaseThresholds:
     max_age_s: float = 8
-    moving_kt: float = 3
-    stopped_kt: float = 1
-    takeoff_kt: float = 80
-    takeoff_exit_kt: float = 60
-    landing_roll_kt: float = 40
-    taxi_after_landing_kt: float = 30
-    vertical_fpm: float = 300
-    cruise_gap_ft: float = 1000
-    arrival_nm: float = 60
-    arrival_agl_ft: float = 10000
-    movement_s: float = 5
-    takeoff_s: float = 3
-    climb_s: float = 8
-    cruise_s: float = 30
-    descent_s: float = 15
-    arrival_s: float = 8
-    landing_s: float = 5
-    parking_s: float = 10
+    creep_kt: float = 1
+    taxi_kt: float = 6
+    takeoff_kt: float = 40
+    reject_kt: float = 30
+    vacate_kt: float = 30
+    initial_climb_agl_ft: float = 1500
+    level_fpm: float = 300
+    descent_fpm: float = 500
+    go_around_fpm: float = 500
+    descent_drop_ft: float = 3000
+    cruise_margin_ft: float = 4000
+    cruise_floor_ft: float = 20000
+    approach_nm: float = 30
+    approach_agl_ft: float = 8000
+    approach_blind_agl_ft: float = 3000
+    final_agl_ft: float = 1500
+    bootstrap_s: float = 3
+    pushback_s: float = 3
+    taxi_s: float = 5
+    takeoff_s: float = 2
+    climb_s: float = 3
+    cruise_s: float = 60
+    recruise_s: float = 120
+    descent_s: float = 20
+    approach_s: float = 5
+    final_s: float = 2
+    go_around_s: float = 5
+    touchdown_s: float = 2
+    parked_s: float = 20
 
 
 class PhaseState(StrictModel):
+    stage: StageId | None = None
     phase: PhaseId = 'preflight'
-    confirmed: bool = False
-    cruise_seen: bool = False
     airborne_seen: bool = False
-    substate: str | None = None
+    peak_ft: float | None = None
     changed_at: float | None = None
+    manual: bool = False
     evidence: list[str] = Field(default_factory=list)
+
+    @model_validator(mode='before')
+    @classmethod
+    def legacy(cls, data):
+        """Sessions written by 1.2.x stored a coarse phase without stage."""
+        if not isinstance(data, dict) or 'stage' in data or 'confirmed' not in data:
+            return data
+        data = dict(data)
+        confirmed = data.pop('confirmed')
+        data.pop('cruise_seen', None)
+        substate = data.pop('substate', None)
+        phase = data.get('phase', 'preflight')
+        if confirmed and phase in PHASE_ENTRY:
+            data['stage'] = 'parked_in' if phase == 'arrival' and substate == 'parking' else PHASE_ENTRY[phase]
+        return data
+
+
+def number(fields, key, unit, limit):
+    field = fields.get(key) or {}
+    value, age = field.get('value'), field.get('age_s')
+    if (field.get('status') not in ('observed', 'simulated') or type(value) not in (int, float)
+            or isinstance(value, bool) or not math.isfinite(value) or field.get('unit') != unit
+            or age is None or not 0 <= age <= limit):
+        return None
+    return float(value)
+
+
+def flag(fields, key, limit):
+    field = fields.get(key) or {}
+    age = field.get('age_s')
+    if (field.get('status') not in ('observed', 'simulated') or type(field.get('value')) is not bool
+            or age is None or not 0 <= age <= limit):
+        return None
+    return field['value']
+
+
+def read_sample(fields, plan, limit=8):
+    """Fresh, typed measurements only; anything else is None."""
+    altitude = number(fields, 'altitude_indicated', 'ft', limit)
+    if altitude is None:
+        altitude = number(fields, 'altitude_msl', 'ft', limit)
+    engines = [flag(fields, key, 20) for key in ('engine_1_running', 'engine_2_running')]
+    sample = {'ground': flag(fields, 'on_ground', limit), 'gs': number(fields, 'ground_speed', 'kt', limit),
+              'vs': number(fields, 'vertical_speed', 'ft/min', limit), 'alt': altitude,
+              'agl': number(fields, 'altitude_agl', 'ft', limit),
+              'engines': True if True in engines else False if engines == [False, False] else None,
+              'distance': None}
+    lat, lon = number(fields, 'latitude', 'deg', limit), number(fields, 'longitude', 'deg', limit)
+    destination = (plan or {}).get('destination') or {}
+    if (lat is not None and lon is not None and type(destination.get('latitude')) in (int, float)
+            and type(destination.get('longitude')) in (int, float)):
+        sample['distance'] = distance_nm(lat, lon, destination['latitude'], destination['longitude'])
+    return sample
+
+
+def cruise_floor(plan, limits):
+    planned = ((plan or {}).get('cruise') or {}).get('initial_altitude_ft')
+    if type(planned) in (int, float) and math.isfinite(planned) and planned > 0:
+        return max(planned-limits.cruise_margin_ft, min(planned, 5000))
+    return limits.cruise_floor_ft
 
 
 class PhaseEngine:
-    """State is durable; continuous confirmation timers deliberately are not.
-
-    Each call supplies qualified flat telemetry, connection health and the planned
-    OFP. Missing samples, clock reversal or a gap >8 s reset all pending holds.
-    Only the highest *confirmed* forward phase is selected. Arrival remains the
-    phase during a go-around; its substate changes without touching any actions.
-    """
+    """Durable stage, in-memory hold timers. A data gap resets the timers only."""
 
     def __init__(self, thresholds: PhaseThresholds | None = None):
         self.limits = thresholds or PhaseThresholds()
@@ -68,173 +172,152 @@ class PhaseEngine:
         self.holds.setdefault(key, now)
         return now-self.holds[key] >= duration
 
-    def evaluate(self, state, fields, plan, now, *, connected, paused,
-                 last_message, forced=None, forced_at=None, active=True, departure_ready=False,
-                 plan_current=True, suspension_reason=None):
-        limits = self.limits
-        if self.last_at is None or not 0 <= now-self.last_at <= limits.max_age_s:
+    def bootstrap(self, s, floor):
+        """First placement, from the current measurements alone."""
+        L = self.limits
+        ground, gs, vs, alt, agl, distance = s['ground'], s['gs'], s['vs'], s['alt'], s['agl'], s['distance']
+        if ground is True and gs is not None:
+            if gs >= L.takeoff_kt:
+                return 'takeoff'
+            if gs > L.taxi_kt:
+                return 'taxi_out'
+            return 'pushback' if gs >= L.creep_kt or s['engines'] else 'parked'
+        if ground is not False or vs is None:
+            return None
+        if agl is not None and agl < L.initial_climb_agl_ft and vs > L.level_fpm and (
+                distance is None or distance > L.approach_nm):
+            return 'takeoff'
+        if distance is not None and distance <= L.approach_nm and agl is not None and agl <= L.approach_agl_ft:
+            return 'final' if agl <= L.final_agl_ft else 'approach'
+        if vs > L.level_fpm:
+            return 'climb'
+        if vs < -L.descent_fpm:
+            return 'descent'
+        return 'cruise' if alt is not None and alt >= floor else 'climb'
+
+    def transitions(self, state, s, floor):
+        """(target, condition, hold, evidence) allowed from the current stage."""
+        L = self.limits
+        stage, ground, gs, vs, alt, agl, distance = (state.stage, s['ground'], s['gs'], s['vs'],
+                                                    s['alt'], s['agl'], s['distance'])
+        on_ground, airborne = ground is True, ground is False
+        level = vs is not None and abs(vs) <= L.level_fpm
+        result = []
+        if stage == 'parked':
+            result.append(('pushback', on_ground and (gs is not None and gs >= L.creep_kt or s['engines'] is True),
+                           L.pushback_s, 'Mouvement lent ou moteur en marche au poste.'))
+        if stage in ('parked', 'pushback'):
+            result.append(('taxi_out', on_ground and gs is not None and gs > L.taxi_kt, L.taxi_s,
+                           f'Au sol, vitesse sol > {L.taxi_kt:g} kt.'))
+        if stage in ('parked', 'pushback', 'taxi_out'):
+            result.append(('takeoff', on_ground and gs is not None and gs >= L.takeoff_kt or airborne,
+                           L.takeoff_s, f'Vitesse sol ≥ {L.takeoff_kt:g} kt ou appareil en vol.'))
+        if stage == 'takeoff':
+            result.append(('taxi_out', on_ground and gs is not None and gs < L.reject_kt and not state.airborne_seen,
+                           L.taxi_s, 'Décollage interrompu : retour à la vitesse de roulage.'))
+            result.append(('climb', airborne and agl is not None and agl >= L.initial_climb_agl_ft, L.climb_s,
+                           f'En vol au-dessus de {L.initial_climb_agl_ft:g} ft sol.'))
+        if stage == 'climb':
+            result.append(('cruise', airborne and level and alt is not None and alt >= floor, L.cruise_s,
+                           f'Palier stable à {alt:,.0f} ft.'.replace(',', ' ') if alt is not None else ''))
+        if stage in ('climb', 'cruise'):
+            result.append(('descent', airborne and vs is not None and vs < -L.descent_fpm and alt is not None
+                           and state.peak_ft is not None and alt <= state.peak_ft-L.descent_drop_ft, L.descent_s,
+                           f'Vario < −{L.descent_fpm:g} ft/min, {L.descent_drop_ft:g} ft sous le plus haut niveau.'))
+        if stage == 'descent':
+            result.append(('cruise', airborne and level and alt is not None and alt >= floor and (
+                distance is None or distance > 3*L.approach_nm), L.recruise_s, 'Nouveau palier haut prolongé.'))
+        if stage in ('climb', 'cruise', 'descent'):
+            near = distance is not None and distance <= L.approach_nm and agl is not None and agl <= L.approach_agl_ft
+            # Low in descent is an approach even far from the planned destination (diversion, long final).
+            blind = stage == 'descent' and agl is not None and agl <= L.approach_blind_agl_ft
+            result.append(('approach', airborne and vs is not None and vs <= L.level_fpm and (near or blind),
+                           L.approach_s, f'À {distance:.0f} NM de la destination, {agl:,.0f} ft sol.'.replace(',', ' ')
+                           if near else f'Sous {L.approach_blind_agl_ft:g} ft sol en descente.'))
+        if stage in ('approach', 'go_around'):
+            result.append(('final', airborne and agl is not None and agl <= L.final_agl_ft and vs is not None
+                           and vs < 0, L.final_s, f'Sous {L.final_agl_ft:g} ft sol en descente.'))
+        if stage in ('approach', 'final'):
+            result.append(('go_around', airborne and vs is not None and vs > L.go_around_fpm and (
+                agl is None or agl < L.approach_agl_ft), L.go_around_s, f'Vario > +{L.go_around_fpm:g} ft/min en approche.'))
+        if stage == 'go_around':
+            result.append(('approach', airborne and vs is not None and vs < -L.level_fpm, 15,
+                           'Nouvelle descente après la remise des gaz.'))
+        if stage in ('climb', 'cruise', 'descent', 'approach', 'final', 'go_around'):
+            result.append(('rollout', on_ground, L.touchdown_s, 'Retour au sol après le vol.'))
+        if stage == 'rollout':
+            result.append(('taxi_in', on_ground and gs is not None and gs < L.vacate_kt, L.taxi_s,
+                           f'Vitesse sol < {L.vacate_kt:g} kt après l’atterrissage.'))
+        if stage in ('rollout', 'taxi_in'):
+            result.append(('parked_in', on_ground and gs is not None and gs < L.creep_kt, L.parked_s,
+                           f'Arrêt pendant {L.parked_s:g} s.'))
+        if stage == 'parked_in':
+            result.append(('taxi_in', on_ground and gs is not None and gs > L.taxi_kt, L.taxi_s,
+                           'Nouveau roulage après l’arrêt.'))
+        return result
+
+    def correct(self, state, phase, now):
+        """Pilot correction: jump to the phase entry stage; automatic tracking resumes from it."""
+        self.reset()
+        stage = PHASE_ENTRY[phase]
+        return state.model_copy(update={
+            'stage': stage, 'phase': phase, 'changed_at': now, 'manual': True,
+            'airborne_seen': phase not in ('preflight', 'departure'), 'peak_ft': None,
+            'evidence': ['Phase corrigée par le pilote.']})
+
+    def evaluate(self, state, sample, plan, now, *, live, active=True):
+        L = self.limits
+        if self.last_at is None or not 0 <= now-self.last_at <= L.max_age_s:
             self.holds.clear()
         self.last_at = now
         state = state.model_copy(deep=True)
-        inputs, reasons, evidence = [], [], []
-        input_ages, valid_ages = [], []
-        inputs.extend(['session.started_at', 'session.phase_state'])
-
-        def read(key, unit, boolean=False):
-            field = fields.get(key, {})
-            inputs.append('telemetry.'+key)
-            value = field.get('value')
-            age = field.get('age_s')
-            if age is not None:
-                input_ages.append(max(0, age))
-            valid = type(value) is bool if boolean else type(value) in (int, float) and math.isfinite(value)
-            if (field.get('status') not in ('observed', 'simulated') or not valid
-                    or field.get('unit') != unit or field.get('age_s') is None
-                    or not 0 <= field['age_s'] <= limits.max_age_s):
-                reasons.append(key+' : mesure absente, périmée ou unité invalide.')
-                return None
-            valid_ages.append(age)
-            return value
-
-        ground = read('on_ground', None, True)
-        speed = read('ground_speed', 'kt') if ground else None
-        vertical = read('vertical_speed', 'ft/min') if ground is False else None
-        healthy = connected and not paused and last_message is not None and 0 <= now-last_message <= limits.max_age_s
-        if not healthy:
-            reasons.append('Transitions suspendues : connexion absente, pause ou télémétrie périmée.')
-        if not active:
-            reasons.append('Suivi inactif : transitions suspendues.')
-        if suspension_reason:
-            reasons.append(suspension_reason)
-        blocked = not healthy or not active or bool(reasons)
-        geometry = {}
-        gap = distance = agl = None
-        if plan is not None and not plan_current:
-            plan = None
-            reasons.append('Plan prévu périmé ou sans date : transitions dépendant du plan suspendues.')
-        if not blocked and ground is False:
-            altitude = read('altitude_msl', 'ft')
-            target = (plan or {}).get('cruise', {}).get('initial_altitude_ft')
-            if altitude is not None and type(target) in (int, float) and math.isfinite(target):
-                gap = altitude-target
-                inputs.append('flight_plan.cruise.initial_altitude_ft')
-                evidence.append(f'Écart altitude MSL / altitude prévue : {gap:g} ft (références différentes possibles).')
-            else:
-                reasons.append('Niveau prévu absent : croisière non confirmable.')
-            # Reuse the existing geometric calculations; never a scenario phase.
-            lat, lon = read('latitude', 'deg'), read('longitude', 'deg')
-            if lat is not None and lon is not None and -90 <= lat <= 90 and -180 <= lon <= 180:
-                geometry = derived(fields, plan, 'flight')
-                distance = geometry.get('direct_distance_to_destination', {}).get('value')
-                if distance is not None:
-                    inputs.append('flight_plan.destination')
-                    evidence.append(f'Destination prévue à {distance:g} NM en orthodromie.')
-            if distance is None:
-                reasons.append('Position ou destination prévue absente : arrivée non confirmable.')
-            agl = read('altitude_agl', 'ft')
-
-        candidates = []
-        conditions = {
-            'departure': (ground is True and speed is not None and speed > limits.moving_kt, limits.movement_s,
-                          f'Au sol, vitesse sol > {limits.moving_kt:g} kt pendant {limits.movement_s:g} s.'),
-            'climb': (ground is False and vertical is not None and vertical > limits.vertical_fpm, limits.climb_s,
-                      f'En vol, vario > {limits.vertical_fpm:g} ft/min pendant {limits.climb_s:g} s.'),
-            'cruise': (ground is False and vertical is not None and abs(vertical) <= limits.vertical_fpm
-                       and gap is not None and abs(gap) <= limits.cruise_gap_ft, limits.cruise_s,
-                       f'Palier ±{limits.vertical_fpm:g} ft/min à ±{limits.cruise_gap_ft:g} ft du niveau prévu pendant {limits.cruise_s:g} s.'),
-            'descent': (state.cruise_seen and ground is False and vertical is not None
-                        and vertical < -limits.vertical_fpm, limits.descent_s,
-                        f'Croisière déjà atteinte, vario < −{limits.vertical_fpm:g} ft/min pendant {limits.descent_s:g} s.'),
-            'arrival': (state.cruise_seen and ground is False and vertical is not None and vertical <= 0
-                        and distance is not None and distance <= limits.arrival_nm
-                        and agl is not None and agl <= limits.arrival_agl_ft, limits.arrival_s,
-                        f'Croisière atteinte, destination ≤ {limits.arrival_nm:g} NM, hauteur ≤ {limits.arrival_agl_ft:g} ft AGL et vario ≤ 0 pendant {limits.arrival_s:g} s.'),
-        }
-        if forced is not None or blocked:
+        floor = cruise_floor(plan, L)
+        pending = None
+        if not live or not active:
             self.holds.clear()
+        elif state.stage is None:
+            guess = self.bootstrap(sample, floor)
+            for key in [k for k in self.holds if k != 'boot_'+str(guess)]:
+                self.holds.pop(key)
+            if guess and self.held('boot_'+guess, True, L.bootstrap_s, now):
+                state.stage, state.changed_at, state.manual = guess, now, False
+                state.airborne_seen = sample['ground'] is False
+                state.evidence = ['Suivi démarré : appareil observé en '+STAGE_LABEL[guess].lower()+'.']
         else:
-            for phase, (condition, duration, label) in conditions.items():
-                if self.held('phase_'+phase, condition, duration, now):
-                    candidates.append((phase, label))
-            if departure_ready:
-                inputs.append('pilot.event.departure_ready')
-                candidates.append(('departure', 'Pilote prêt pour le départ (déclaration explicite).'))
-            if self.held('returned_ground', state.airborne_seen and ground is True, limits.landing_s, now):
-                candidates.append(('arrival', 'Retour au sol confirmé après le vol ; destination non déduite.'))
-            if not state.confirmed and ground is True:
-                state.confirmed, state.changed_at = True, now
-                state.evidence = ['Suivi démarré ; appareil observé au sol.']
+            candidates = []
+            for target, condition, hold, reason in self.transitions(state, sample, floor):
+                key = state.stage+'>'+target
+                if self.held(key, bool(condition), hold, now):
+                    candidates.append((target, reason))
+                elif key in self.holds and pending is None:
+                    pending = {'stage': target, 'elapsed_s': round(now-self.holds[key]), 'hold_s': hold}
             if candidates:
-                selected, reason = max(candidates, key=lambda item: PHASE_IDS.index(item[0]))
-                if PHASE_IDS.index(selected) > PHASE_IDS.index(state.phase):
-                    state.phase, state.confirmed, state.changed_at = selected, True, now
-                    state.evidence = [reason]
-                    state.substate = None
-                if selected == 'cruise':
-                    state.cruise_seen = True
-            if (self.held('airborne', ground is False, limits.climb_s, now)
-                    and state.confirmed and state.phase != 'preflight'):
+                index = STAGE_IDS.index(state.stage)
+                forward = [c for c in candidates if STAGE_IDS.index(c[0]) > index]
+                target, reason = max(forward, key=lambda c: STAGE_IDS.index(c[0])) if forward else candidates[0]
+                state.stage, state.changed_at, state.manual, state.evidence = target, now, False, [reason]
+                self.holds.clear()
+                pending = None
+        if state.stage is not None:
+            state.phase = STAGE_PHASE[state.stage]
+        if live and sample['ground'] is False:
+            if state.stage not in GROUND_STAGES:
                 state.airborne_seen = True
-            self.substate(state, ground, speed, vertical, now)
-
-        if not state.confirmed:
-            reasons.append('Phase automatique non confirmée ; correction manuelle disponible.')
-        if ground is False and not state.cruise_seen and state.phase not in ('preflight', 'departure'):
-            if vertical is not None and vertical < -limits.vertical_fpm:
-                reasons.append('Descente sans croisière confirmée : corriger manuellement si nécessaire.')
-        # Age refers only to the actual phase inputs, not unrelated catalogue entries.
-        age = max(input_ages if blocked else valid_ages, default=0)
-        current_missing = ground is False and ((state.phase == 'cruise' and gap is None)
-                                               or (state.phase == 'arrival' and (distance is None or agl is None)))
-        status = 'unavailable' if not state.confirmed else 'stale' if blocked or current_missing else 'derived'
-        automatic = QualifiedValue(value=state.phase if state.confirmed else None, unit=None,
-                                   nature='calculated', status=status, source='copilot.phase_engine',
-                                   reference='phase:'+str(state.changed_at), age_s=age if state.confirmed else None,
-                                   max_age_s=limits.max_age_s, verification='not_applicable',
-                                   method='Seuils confirmés dans la durée ; progression vers l’avant, état conservé sur interruption.',
-                                   inputs=list(dict.fromkeys(inputs)) or ['session.started'])
-        effective = automatic
-        if forced is not None:
-            effective = QualifiedValue(value=forced, unit=None, nature='declared', status='available',
-                                       source='pilot.phase', reference='session.forced_phase:'+str(forced_at),
-                                       age_s=max(0, now-forced_at) if forced_at is not None else 0,
-                                       max_age_s=None, verification='not_applicable')
-        next_phase = PHASE_IDS[PHASE_IDS.index(state.phase)+1] if state.phase != 'arrival' else None
-        if not state.confirmed and ground is False:
-            next_phase = 'climb' if vertical is not None and vertical > limits.vertical_fpm else 'cruise'
-        trigger = conditions.get(next_phase)
-        pending = self.holds.get('phase_'+str(next_phase))
+            if sample['alt'] is not None:
+                state.peak_ft = sample['alt'] if state.peak_ft is None else max(state.peak_ft, sample['alt'])
+        known = state.stage is not None
+        status = 'unavailable' if not known else 'derived' if live and active else 'stale'
         return state, {
-            'effective': effective.model_dump(), 'automatic': automatic.model_dump(),
-            'mode': 'manual' if forced else 'automatic',
-            'substate': state.substate if forced is None else None,
-            'evidence': state.evidence+evidence, 'uncertainty': list(dict.fromkeys(reasons)),
-            'suspended': blocked or forced is not None,
-            'next_trigger': {'phase': next_phase, 'label': trigger[2] if trigger else
-                             'Arrivée conservée : approche, atterrissage, roulage, parking ou remise des gaz.',
-                             'hold_s': trigger[1] if trigger else 0,
-                             'elapsed_s': max(0, now-pending) if pending is not None else 0},
-            'geometry': geometry,
+            'stage': state.stage, 'stage_label': STAGE_LABEL.get(state.stage),
+            'phase': state.phase if known else None,
+            'effective': {'value': state.phase if known else None, 'status': status},
+            'substate': SUBSTATE.get(state.stage),
+            'mode': 'manual' if state.manual else 'automatic',
+            'live': bool(live and active), 'since': state.changed_at, 'evidence': state.evidence,
+            'next': {'label': STAGE_NEXT.get(state.stage) if known else
+                     'Placement automatique dès réception de mesures récentes', **(pending or {})},
+            'distance_to_destination_nm': None if sample['distance'] is None else round(sample['distance']),
         }
 
-    def substate(self, state, ground, speed, vertical, now):
-        limits = self.limits
-        taxi = (ground is True and speed is not None and speed > limits.moving_kt
-                and (not state.airborne_seen or speed < limits.taxi_after_landing_kt)
-                and (state.substate != 'takeoff' or speed < limits.takeoff_exit_kt))
-        candidates = [
-            ('taxi', taxi, limits.movement_s),
-            ('takeoff', state.phase == 'departure' and (ground is False or
-                        speed is not None and speed >= limits.takeoff_kt), limits.takeoff_s),
-            ('approach', state.phase == 'arrival' and ground is False and vertical is not None
-                         and vertical <= 0, limits.arrival_s),
-            ('landing', state.airborne_seen and ground is True and speed is not None
-                        and speed >= limits.landing_roll_kt, limits.landing_s),
-            ('parking', ground is True and speed is not None and speed <= limits.stopped_kt, limits.parking_s),
-            ('go_around', state.phase == 'arrival' and ground is False and vertical is not None
-                          and vertical > limits.vertical_fpm, limits.climb_s),
-        ]
-        confirmed = [name for name, condition, duration in candidates
-                     if self.held('sub_'+name, condition, duration, now)]
-        if confirmed:
-            state.substate = confirmed[-1]
+
+__all__ = ['PHASE_IDS', 'PhaseEngine', 'PhaseState', 'PhaseThresholds', 'STAGES', 'read_sample']

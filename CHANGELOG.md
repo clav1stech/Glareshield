@@ -2,6 +2,21 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.10] - 2026-10-30
+
+- Refonte du mode Copilote : détection d’étape robuste et écran Vol conforme à la maquette.
+- Treize étapes (au poste, repoussage, roulage, décollage, montée, croisière,
+  descente, approche, finale, remise des gaz, atterrissage, roulage, au poste).
+  Croisière comparée à l’altitude indiquée avec une marge large ; la descente
+  ne dépend plus de la croisière ; placement direct si le suivi démarre en vol.
+- Maintenant piloté par l’étape ; seule la phase en cours est affichée, avec
+  des libellés courts et des valeurs sourcées saisissables d’un clic.
+- Au plus trois messages radio par étape avec station et fréquence ; ATC et
+  ATIS filtrés sur l’aérodrome utile et les centres proches.
+- Clic sur le parcours : aperçu, puis correction explicite ; la détection
+  automatique reprend ensuite. Rappels à acquitter et provenances détaillées
+  retirés de l’écran. Sessions 1.2 relues sans réinitialisation.
+
 ## [1.2.9] - 2026-10-29
 
 - Issue #20 : démonstration complète hors réseau, recette du copilote et guide de livraison

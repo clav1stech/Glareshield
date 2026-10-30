@@ -695,7 +695,7 @@
           "inputs": []
         }
       },
-      "now_step": "final_approach_data",
+      "now_step": "landing_check",
       "conflicts": [
         {
           "kind": "atis_changed",

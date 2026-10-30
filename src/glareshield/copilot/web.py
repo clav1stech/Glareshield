@@ -24,6 +24,10 @@ class DeclareAction(SessionAction):
     declaration: DeclarationInput
 
 
+class ValueAction(SessionAction):
+    value: str | None
+
+
 def create_session_router(bridge):
     router = APIRouter(prefix='/api/ai/session')
 
@@ -67,8 +71,8 @@ def create_session_router(bridge):
     async def revoke(declaration_id: str, payload: SessionAction):
         return execute(payload, lambda service: service.revoke(declaration_id))
 
-    @router.post('/reminders/{reminder_id}/acknowledge')
-    async def acknowledge(reminder_id: str, payload: SessionAction):
-        return execute(payload, lambda service: service.acknowledge_reminder(reminder_id))
+    @router.put('/values/{key}')
+    async def value(key: str, payload: ValueAction):
+        return execute(payload, lambda service: service.set_value(key, payload.value))
 
     return router

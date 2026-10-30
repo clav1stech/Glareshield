@@ -134,299 +134,283 @@ function preparationView(view) {
   start.setAttribute('aria-describedby', 'startExplanation');
   action('Voir le mode Vol', () => navigate('Vol'), cardActions(readiness), 'small');
 }
-let phaseDraft = null;
+// Vol: one screen per stage. The service decides the stage and what matters; this only draws it.
+let flightPreview = null;
+let flightEditing = null;
 let flightPointerDown = false;
 if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', () => { flightPointerDown = true; });
   document.addEventListener('pointerup', () => { flightPointerDown = false; });
   document.addEventListener('pointercancel', () => { flightPointerDown = false; });
 }
-// Live islands update text and checked state; controls and their closures stay mounted.
+const FLIGHT_STATUS = {
+  live: ['Données en direct', 'ok'], demo: ['Démonstration', 'sim'], paused: ['Simulateur en pause', 'warn'],
+  disconnected: ['Simulateur déconnecté', 'warn'], stale: ['Données périmées', 'warn'],
+};
+const fmt = (value, digits = 0) => value == null ? '—' : Number(value).toLocaleString('fr-FR', { maximumFractionDigits: digits });
+function flightNode(tag, className, text = null) { return el(tag, text, className ? { className } : {}); }
+function flightKey(node, key) { node.dataset.key = key; return node; }
+function flightPill(text, tone = '') { return flightNode('span', 'fl-pill ' + tone, text); }
+function flightKv(label, value, extra = null) {
+  let kv = flightNode('div', 'fl-kv');
+  kv.append(flightNode('span', null, label), flightNode('b', null, value));
+  if (extra) kv.append(flightNode('small', null, extra));
+  return kv;
+}
+function flightPanel(parent, title) {
+  let panel = flightNode('section', 'fl-panel');
+  if (title) panel.append(flightNode('h2', 'fl-h2', title));
+  parent.append(panel);
+  return panel;
+}
+
+function flightBar(cockpit) {
+  let h = cockpit.header, bar = flightNode('div', 'fl-bar'), ident = flightNode('div', 'fl-ident');
+  ident.append(flightNode('div', 'fl-cs', h.callsign || '<indicatif>'));
+  let route = flightNode('div', 'fl-route');
+  route.append(flightNode('b', null, h.origin || '<départ>'), ' ' + (h.origin_name || '') + ' → ',
+    flightNode('b', null, h.destination || '<arrivée>'), ' ' + (h.destination_name || '') + (h.aircraft ? ' · ' + h.aircraft : ''));
+  ident.append(route);
+  bar.append(ident, flightKv('Heure UTC', new Date(h.utc * 1000).toISOString().slice(11, 19)));
+  if (h.eta) bar.append(flightKv('Arrivée prévue', h.eta));
+  if (h.ofp_age_min != null) bar.append(flightKv('OFP', h.ofp_age_min + ' min' + (h.airac ? ' · AIRAC ' + h.airac : '')));
+  bar.append(flightNode('div', 'fl-spacer'));
+  let [label, tone] = FLIGHT_STATUS[h.status] || FLIGHT_STATUS.stale;
+  if (connectionLost) [label, tone] = ['Connexion à Glareshield perdue', 'bad'];
+  bar.append(flightPill(label, tone));
+  return bar;
+}
+
+function flightTrack(cockpit) {
+  let nav = flightNode('nav', 'fl-track');
+  nav.setAttribute('aria-label', 'Phases du vol : cliquer pour consulter une autre phase');
+  for (let leg of cockpit.track) {
+    let button = flightKey(el('button', null, { type: 'button', className: 'fl-leg ' + leg.state }), 'leg-' + leg.id);
+    if (leg.state === 'current') button.setAttribute('aria-current', 'step');
+    if (flightPreview === leg.id) button.classList.add('preview');
+    let bar = flightNode('span', 'fl-legbar'), fill = flightNode('i');
+    fill.style.width = leg.progress + '%';
+    bar.append(fill);
+    button.append(bar, flightNode('span', 'fl-legname', leg.label), flightNode('span', 'fl-legsub', leg.sub));
+    button.title = leg.done + '/' + leg.total + ' étapes cochées';
+    button.onclick = () => { flightPreview = leg.state === 'current' ? null : leg.id; updateFlightView(true); };
+    nav.append(button);
+  }
+  return nav;
+}
+
+function flightNow(cockpit) {
+  let now = cockpit.now, panel = flightNode('section', 'fl-panel fl-now');
+  panel.append(flightNode('div', 'fl-eyebrow', 'Maintenant' + (cockpit.stage_label ? ' · ' + cockpit.stage_label : '')),
+    flightNode('div', 'fl-big', now.title));
+  if (now.why) panel.append(flightNode('div', 'fl-why', now.why));
+  if (now.pills.length) {
+    let pills = flightNode('div', 'fl-pills');
+    now.pills.forEach(p => pills.append(flightPill(p.text, p.tone)));
+    panel.append(pills);
+  }
+  return panel;
+}
+
 function flightValue(value) {
-  if (value?.value == null) return value?.placeholder || '<…>';
-  return (typeof value.value === 'boolean' ? (value.value ? 'Oui' : 'Non') :
-    typeof value.value === 'number' ? value.value.toLocaleString('fr-FR', {maximumFractionDigits: 1}) : value.value) +
-    (value.unit ? ' ' + value.unit : '');
+  if (flightEditing === value.key) {
+    let input = flightKey(el('input', null, { type: 'text', className: 'fl-edit', value: value.open ? '' : value.text,
+      placeholder: value.label, maxLength: 80 }), 'edit-' + value.key);
+    input.setAttribute('aria-label', 'Saisir : ' + value.label);
+    let done = false;
+    const save = async keep => {
+      if (done) return;
+      done = true;
+      flightEditing = null;
+      if (keep && input.value.trim() !== (value.open ? '' : value.text)) {
+        try { await sessionAction('values/' + value.key, 'PUT', { value: input.value.trim() || null }); return; }
+        catch (e) { message(e.message, true); }
+      }
+      updateFlightView(true);
+    };
+    input.onkeydown = e => {
+      if (e.key === 'Enter') { e.preventDefault(); save(true); }
+      if (e.key === 'Escape') { e.preventDefault(); save(false); }
+    };
+    input.onblur = () => save(true);
+    return input;
+  }
+  let chip = flightKey(el('button', null, { type: 'button', className: 'fl-val' + (value.open ? ' open' : '') }), 'val-' + value.key);
+  chip.append(value.text);
+  if (value.source) chip.append(flightNode('small', 'fl-src', value.source));
+  chip.title = (value.open ? 'Inconnu : cliquer pour saisir ' : 'Cliquer pour corriger ') + value.label;
+  chip.onclick = e => { e.preventDefault(); flightEditing = value.key; updateFlightView(true); };
+  return chip;
 }
-function flightSource(value) {
-  return (value?.source || 'Source inconnue') + ' · ' +
-    ({planned:'Prévu', declared:'Déclaré', published:'Publié', observed:'Simulateur', procedure:'Procédure'}[value?.nature] || 'Calculé') +
-    ' · ' + ({available:'Disponible', observed:'Observé', simulated:'Démonstration', stale:'Périmé', unavailable:'Indisponible', derived:'Calculé'}[value?.status] || 'Indisponible') +
-    (value?.age_s == null ? '' : ' · ' + Math.floor(value.age_s) + ' s') +
-    (value?.reference && value.reference !== value.source ? ' · ' + value.reference : '');
+
+function flightGroup(group) {
+  let section = flightNode('section', 'fl-group'), head = flightNode('div', 'fl-ghead');
+  let done = group.steps.filter(s => s.checked).length;
+  head.append(flightNode('h2', 'fl-h2', group.label), flightNode('span', 'fl-count', done + '/' + group.steps.length));
+  let items = flightNode('div', 'fl-items');
+  for (let step of group.steps) {
+    let row = flightNode('label', 'fl-item' + (step.checked ? ' done' : '')),
+      input = flightKey(el('input', null, { type: 'checkbox', checked: step.checked }), 'step-' + step.id),
+      label = flightNode('span', 'fl-lbl', step.label), right = flightNode('span', 'fl-right');
+    input.setAttribute('aria-label', step.label);
+    if (step.detected) label.append(flightNode('small', null, 'Détecté par le simulateur'));
+    input.onchange = async () => {
+      input.disabled = true;
+      try { await sessionAction('steps/' + step.id, 'PUT', { checked: input.checked }); }
+      catch (e) { input.checked = step.checked; input.disabled = false; message(e.message, true); }
+    };
+    step.values.forEach(v => right.append(flightValue(v)));
+    row.append(input, label, right);
+    items.append(row);
+  }
+  section.append(head, items);
+  return section;
 }
-function flightPhaseEvidence(target, phase) {
-  target.replaceChildren();
-  if (phase?.suspended) target.append(el('p', 'Transitions automatiques suspendues.', {className:'banner warn'}));
-  if (phase?.effective?.status === 'stale') target.append(el('p', 'Dernière phase connue · données périmées.', {className:'banner warn'}));
-  for (let text of phase?.evidence || []) target.append(el('p', text, {className:'muted'}));
-  for (let text of phase?.uncertainty || []) target.append(el('p', text, {className:'banner warn'}));
-  if (phase?.automatic?.method) target.append(el('p', phase.automatic.method, {className:'muted'}));
-  if (phase?.next_trigger) target.append(el('p', 'Prochain déclencheur : ' + phase.next_trigger.label +
-    (phase.next_trigger.elapsed_s ? ' · confirmation ' + Math.floor(phase.next_trigger.elapsed_s) + '/' + phase.next_trigger.hold_s + ' s' : '')));
+
+function flightRadio(cockpit) {
+  let section = flightNode('section', 'fl-group'), head = flightNode('div', 'fl-ghead'), items = flightNode('div', 'fl-items');
+  head.append(flightNode('h2', 'fl-h2', 'Radio'), flightNode('span', 'fl-when', 'Messages prêts · copier n’émet rien'));
+  for (let r of cockpit.radio) {
+    let box = flightNode('div', 'fl-radio'), top = flightNode('div', 'fl-radiotop');
+    top.append(flightNode('span', 'fl-trg', r.trigger));
+    if (r.station) top.append(flightPill(r.station + (r.frequency ? ' · ' + r.frequency : ''), 'ivao'));
+    if (r.mode === 'texte') top.append(flightPill('texte'));
+    top.append(flightNode('span', 'fl-spacer'));
+    let copy = flightKey(el('button', 'Copier', { type: 'button', className: 'small' }), 'copy-' + r.id);
+    copy.onclick = async () => {
+      try { await copyText(r.text); message('Copié.'); }
+      catch (e) { message('Sélectionnez le texte pour copier.', true); }
+    };
+    top.append(copy);
+    box.append(top, flightNode('pre', 'fl-msg' + (r.mode === 'texte' ? ' txt' : ''), r.text));
+    items.append(box);
+  }
+  section.append(head, items);
+  return section;
 }
-function flightDashboard(view, data) {
-  let root = el('div', null, {id:'flightDashboard'});
+
+function flightSituation(cockpit) {
+  let col = flightNode('aside', 'fl-col'), s = cockpit.situation;
+  col.setAttribute('aria-label', 'Situation du vol');
+  let panel = flightPanel(col, 'Situation'), tele = flightNode('div', 'fl-tele');
+  const signed = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(Math.round(v / 50) * 50));
+  tele.append(flightKv('Altitude', s.altitude_ft == null ? '—' : fmt(Math.round(s.altitude_ft / 10) * 10) + ' ft'),
+    flightKv('Vitesse sol', s.ground_speed_kt == null ? '—' : fmt(s.ground_speed_kt) + ' kt'),
+    flightKv('Vario', s.vertical_speed_fpm == null ? '—' : signed(s.vertical_speed_fpm) + ' fpm'),
+    flightKv('Carburant', s.fuel_kg == null ? '—' : fmt(Math.round(s.fuel_kg / 10) * 10) + ' kg',
+      s.fuel_vs_plan_kg == null ? null : (s.fuel_vs_plan_kg >= 0 ? '+' : '−') + fmt(Math.abs(s.fuel_vs_plan_kg)) + ' kg vs plan'));
+  if (s.distance_total_nm) {
+    let gauge = flightNode('div', 'fl-gauge'), row = flightNode('div', 'fl-gaugerow'), rail = flightNode('div', 'fl-rail'), fill = flightNode('i');
+    row.append(flightNode('span', null, 'Distance parcourue'), flightNode('b', null, fmt(s.distance_flown_nm) + ' / ' + fmt(s.distance_total_nm) + ' NM'));
+    fill.style.width = Math.min(100, 100 * (s.distance_flown_nm || 0) / s.distance_total_nm) + '%';
+    rail.append(fill);
+    if (s.tod_ratio != null) { let tod = flightNode('u'); tod.style.left = (100 * s.tod_ratio) + '%'; tod.title = 'TOD'; rail.append(tod); }
+    let ends = flightNode('div', 'fl-gaugerow');
+    ends.append(flightNode('span', null, 'Départ'), ...(s.tod_ratio != null ? [flightNode('span', null, 'TOD')] : []), flightNode('span', null, 'Arrivée'));
+    gauge.append(row, rail, ends);
+    tele.append(gauge);
+  }
+  panel.append(tele);
+  if (cockpit.atc.length) {
+    let atc = flightPanel(col, 'ATC en ligne');
+    for (let a of cockpit.atc) {
+      let row = flightNode('div', 'fl-atcrow');
+      row.append(flightNode('span', 'fl-atccs', a.callsign), flightNode('span', 'fl-freq', a.frequency || '—'), flightNode('span', 'fl-note', a.note));
+      atc.append(row);
+    }
+  }
+  if (cockpit.atis) {
+    let a = cockpit.atis, atis = flightPanel(col, (a.letter ? 'ATIS ' + a.airport + ' · ' + a.letter : a.source + ' · ' + a.airport));
+    if (a.changed) atis.append(flightNode('div', 'fl-change', a.changed));
+    let text = flightNode('div', 'fl-atis');
+    a.lines.forEach((line, i) => { if (i) text.append(el('br')); text.append(line); });
+    atis.append(text);
+    if (a.age_min != null) atis.append(flightNode('div', 'fl-note', 'Publié il y a ' + a.age_min + ' min · lu ≠ écouté'));
+  }
+  if (cockpit.upcoming.length) {
+    let next = flightPanel(col, 'À venir'), list = flightNode('div', 'fl-upc');
+    for (let u of cockpit.upcoming) {
+      let row = flightNode('div', 'fl-u');
+      row.append(flightNode('span', null, u.at), flightNode('div', null, u.text));
+      list.append(row);
+    }
+    next.append(list);
+  }
+  return col;
+}
+
+function flightDashboard(data) {
+  let cockpit = data.cockpit, root = flightNode('div', 'fl');
+  root.id = 'flightDashboard';
   root.dataset.session = data.session.id;
-  root.dataset.activePhase = data.phase?.effective?.value || '';
-  view.append(root);
-  root.append(el('div', null, {id:'flightBanner', className:'flight-banner'}));
-  root.append(el('small', null, {id:'flightBannerSource', className:'muted'}));
-  let phases = el('nav', null, {className:'flight-phases', 'aria-label':'Progression des six phases'});
-  root.append(phases);
-  for (let p of data.phases) {
-    let button = action(p.label, () => sessionAction('phase', 'PUT', {phase:p.id}), phases, 'ghost');
-    button.dataset.phase = p.id;
-    button.title = 'Correction manuelle : ' + p.label + ' (ne coche aucune case)';
-    button.setAttribute('aria-label', 'Corriger la phase : ' + p.label);
+  for (let text of data.warnings || []) root.append(el('p', text, { className: 'banner warn' }));
+  root.append(flightBar(cockpit), flightTrack(cockpit));
+  let shown = flightPreview || cockpit.phase || 'preflight', label = data.phases.find(p => p.id === shown)?.label;
+  if (flightPreview) {
+    let banner = flightNode('div', 'fl-preview');
+    banner.append(flightNode('span', null, 'Aperçu de la phase ' + label + ' · le suivi reste en ' + (cockpit.stage_label || 'détection') + '.'));
+    let bar = flightNode('span', 'fl-previewactions');
+    action('Je suis en ' + label, async () => { await sessionAction('phase', 'PUT', { phase: shown }); flightPreview = null; updateFlightView(true); }, bar, 'small');
+    action('Revenir à la phase en cours', () => { flightPreview = null; updateFlightView(true); }, bar, 'small ghost');
+    banner.append(bar);
+    root.append(banner);
   }
-  let columns = el('div', null, {className:'flight-columns'}), left = el('div', null, {className:'stack flight-actions'}), right = el('aside', null, {className:'stack flight-situation', 'aria-label':'Situation du vol'});
-  columns.append(left, right); root.append(columns);
-  let now = card(left, 'Maintenant', 'Priorité du profil dans la phase courante ; déclencheur à confirmer par le pilote.');
-  now.id = 'flightNow'; now.classList.add('flight-now');
-  now.append(el('h3', null, {id:'flightNowTitle'}), el('p', null, {id:'flightNowContext'}), el('p', null, {id:'flightNowValue'}), el('small', null, {id:'flightNowSource', className:'muted'}));
-  for (let p of data.phases) {
-    let details = el('details', null), summary = el('summary', p.label);
-    details.open = (data.phase?.effective?.value || 'preflight') === p.id;
-    details.dataset.phaseGroup = p.id;
-    details.append(summary); left.append(details);
-    for (let group of data.groups.filter(g => g.phase === p.id)) {
-      let groupCard = card(details, group.label), count = el('p', null, {className:'muted'});
-      count.dataset.group = group.id; groupCard.append(count);
-      for (let step of group.steps) {
-        let row = el('div', null, {className:'flight-step'}), label = el('label', null, {className:'check'}), input = el('input', null, {type:'checkbox', checked:step.checked});
-        row.dataset.step = step.id;
-        input.setAttribute('aria-label', step.label);
-        input.onchange = async () => {
-          input.disabled = true;
-          try { await sessionAction('steps/' + step.id, 'PUT', {checked:input.checked}); }
-          catch (e) { input.checked = step.checked; message(e.message, true); }
-          finally { input.disabled = false; }
-        };
-        label.append(input, el('span', step.label)); row.append(label);
-        row.append(el('small', null, {className:'step-status muted'}));
-        for (let id of step.expected) {
-          let value = el('div', null, {className:'step-value'});
-          value.dataset.value = id;
-          value.append(el('p'), el('small', null, {className:'muted'})); row.append(value);
-        }
-        row.append(el('small', 'Contexte : ' + step.trigger, {className:'muted'}));
-        groupCard.append(row);
-      }
-    }
-  }
-  let telemetry = card(right, 'Situation', 'Mesures du simulateur · lecture seule');
-  for (let key of ['altitude_indicated','altitude_msl','ias','ground_speed','vertical_speed','fuel_total']) {
-    let row = el('div', null, {className:'flight-metric'}); row.dataset.metric = key;
-    row.append(el('span'), el('strong'), el('small', null, {className:'muted'})); telemetry.append(row);
-  }
-  let route = card(right, 'Route prévue', 'Géométrie OFP et position ; un direct peut fausser cet avancement.');
-  route.append(el('div', null, {id:'flightRoute'}));
-  right.append(el('div', null, {id:'flightNetwork'}));
-  let events = card(right, 'Prochains événements', 'Déclencheur de phase, prochains points et événements réseau disponibles.');
-  events.append(el('div', null, {id:'flightEvents'}));
-  let messages = card(left, 'Rappels', 'Un rappel reste présent jusqu’à acquittement ; les actions de procédure restent séparées.');
-  messages.append(el('p', null, {id:'flightReminderStatus', className:'muted'}), el('div', null, {id:'flightReminders'}));
-  let radio = card(left, 'Messages radio', 'Lecture et copie uniquement ; aucun envoi automatique.');
-  radio.append(el('div', null, {id:'flightRadio'}));
-  updateFlightView();
+  let grid = flightNode('div', 'fl-grid'), left = flightNode('div', 'fl-col');
+  left.append(flightNow(cockpit));
+  cockpit.groups.filter(g => g.phase === shown).forEach(g => left.append(flightGroup(g)));
+  if (!flightPreview && cockpit.radio.length) left.append(flightRadio(cockpit));
+  grid.append(left, flightSituation(cockpit));
+  root.append(grid);
+  let foot = flightNode('div', 'fl-foot');
+  foot.append(flightNode('span', 'fl-note', cockpit.mode === 'manual'
+    ? 'Phase corrigée à la main ; le suivi automatique reprend à partir d’elle.'
+    : 'Phase détectée automatiquement. Cliquer une phase du parcours pour la consulter ou la corriger.'));
+  foot.append(flightNode('span', 'fl-spacer'));
+  action('Terminer le suivi', () => sessionAction('end'), foot, 'small ghost');
+  root.append(foot);
+  return root;
 }
-function updateFlightView() {
-  if (tab !== 'Vol') return;
-  const data = ai.session, flight = data?.flight, root = $('#flightDashboard');
-  if (!root || root.dataset.session !== data?.session?.id || data?.session?.status !== 'active') {
-    if (root) {
-      $('#flightBanner').textContent = 'Le suivi a changé : terminer la saisie puis actualiser avant toute action.';
-      root.querySelectorAll('button,input').forEach(n => { n.disabled = true; });
-    }
-    if (!isEditing() && !flightPointerDown) render();
-    return;
-  }
-  if (!flight) return;
-  if (flightPointerDown) return;
-  let active = data.phase?.effective?.value;
-  if (root.dataset.activePhase !== active) {
-    let section = root.querySelector('[data-phase-group="' + active + '"]');
-    if (section) section.open = true;
-    root.dataset.activePhase = active || '';
-  }
-  const set = (id, text) => { let node = $('#' + id); if (node) node.textContent = text; };
-  const v = id => flight.values[id];
-  set('flightBanner', flightValue(v('callsign')) + ' · ' + flightValue(v('origin')) + ' → ' + flightValue(v('destination')) +
-    ' · OFP prévu · ' + (flight.plan_age_min == null ? '<âge OFP>' : flight.plan_age_min + ' min') +
-    ' · ' + new Date(flight.utc * 1000).toISOString().slice(11,19) + ' UTC' +
-    (data.universe === 'demo' ? ' · DÉMONSTRATION' : '') + (flight.paused ? ' · EN PAUSE' : '') +
-    (!flight.connected ? ' · DÉCONNECTÉ' : '') + (flight.stale ? ' · DONNÉES PÉRIMÉES' : '') +
-    (connectionLost ? ' · CONNEXION À GLARESHIELD PERDUE' : ''));
-  set('flightBannerSource', 'Source du trajet : OFP prévu · ' + (flight.plan?.aircraft?.icao || '<appareil>') +
-    ' · Arrivée prévue : ' + (flight.plan?.times?.scheduled_in_utc || '<…>') + ' · Horloge UTC : serveur Glareshield');
-  for (let p of data.phases) {
-    let steps = data.groups.filter(g => g.phase === p.id).flatMap(g => g.steps), button = root.querySelector('[data-phase="' + p.id + '"]');
-    button.textContent = p.label + ' · ' + steps.filter(s => s.checked).length + '/' + steps.length;
-    if (p.id === active) button.setAttribute('aria-current', 'step'); else button.removeAttribute('aria-current');
-  }
-  const current = flight.now;
-  set('flightNowTitle', current?.label || (active ? 'Actions de cette phase terminées' : 'Phase à confirmer'));
-  set('flightNowContext', (current ? current.trigger + ' · priorité ' + current.priority : 'Les autres phases conservent leurs cases.') +
-    ' · Prochain déclencheur : ' + (data.phase?.next_trigger?.label || '<…>'));
-  set('flightNowValue', current?.kind === 'reminder' ? 'Rappel maintenu jusqu’à acquittement.' : current ? current.expected.map(id => v(id).label + ' : ' + flightValue(v(id))).join(' · ') : '<…>');
-  set('flightNowSource', current?.kind === 'reminder' ? 'Source : ' + current.source + ' · ' + current.reference : current ? current.expected.map(id => flightSource(v(id))).join(' · ') : 'Source : progression du suivi');
-  for (let group of data.groups) {
-    root.querySelector('[data-group="' + group.id + '"]').textContent = group.steps.filter(s => s.checked).length + '/' + group.steps.length + ' terminées · ' + ({mcdu:'MCDU',fcu:'FCU',checklist:'Checklist'}[group.kind]);
-    for (let step of group.steps) {
-      let row = root.querySelector('[data-step="' + step.id + '"]'), input = row.querySelector('input');
-      if (!input.disabled) input.checked = step.checked;
-      row.querySelector('.step-status').textContent = ({manual:'Manuel',detected:'Détecté',pending:'À confirmer'}[step.provenance]) +
-        (step.conflict ? ' · Observation contradictoire ; geste manuel prioritaire.' : '') +
-        (step.detected ? ' · ' + step.detected.reference + ' · ' + new Date(step.detected.recorded_at * 1000).toLocaleString('fr-FR') + (step.detection_current ? '' : ' · historique à reconfirmer') : '') +
-        (step.observation ? ' · ' + (step.observation.origin === 'scenario' ? 'Démonstration' : 'SimConnect') + ' · ' + step.observation.reason +
-          (step.observation.observed_at != null ? ' · mesure du ' + new Date(step.observation.observed_at * 1000).toLocaleString('fr-FR') : '') : '');
-      for (let cell of row.querySelectorAll('[data-value]')) {
-        let value = v(cell.dataset.value);
-        cell.firstChild.textContent = value.label + ' : ' + flightValue(value);
-        cell.lastChild.textContent = flightSource(value);
-      }
-    }
-  }
-  for (let row of root.querySelectorAll('[data-metric]')) {
-    let value = flight.telemetry[row.dataset.metric];
-    row.children[0].textContent = value?.label || row.dataset.metric;
-    row.children[1].textContent = flightValue(value);
-    row.children[2].textContent = flightSource(value);
-  }
-  let route = flight.derived.route_progress, routeNode = $('#flightRoute');
-  routeNode.textContent = route ? 'Prochain point : ' + route.next_waypoint + ' · reste ' + route.remaining_along_route_nm + ' NM · Source : position simulateur + OFP · Calculé. ' + route.method : '<avancement sur la route prévue> · Source : position simulateur + OFP indisponible';
-  const reminderStatus = flight.reminder_status, tod = reminderStatus?.tod;
-  routeNode.append(el('p', tod?.kind === 'supplied' ? 'TOD fourni : ' + new Date(tod.value * 1000).toISOString() + ' · ' + tod.reference + ' · ' + tod.notice : 'TOD MCDU : <…> · ' + (tod?.notice || 'Source indisponible ; aucune déduction.')));
-  let network = $('#flightNetwork');
-  if (!network.contains(document.activeElement) && !flightPointerDown) {
-    network.replaceChildren(); flightNetworkView(network, data.network);
-  }
-  let events = $('#flightEvents'); events.replaceChildren();
-  events.append(el('p', 'Prochain déclencheur : ' + (data.phase?.next_trigger?.label || '<…>') + ' · Source : moteur de phase'));
-  for (let point of route?.upcoming || []) events.append(el('p', point.ident + ' · ' + point.distance_nm + ' NM · Source : OFP + position · Calculé'));
-  for (let event of reminderStatus?.upcoming?.filter(e => !e.fired && e.eligible) || []) events.append(el('p', event.label + ' · ' + event.trigger + (event.uncertainty.length ? ' · ' + event.uncertainty.join(' ') : '')));
-  set('flightReminderStatus', (reminderStatus?.suspended ? 'Déclenchements suspendus ; rappels historiques conservés. ' : '') +
-    (reminderStatus?.critical ? 'Phase critique : rappels prioritaires seulement. ' : '') +
-    (reminderStatus?.pending_count || 0) + ' rappel(s) à acquitter' + (reminderStatus?.deferred_count ? ' · ' + reminderStatus.deferred_count + ' différé(s)' : '') +
-    (reminderStatus?.gap ? ' · Flux d’événements incomplet ; aucun événement manquant supposé.' : ''));
-  updateReminders($('#flightReminders'), flight.reminders);
-  updateRadio($('#flightRadio'), flight.radio);
-  let label = data.phases.find(p => p.id === active)?.label || 'Non confirmée';
-  const substates = {taxi:'Roulage',takeoff:'Décollage',approach:'Approche',landing:'Atterrissage',parking:'Parking',go_around:'Remise des gaz'};
-  set('flightPhase', label + ' · ' + (data.phase?.mode === 'manual' ? 'Déclarée par le pilote' : 'Calculée') + (data.phase?.substate ? ' · ' + substates[data.phase.substate] : ''));
-  if ($('#flightPhaseEvidence')) flightPhaseEvidence($('#flightPhaseEvidence'), data.phase);
-}
-function updateReminders(target, reminders) {
-  const ids = new Set(reminders.map(r => r.id));
-  for (let row of [...target.children]) if (!ids.has(row.dataset.reminder)) row.remove();
-  for (let [index, reminder] of reminders.entries()) {
-    let row = target.querySelector('[data-reminder="' + reminder.id + '"]');
-    if (!row) {
-      row = el('article', null, {className:'flight-message'}); row.dataset.reminder = reminder.id;
-      row.append(el('h3'), el('p'), el('small', null, {className:'muted'}));
-      const acknowledge = action('Acquitter le rappel', () => sessionAction('reminders/' + reminder.id + '/acknowledge'), row, 'small');
-      acknowledge.setAttribute('aria-label', 'Acquitter le rappel : ' + reminder.label);
-      target.append(row);
-    }
-    row.querySelector('h3').textContent = reminder.label;
-    row.querySelector('p').textContent = reminder.method;
-    row.querySelector('small').textContent = reminder.source + ' · ' + reminder.reference + ' · détecté le ' + new Date(reminder.triggered_at * 1000).toLocaleString('fr-FR');
-    if (target.children[index] !== row) target.insertBefore(row, target.children[index] || null);
-  }
-}
-function updateRadio(target, entries) {
-  const ids = new Set(entries.map(r => r.id));
-  for (let row of [...target.children]) if (!ids.has(row.dataset.radio)) row.remove();
-  for (let [index, entry] of entries.entries()) {
-    let row = target.querySelector('[data-radio="' + entry.id + '"]');
-    if (!row) {
-      row = el('article', null, {className:'flight-message'}); row.dataset.radio = entry.id;
-      row.append(el('h3'), el('p', null, {className:'radio-station'}), el('p', null, {className:'radio-trigger muted'}));
-      for (let [kind, title] of [['voice','Pilote · voix'], ['readback','Collationnement après réception'], ['voice_alternate','Variante voix française · station inconnue'], ['readback_alternate','Variante collationnement français après réception'], ['unicom','Variante UNICOM · texte']]) {
-        let block = el('div', null, {className:'radio-variant'}); block.dataset.variant = kind;
-        block.append(el('strong', title), el('pre'), el('small', null, {className:'muted'}));
-        const copyLabel = {voice:'la voix',readback:'le collationnement',voice_alternate:'la variante française',readback_alternate:'le collationnement français',unicom:'le texte UNICOM'}[kind];
-        const button = action('Copier ' + copyLabel, async () => {
-          let latest = ai.session?.flight?.radio?.find(r => r.id === entry.id)?.[kind];
-          if (!latest) throw Error('Message indisponible : actualiser.');
-          await copyText(latest);
-          message('Message copié. Copier ne signifie pas émettre.');
-        }, block, 'small');
-        button.setAttribute('aria-label', 'Copier ' + copyLabel + ' : ' + entry.trigger.label);
-        row.append(block);
-      }
-      let details = el('details', null); details.append(el('summary', 'Valeurs et sources'), el('div', null, {className:'radio-sources muted'})); row.append(details);
-      target.append(row);
-    }
-    row.querySelector('h3').textContent = entry.trigger.label + ' · ' + ({ready:'Déclencheur confirmé',upcoming:'À venir',unknown:'Condition à confirmer'}[entry.trigger.status]);
-    row.querySelector('.radio-station').textContent = (ai.session?.universe === 'demo' ? 'Démonstration · ' : '') + (entry.station.callsign || '<station>') + ' · ' +
-      (entry.station.frequency_mhz == null ? '<fréquence>' : entry.station.frequency_mhz.toFixed(3) + ' MHz publiée') +
-      ' · Voix ' + (entry.language === 'fr' ? 'française' : 'anglaise') + ' · ' + entry.station.notice;
-    row.querySelector('.radio-trigger').textContent = entry.copy_notice;
-    for (let [kind, text] of [['voice',entry.voice],['readback',entry.readback],['voice_alternate',entry.voice_alternate],['readback_alternate',entry.readback_alternate],['unicom',entry.unicom]]) {
-      let block = row.querySelector('[data-variant="' + kind + '"]'); block.hidden = !text;
-      block.querySelector('pre').textContent = text || '';
-      block.querySelector('small').textContent = kind.startsWith('readback') ? entry.readback_notice : kind === 'unicom' ? entry.unicom_notice : entry.station.notice;
-    }
-    let sources = row.querySelector('.radio-sources'); sources.replaceChildren();
-    for (let value of Object.values(entry.values)) sources.append(el('p', value.label + ' : ' + flightValue(value) + ' · ' + flightSource(value)));
-    if (target.children[index] !== row) target.insertBefore(row, target.children[index] || null);
-  }
-}
+
 function flightPendingView(view) {
   let data = ai.session, session = data?.session;
-  let c = card(view, 'Suivi du vol', data?.universe === 'demo' ? 'Démonstration · suivi séparé de SimConnect' : 'SimConnect · lecture seule du cockpit');
-  for (let text of data?.warnings || []) c.append(el('p', text, { className: 'banner warn' }));
-  let bar = cardActions(c);
-  action('Retour à l’initialisation', () => navigate('Initialisation'), bar);
-  action('Consulter la télémétrie existante', () => navigate('Vol en cours'), bar);
-  if (!session) {
-    c.append(el('p', 'Aucun suivi démarré. Les notes libres ne renseignent jamais les déclarations ci-dessous.'));
-    action('Démarrer le suivi du vol', () => sessionAction('start'), bar, 'primary').disabled = data?.storage_blocked || connectionLost;
-  } else {
-    c.append(el('p', (session.status === 'active' ? 'Suivi actif' : 'Suivi terminé') + ' · OFP : ' + (session.plan_summary.ofp_id || 'sans identifiant') + ' · révision ' + session.plan_revision + ' · ' + data.archived_count + ' suivi(s) archivé(s).'));
-    action(session.status === 'active' ? 'Terminer le suivi' : 'Reprendre le suivi', () => sessionAction(session.status === 'active' ? 'end' : 'resume'), bar);
+  if (session?.status === 'active' && !data.storage_blocked && data.cockpit) {
+    view.append(flightDashboard(data));
+    return;
   }
-  action('Réinitialiser le suivi', async () => {
-    if (confirm('Ouvrir un suivi vide ? Le suivi précédent sera conservé sous local/, y compris un fichier ancien ou invalide.')) await sessionAction('reset');
+  let c = card(view, 'Suivi du vol', data?.universe === 'demo' ? 'Démonstration' : 'SimConnect · lecture seule du cockpit');
+  for (let text of data?.warnings || []) c.append(el('p', text, { className: 'banner warn' }));
+  c.append(el('p', session ? 'Suivi terminé. Les cases cochées et les valeurs saisies sont conservées.'
+    : 'Aucun suivi démarré. La phase sera détectée automatiquement, même si le vol est déjà en cours.'));
+  let bar = cardActions(c);
+  if (!session) action('Démarrer le suivi du vol', () => sessionAction('start'), bar, 'primary').disabled = data?.storage_blocked || connectionLost;
+  else action('Reprendre le suivi', () => sessionAction('resume'), bar, 'primary');
+  action('Retour à l’initialisation', () => navigate('Initialisation'), bar);
+  action('Nouveau suivi vide', async () => {
+    if (confirm('Ouvrir un suivi vide ? Le suivi précédent reste archivé sous local/.')) await sessionAction('reset');
   }, bar, 'danger');
-  if (!session || session.status !== 'active' || data.storage_blocked) return;
-  flightDashboard(view, data);
-  let phaseData = data.phase, effectivePhase = phaseData?.effective?.value;
-  let phase = card(view, 'Phase du vol', 'Changer de phase ne coche aucune case. Le choix manuel reste actif jusqu’au retour explicite en automatique.');
-  const phaseLabel = id => data.phases.find(p => p.id === id)?.label || 'Non confirmée';
-  const substates = { taxi: 'Roulage', takeoff: 'Décollage', approach: 'Approche', landing: 'Atterrissage', parking: 'Parking', go_around: 'Remise des gaz' };
-  phase.append(el('p', phaseLabel(effectivePhase) + ' · ' + (phaseData?.mode === 'manual' ? 'Déclarée par le pilote' : 'Calculée') + (phaseData?.substate ? ' · ' + substates[phaseData.substate] : ''), { id: 'flightPhase' }));
-  let getPhase = field(phase, 'Phase', phaseDraft?.sessionId === session.id ? phaseDraft.value : session.forced_phase || 'automatic', 'text', ['automatic', ...data.phases.map(p => p.id)]);
-  phase.querySelector('select').oninput = () => { phaseDraft = { sessionId: session.id, value: getPhase() }; };
-  for (let option of phase.querySelector('select').options) option.textContent = option.value === 'automatic' ? 'Automatique' : data.phases.find(p => p.id === option.value).label;
-  let phaseActions = cardActions(phase);
-  action('Enregistrer la phase', async () => {
-    await sessionAction('phase', 'PUT', { phase: getPhase() === 'automatic' ? null : getPhase() });
-    phaseDraft = null;
+}
+
+function updateFlightView(force = false) {
+  if (tab !== 'Vol') return;
+  const data = ai.session, root = $('#flightDashboard');
+  if (!force && (flightPointerDown || flightEditing)) return;
+  const active = data?.session?.status === 'active' && !data.storage_blocked && data.cockpit;
+  if (!root || !active || root.dataset.session !== data.session.id) {
+    if (!force && isEditing() && !root) return;
+    flightPreview = null;
+    flightEditing = null;
     render();
-  }, phaseActions);
-  action('Revenir en automatique', async () => {
-    await sessionAction('phase', 'PUT', { phase: null });
-    phaseDraft = null; render();
-  }, phaseActions).disabled = !session.forced_phase;
-  action('Prêt pour le départ', () => sessionAction('declarations', 'PUT', { declaration: {
-    kind: 'event', field: 'event.departure_ready', value: true, reference: 'Geste explicite du pilote', context: { stage: 'departure' },
-  } }), phaseActions).disabled = effectivePhase !== 'preflight';
-  let evidence = el('div', null, {id:'flightPhaseEvidence'}); phase.append(evidence);
-  flightPhaseEvidence(evidence, phaseData);
-  declarationForms(view, session);
-  let current = card(view, 'Déclarations du pilote', 'Saisies explicites, datées et révisées ; aucune interprétation des notes libres. Consultation et annonce ATIS sont déclarées séparément, à l’heure saisie.');
-  if (!session.declarations.length) current.append(el('p', 'Aucune déclaration.'));
-  for (let d of session.declarations) {
-    let line = el('div', null, { className: 'card' });
-    line.append(el('p', declarationLabel(d.field) + ' : ' + d.value + (d.unit ? ' ' + d.unit : '') + ' · déclarée · révision ' + d.revision + ' · ' + new Date(d.recorded_at * 1000).toLocaleString('fr-FR')));
-    if (d.occurred_at) line.append(el('p', 'Heure déclarée : ' + new Date(d.occurred_at * 1000).toLocaleString('fr-FR')));
-    line.append(el('p', 'Référence : ' + d.reference + ' · ' + Object.entries(d.context).map(([k,v]) => declarationLabel(k) + ' : ' + declarationLabel(v)).join(' · ')));
-    if (d.revoked_at || d.invalidated_reason) line.append(el('p', d.revoked_at ? 'Révoquée / remplacée' : d.invalidated_reason, { className: 'banner warn' }));
-    if (!d.revoked_at) action('Révoquer', () => sessionAction('declarations/' + d.id + '/revoke'), cardActions(line), 'small');
-    current.append(line);
+    return;
+  }
+  // Rebuild, then put focus back on the same control so keyboard use survives each refresh.
+  const key = document.activeElement?.closest?.('[data-key]')?.dataset.key;
+  const next = flightDashboard(data);
+  root.replaceWith(next);
+  const target = key && next.querySelector('[data-key="' + key + '"]');
+  if (target) target.focus({ preventScroll: true });
+  if (flightEditing) {
+    const input = next.querySelector('.fl-edit');
+    if (input) { input.focus({ preventScroll: true }); input.select(); }
   }
 }
 
@@ -438,7 +422,7 @@ async function sessionAction(path, method = 'POST', values = {}) {
   }
   try {
     ai.session = await api('ai/session/' + path, method, { session_id: current?.session?.id || null, universe: current.universe, ...values });
-    if (tab === 'Vol' && current?.session?.id === ai.session?.session?.id && current?.session?.status === ai.session?.session?.status && path.startsWith('steps/')) updateFlightView();
+    if (tab === 'Vol' && mounted && current?.session?.id === ai.session?.session?.id && ai.session?.session?.status === 'active') updateFlightView(true);
     else render();
   } catch (e) {
     // A stale tab must not apply a gesture to a newly opened flight.
@@ -448,108 +432,6 @@ async function sessionAction(path, method = 'POST', values = {}) {
   }
 }
 
-let declarationDrafts = {};
-const DECLARATION_LABELS = {
-  true:'Oui', false:'Non', radio:'Radio', event:'Événement', stand:'Poste', exit:'Sortie de piste', approach_position:'Position en approche', tod_utc:'TOD fourni (date et heure avec fuseau)',
-  clearance:'Clairance', selection:'Choix', atis:'ATIS déclaré', performance:'Performance',
-  altitude:'Altitude autorisée', heading:'Cap autorisé', speed:'Vitesse autorisée', squawk:'Code transpondeur', instruction:'Instruction reçue',
-  runway:'Piste', approach:'Approche', sid:'SID', star:'STAR', heard_letter:'Lettre écoutée', announced_letter:'Lettre annoncée', callsign:'Indicatif utilisé',
-  preflight:'Prévol', cruise:'Croisière',
-  v1:'V1', vr:'VR', v2:'V2', flex:'FLEX', vapp:'VAPP', thr_red:'THR RED', acc:'ACC',
-  departure:'Départ', arrival:'Arrivée', climb:'Montée', descent:'Descente', taxi:'Roulage', transfer:'Transfert',
-  type:'Type', station:'Station', stage:'Départ / arrivée', airport:'Aérodrome', version:'Version ATIS',
-  aircraft:'Appareil', mass:'Masse', configuration:'Configuration', weather:'Météo',
-};
-function declarationLabel(value) {
-  let text = String(value), parts = text.split('.');
-  return parts.length === 2 && ['clearance','selection','atis','performance','station'].includes(parts[0])
-    ? parts.map(key => DECLARATION_LABELS[key] || key).join(' · ') : DECLARATION_LABELS[text] || text;
-}
-function declarationForms(view, session) {
-  if (declarationDrafts.sessionId !== session.id) declarationDrafts = { sessionId: session.id };
-  for (let [kind, title, fields, contextFields] of [
-    ['clearance', 'Déclarer une clairance', ['altitude', 'heading', 'speed', 'squawk', 'instruction','runway','sid','qnh','frequency','taxi_route'], [['type','Type de clairance', ['departure','climb','descent','approach','runway','taxi','transfer']], ['station','Station / origine']]],
-    ['selection', 'Déclarer la piste ou l’approche retenue', ['runway','approach','sid','star','tod_utc'], [['stage','Départ / arrivée', ['departure','arrival']]]],
-    ['atis', 'Déclarer un ATIS consulté ou annoncé', ['heard_letter','announced_letter'], [['airport','Aérodrome OACI'], ['version','Version / référence du bulletin']]],
-    ['station', 'Déclarer la station réellement utilisée', ['callsign'], [['stage','Phase de déclaration', ['preflight','departure','climb','cruise','descent','arrival']]]],
-    ['radio', 'Déclarer la position ou le poste pour la radio', ['stand','exit','approach_position'], [['stage','Phase de déclaration', ['preflight','departure','climb','cruise','descent','arrival']]]],
-    ['event', 'Confirmer un événement de procédure', ['before_start','ready_pushback','after_start','before_taxi','holding_point','handoff','traffic_announcement','before_tod','approach_ready','landing_ready','go_around','runway_vacated','parked','securing','departure_ready'], [['stage','Phase de déclaration', ['preflight','departure','climb','cruise','descent','arrival']]]],
-    ['performance', 'Déclarer une performance manuelle', ['v1','vr','v2','flex','vapp','thr_red','acc'], [['aircraft','Appareil'], ['runway','Piste'], ['mass','Masse et unité'], ['configuration','Configuration'], ['weather','Météo associée']]],
-  ]) {
-    let draft = declarationDrafts[kind] ||= {}, details = el('details', null);
-    details.open = !!draft.open;
-    details.ontoggle = () => { draft.open = details.open; };
-    details.append(el('summary', title)); view.append(details);
-    let c = card(details, title, 'Référence et contexte obligatoires. Une nouvelle saisie remplace le même champ ; l’historique est conservé.');
-    const draftField = (key, label, choices = null) => {
-      let get = field(c, label, draft[key] ?? choices?.[0] ?? '', 'text', choices), input = c.lastChild.querySelector('input,select');
-      if (choices) for (let option of input.options) option.textContent = declarationLabel(option.value);
-      input.oninput = () => { draft[key] = get(); };
-      return get;
-    };
-    let getField = draftField('field', 'Champ déclaré', fields), value = draftField('value', kind === 'event' ? 'Événement confirmé' : 'Valeur déclarée', kind === 'event' ? ['true','false'] : null), unit = draftField('unit', 'Unité (ex. kt, ft, °C)'), reference = draftField('reference', 'Référence (EFB, ATC ou bulletin)');
-    let getTime = null;
-    if (kind === 'atis') {
-      let now = new Date(), local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0,16);
-      getTime = field(c, 'ATIS consulté ou annoncé le', draft.time || local, 'datetime-local');
-      c.lastChild.querySelector('input').oninput = () => { draft.time = getTime(); };
-    }
-    let getters = contextFields.map(([key,label,choices]) => [key, draftField(key,label,choices)]);
-    action('Enregistrer : ' + title, async () => {
-      let raw = value().trim();
-      if (!raw || !reference().trim()) throw Error('Valeur et référence obligatoires.');
-      if (kind === 'performance' && !Number.isFinite(Number(raw))) throw Error('Saisir une performance numérique.');
-      if (getTime && !Number.isFinite(new Date(getTime()).getTime())) throw Error('Saisir l’heure de consultation de l’ATIS.');
-      if (kind === 'event' && !['true','false'].includes(raw.trim().toLowerCase())) throw Error('Confirmer un événement avec true ou false.');
-      await sessionAction('declarations', 'PUT', { declaration: { kind, field: kind + '.' + getField(), value: kind === 'performance' ? Number(raw) : kind === 'event' ? raw.trim().toLowerCase() === 'true' : raw, unit: unit().trim() || null, reference: reference().trim(), occurred_at: getTime ? new Date(getTime()).getTime()/1000 : null, context: Object.fromEntries(getters.map(([key,get]) => [key,get().trim()])) } });
-      delete declarationDrafts[kind];
-      render();
-    }, cardActions(c), 'primary');
-  }
-}
-let networkDetailsOpen = false;
-function flightNetworkView(view, network) {
-  if (!network) return;
-  const states = { disabled:'Intégration désactivée', unknown:'Flux inconnu', stale:'Données périmées', empty:'Aucune position candidate en ligne', current:'Cache disponible' };
-  const sourceLabel = source => {
-    if (!source) return 'Source inconnue';
-    const status = { current:'actuel', stale:'périmé', unavailable:'inconnu' }[source.status] || source.status;
-    return source.source + ' · ' + status + (source.age_s == null ? ' · âge inconnu' : ' · âge ' + Math.floor(source.age_s) + ' s');
-  };
-  let c = card(view, 'Réseau pour le suivi', states[network.state] || 'État inconnu');
-  c.append(el('p', network.notice, { className: 'muted' }));
-  if (connectionLost) c.append(el('p', 'Connexion à Glareshield perdue : état réseau non confirmé.', { className: 'banner warn' }));
-  if (network.used_station) c.append(el('p', 'Station utilisée : ' + network.used_station.value + ' · déclarée par le pilote · ' + Math.floor(network.used_station.age_s) + ' s · ' + ({ disabled:'intégration désactivée', unknown:'présence inconnue', stale:'présence non confirmée, flux périmé', online:'position publiée en ligne', offline:'position absente du dernier flux' }[network.used_station_state]) + '. Cette déclaration ne confirme pas la couverture.'));
-  else c.append(el('p', 'Station utilisée : <station à déclarer>.'));
-  if (network.state === 'disabled') return;
-  c.append(el('p', sourceLabel(network.feeds.whazzup), { className: 'muted' }));
-  let positions = (network.positions || []).filter(p => p.useful_for.length || p.pilot_selected);
-  if (!positions.length && network.positions !== null) c.append(el('p', 'Aucune position candidate pour la phase courante ou suivante. La couverture reste à vérifier.'));
-  for (let p of positions) {
-    let matches = p.matched_by.map(m => ({ callsign_prefix:'Préfixe OACI', distance_to_airport:'Proximité aérodrome', distance_to_aircraft:'Proximité appareil', published_range:'Portée publiée' }[m.basis] || m.basis) + (m.airport ? ' ' + m.airport : '')).join(', ');
-    c.append(el('p', p.callsign + (p.frequency_mhz == null ? ' · fréquence inconnue' : ' · ' + p.frequency_mhz.toFixed(3) + ' MHz publiée') + ' · ' + p.useful_for.map(slot => slot === 'current' ? 'phase courante' : 'phase suivante').join(', ') + ' · ' + (matches || 'Déclaration pilote') + ' · couverture non confirmée' + (p.pilot_selected ? ' · station déclarée utilisée' : '')));
-  }
-  let details = el('details', null);
-  details.open = networkDetailsOpen;
-  details.ontoggle = () => { networkDetailsOpen = details.open; };
-  details.append(el('summary', 'ATIS et météo publiés')); c.append(details);
-  for (let a of network.atis) {
-    details.append(el('h4', a.station + ' · ATIS téléchargé ' + (a.revision || '<lettre inconnue>')));
-    details.append(el('p', sourceLabel(a.provenance) + ' · texte non interprété · référence ' + a.reference, { className: 'muted' }));
-    details.append(el('pre', a.lines.join('\n')));
-  }
-  if (!network.atis.length) details.append(el('p', 'Aucun ATIS téléchargé pour les positions candidates.'));
-  for (let w of network.weather) for (let kind of ['metar', 'taf']) {
-    let bulletin = w[kind];
-    details.append(el('h4', w.icao + ' · ' + kind.toUpperCase() + ' IVAO'));
-    details.append(el('p', sourceLabel(bulletin.provenance), { className: 'muted' }));
-    details.append(el('pre', bulletin.raw || ({ feed_unavailable:'Flux inconnu', not_published:'Bulletin non publié' }[bulletin.status] || 'Inconnu')));
-    if (bulletin.values) for (let [key, value] of Object.entries(bulletin.values)) {
-      details.append(el('p', ({ qnh:'QNH', temperature:'Température', wind:'Vent' }[key]) + ' : ' + (value.value ?? '<inconnu>') + (value.unit ? ' ' + value.unit : '') + ' · ' + ({ available:'publié', stale:'périmé', unavailable:'inconnu' }[value.status]) + ' · lecture ' + ({ parsed:'réussie', ambiguous:'ambiguë', missing:'absente', unsupported:'format non pris en charge', truncated:'texte tronqué' }[value.reading_status])));
-    }
-  }
-  for (let a of network.pilot_atis) c.append(el('p', (a.field === 'atis.announced_letter' ? 'ATIS annoncé' : 'ATIS consulté') + ' : ' + a.context.airport + ' ' + a.value + ' · déclaré à ' + new Date(a.occurred_at * 1000).toLocaleString('fr-FR') + ' · ' + ({ same_letter:'même lettre publiée ; vérifier aussi le texte', different_letter:'lettre publiée différente : nouvelle consultation à confirmer', unknown:'comparaison non confirmée' }[a.comparison] || 'comparaison non confirmée'), { className: a.comparison === 'different_letter' ? 'banner warn' : 'muted' }));
-}
 function settingsHome(view) {
   for (let [category, names] of SETTINGS) {
     let c = card(view, category), bar = cardActions(c);
@@ -569,7 +451,7 @@ function displayView(view) {
 }
 function copilotSettingsView(view) {
   let c = card(view, 'Copilote A320', 'Navigation et préparation du vol');
-  c.append(el('p', 'Le suivi conserve les cases, déclarations et phases forcées sous local/copilot/. Les phases automatiques et détections seront raccordées lors des prochaines étapes.'));
+  c.append(el('p', 'La phase est détectée en continu depuis le simulateur ; un clic sur le parcours la corrige. Cases cochées et valeurs saisies restent sous local/copilot/.'));
   action('Variables et démonstration', () => navigate('Variables IA'), cardActions(c));
 }
 function applicationView(view) {
@@ -581,7 +463,7 @@ function applicationView(view) {
 }
 for (let [name, renderer, iconName, subtitle] of [
   ['Initialisation', preparationView, 'plan', 'Sources et préparation du vol'],
-  ['Vol', flightPendingView, 'plane', 'État du suivi de session'],
+  ['Vol', flightPendingView, 'plane', 'Suivi du vol en cours'],
   ['Réglages', settingsHome, 'settings', 'Copilote, affichage, intégrations, éclairage et application'],
   ['Affichage', displayView, 'settings', 'Thème et lisibilité'],
   ['Copilote', copilotSettingsView, 'plane', 'Préparation du copilote A320'],

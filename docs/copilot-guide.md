@@ -3,35 +3,37 @@
 ## Préparer et suivre un vol
 
 1. Dans **Initialisation**, vérifier simulateur et AI Bridge, importer l’OFP et
-   consulter son résumé. IVAO et l’éclairage restent facultatifs. Les notes
-   libres sont conservées, mais ne remplissent jamais une clairance structurée.
-2. **Démarrer le suivi du vol** ouvre **Vol**. Choisir les déclarations utiles :
-   clairance reçue, piste/approche retenue, ATIS consulté avec sa référence,
-   performances manuelles sourcées, station réellement utilisée et poste/position.
-   Les inconnues restent `<…>`.
-3. Suivre **Maintenant**, puis les groupes MCDU, FCU et checklists. Les cases
-   manuelles priment dans les deux sens ; une détection contraire reste visible.
-   La détection du levier de train ne prouve pas son verrouillage, et STD ne
-   prouve pas le respect du seuil de transition. APPR reste manuel.
-4. Les rappels restent présents jusqu’à **Acquitter le rappel**. Leur méthode
-   et leurs seuils sont affichés ; les rappels secondaires sont différés en
-   phase critique. Acquitter un rappel ne coche aucune procédure.
-5. Lire le déclencheur et la station avant de choisir une variante radio.
-   **Copier** prend seulement le texte choisi et ne signifie jamais « émis ».
-   Remplir un collationnement après réception de l’instruction. La lettre d’ATIS
-   publiée n’est pas utilisée comme lettre consultée sans déclaration explicite.
+   consulter son résumé. IVAO et l’éclairage restent facultatifs.
+2. **Démarrer le suivi du vol** ouvre **Vol**. La phase est détectée seule, y
+   compris si le vol est déjà en cours ([règles de détection](copilot-phases.md)).
+3. Lire **Maintenant** : une seule action, celle de l’étape en cours (au poste,
+   roulage, montée, approche…), avec les faits utiles (piste, ATIS, distance,
+   carburant) et ce qui déclenchera l’étape suivante.
+4. Cocher les lignes MCDU, FCU et checklists de la phase. Seule la phase en
+   cours est affichée ; ses valeurs viennent de l’OFP, du METAR ou de la
+   saisie pilote, indiquée en petit à côté de la valeur.
+5. Une valeur inconnue apparaît en pointillés, par exemple `<V1>`. Un clic
+   permet de la saisir (Entrée pour valider, Échap pour annuler). Une saisie
+   prime sur l’OFP : piste changée, altitude autorisée, squawk, poste… Vider
+   le champ revient à la valeur prévue.
+6. **Radio** propose au plus trois messages, ceux de l’étape, avec la station
+   en ligne et sa fréquence. **Copier** ne transmet rien. Sans contrôle en
+   ligne, un message UNICOM texte est ajouté.
 
-La phase avance à partir des observations et du plan. Les six boutons de phase
-et le formulaire permettent une correction manuelle. Le retour en automatique
-est explicite. Une correction ne coche aucune étape. Les déclencheurs des
-étapes sont du contexte à confirmer ; Maintenant classe les cases non terminées
-de la phase, avec les rappels admissibles selon leur priorité.
+La colonne de droite résume la situation (altitude, vitesse sol, vario,
+carburant et écart au plan, distance parcourue avec le TOD de l’OFP), l’ATC
+utile à la phase (aérodrome de départ, puis centres proches, puis arrivée),
+l’ATIS de l’aérodrome concerné avec son changement de lettre, et les prochains
+repères.
+
+Cliquer une autre phase du parcours l’affiche en **aperçu** pour préparer la
+suite. **Je suis en …** corrige la phase : le suivi automatique reprend alors
+à partir d’elle. Une correction ne coche aucune case.
 
 Pour reprendre, ouvrir Vol ou choisir **Reprendre le suivi** après une fin.
-Les cases, déclarations, rappels et acquittements restent sous `local/copilot/`.
-Un OFP corrigé conserve les cases et invalide les déclarations à revoir ; un
-nouveau vol archive le suivi précédent. **Réinitialiser** est une action explicite.
-Les sessions de démonstration et SimConnect sont distinctes.
+Les cases, valeurs saisies et l’étape restent sous `local/copilot/`. Un OFP
+corrigé conserve les cases ; un nouveau vol archive le suivi précédent. Les
+sessions de démonstration et SimConnect sont distinctes.
 
 ## Démonstration complète hors réseau
 
@@ -69,23 +71,19 @@ Pour la recette navigateur simulée, utiliser `tests/test_preparation.py`, puis
 `GLARESHIELD_TEST_URL` permet de choisir l’URL d’un serveur de recette isolé.
 Les captures restent sous `local/ui-test/`, jamais dans Git.
 
-## Limites de cette livraison
+## Limites
 
-- Les validations réelles exigent une [correspondance de source validée pour
-  l’appareil](copilot-contract.md#validation-des-étapes). Une simple SimVar SDK
-  ou un nom de LVar familier ne suffit pas. Les sources Fenix connues incorrectes
-  restent exclues ; les tests d’éclairage ne servent jamais de preuves.
-- Le TOD MCDU reste absent. Le pilote peut fournir une date/heure de TOD avec
-  fuseau et référence ; à défaut, le TOD est inconnu. La distance de préparation
-  arrivée n’est pas une estimation du TOD et ne guide pas la descente.
-- Les franchissements livrés utilisent l’altitude vraie MSL, pas FL100. Aucun
-  état FMA/ECAM, réglage FCU non exposé ou performance n’est inventé.
-- Une station candidate et une fréquence publiée ne prouvent pas la couverture
-  ni un transfert reçu. Un flux indisponible ne permet pas de conclure UNICOM.
-- Une pause ou une perte de télémétrie suspend les nouvelles détections et
-  temporisations ; les gestes et preuves historiques sont conservés.
+- La validation automatique d’une case exige une [correspondance de source
+  validée pour l’appareil](copilot-contract.md#validation-des-étapes). Sinon,
+  la case reste manuelle.
+- Le TOD n’est connu que s’il figure dans le journal de navigation de l’OFP ;
+  il n’est pas lu dans le MCDU.
+- Les stations ATC sont rapprochées par indicatif et distance : une station
+  proposée n’est pas une couverture confirmée. Le nom prononcé est déduit de
+  l’OFP (aérodromes) ou de l’indicatif (centres) ; le relire avant d’émettre.
+- La lettre d’ATIS publiée sert à préremplir les messages ; elle ne prouve pas
+  que l’ATIS a été écouté.
 - Les fixtures ne valident aucun matériel ni aucune source réelle. La recette
   visuelle est documentée dans la [matrice de couverture](copilot-acceptance.md).
 
-Voir aussi les [rappels](copilot-reminders.md), la [radio](copilot-radio.md) et
-les [règles de session](copilot-session.md).
+Voir aussi les [règles de session](copilot-session.md).

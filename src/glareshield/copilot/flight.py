@@ -13,14 +13,15 @@ def path_value(data, path):
     return data
 
 
-def priority_step(groups, phase):
-    """Highest priority unchecked step in effective phase; profile order breaks ties.
-
-    Triggers are displayed as context only, until the separate step engine exists.
-    A phase change never completes a step.
-    """
-    candidates = [s for g in groups if g['phase'] == phase for s in g['steps'] if not s['checked']]
-    return max(candidates, key=lambda s: s['priority'], default=None)
+def pilot_number(text):
+    """Typed digits become a number for display; anything else stays as typed (04R, FL120)."""
+    try:
+        number = float(text.replace(' ', '').replace(',', '.'))
+    except ValueError:
+        return text
+    if not math.isfinite(number):
+        return text
+    return int(number) if number.is_integer() else number
 
 
 def flight_view(service, session, phase, network):
@@ -117,11 +118,16 @@ def flight_view(service, session, phase, network):
                       'source': profile.procedure_reference if expected.literal is not None else
                                 ' / '.join(profile.sources[s].path for s in expected.sources) or 'Procédure',
                       'reference': profile.procedure_reference, 'age_s': None}
+        typed = session.pilot_values.get(key) if session else None
+        if typed is not None and expected.literal is None:
+            # Codes such as a squawk have no unit and keep their leading zeros.
+            chosen = {'value': pilot_number(typed.value) if expected.unit else typed.value, 'unit': expected.unit, 'source': 'pilot.value',
+                      'reference': 'Saisie pilote', 'nature': 'declared', 'status': 'available',
+                      'age_s': max(0, now-typed.recorded_at)}
         values[key] = {**chosen, 'label': expected.label, 'placeholder': expected.placeholder}
     usable = fields if store.connected and not store.paused else {}
     return {'values': values, 'telemetry': fields, 'derived': derived(usable, plan, 'full'),
             'plan': plan, 'plan_age_min': plan_age, 'utc': now, 'connected': store.connected,
             'plan_current': bool(plan and plan_status.get('generated_age_h') is not None
                                  and 0 <= plan_status['generated_age_h'] <= bridge.settings.ofp_max_age_h),
-            'paused': store.paused, 'stale': store.last_message is None or now-store.last_message > 8,
-            'reminders': [], 'radio': []}
+            'paused': store.paused, 'stale': store.last_message is None or now-store.last_message > 8}

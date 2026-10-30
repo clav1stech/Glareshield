@@ -8,7 +8,7 @@ from glareshield.aibridge.scenario import DURATION_S, values
 from glareshield.aibridge.service import AIBridge
 from glareshield.aibridge.telemetry import TelemetryStore
 from glareshield.copilot.contract import PHASE_IDS
-from glareshield.copilot.phases import PhaseState
+from glareshield.copilot.phases import STAGE_IDS
 from glareshield.copilot.session import DeclarationInput
 from test_copilot_session import first_step, shown
 from test_aibridge_web import client_and_headers
@@ -28,32 +28,33 @@ def offline(root, clock):
     return bridge
 
 
-def test_complete_flight_visits_six_phases_and_prepares_arrival_before_descent(tmp_path):
+def test_complete_flight_visits_every_stage_with_guidance_radio_and_network(tmp_path):
     clock = Clock()
     bridge = offline(tmp_path, clock)
     service = bridge.sessions
     service.start()
     manual = first_step(service)
     service.set_step(manual, True)
-    phases, substates, first_reminders, radio_ids, network_kinds = [], set(), {}, set(), set()
+    phases, stages, radio_ids, network_kinds, titles, pills = [], [], set(), set(), {}, set()
     for elapsed in range(DURATION_S):
         clock.now = 2_000_000_000.+elapsed
         state = service.view()
+        cockpit = state['cockpit']
         phase = state['phase']['effective']['value']
-        if not phases or phases[-1] != phase: phases.append(phase)
-        substates.add(state['phase']['substate'])
-        radio_ids.update(r['id'] for r in state['flight']['radio'])
-        for reminder in state['session']['reminder_state']['events'].values():
-            first_reminders.setdefault(reminder['rule'], elapsed)
+        if phase and (not phases or phases[-1] != phase): phases.append(phase)
+        if cockpit['stage'] and (not stages or stages[-1] != cockpit['stage']): stages.append(cockpit['stage'])
+        titles.setdefault(cockpit['stage'], cockpit['now']['title'])
+        radio_ids.update(r['id'] for r in cockpit['radio'])
+        pills.update(p['text'] for p in cockpit['now']['pills'])
         network_kinds.update(e['kind'] for e in state['network']['events']['events'])
         assert state['network']['simulation'] is True
+        assert len(cockpit['radio']) <= 3 and len(cockpit['atc']) <= 5 and len(cockpit['upcoming']) <= 4
     assert tuple(phases) == PHASE_IDS
-    assert {'taxi','takeoff','approach','landing','parking'} <= substates
-    assert state['phase']['substate'] == 'parking'
-    assert first_reminders['prepare_arrival'] < 1000
-    assert {'descent_started','altitude_10000_up','altitude_10000_down','atis_update','atc_presence'} <= first_reminders.keys()
-    assert {'atis_changed','connected','disconnected'} <= network_kinds
-    assert {'radio_clearance','radio_takeoff','radio_descent_request','radio_go_around','radio_parked'} <= radio_ids
+    assert stages == [s for s in STAGE_IDS if s != 'go_around']
+    assert titles['cruise'] == 'Préparer l’arrivée avant le TOD'
+    assert {'radio_clearance', 'radio_takeoff', 'radio_descent_request', 'radio_landing', 'radio_parked'} <= radio_ids
+    assert any(p.startswith('ATIS ') and 'nouvelle lettre' in p for p in pills)
+    assert {'atis_changed', 'connected', 'disconnected'} <= network_kinds
     assert shown(service, manual)['checked']
     assert bridge.definitions() == {}  # No simulator connection is needed.
     assert bridge.ivao.whazzup.data is None  # The real-network cache was never populated.
@@ -76,7 +77,7 @@ async def test_offline_network_outage_is_not_a_disconnect_and_real_cache_is_sepa
     outage = bridge.sessions.view()
     assert outage['network']['state'] == 'stale'
     assert outage['network']['events']['latest_sequence'] == latest
-    assert all(r['station']['frequency_mhz'] is None for r in outage['flight']['radio'])
+    assert outage['cockpit']['atc']  # Last known positions stay readable during the outage.
     clock.now += 60
     recovered = bridge.sessions.view()
     assert recovered['network']['state'] == 'current'
@@ -122,36 +123,33 @@ def test_restart_same_corrected_and_new_ofp_and_universe_separation(tmp_path):
     with pytest.raises(ValueError): restarted.sessions.start()
 
 
-def test_pause_reconnect_forced_then_automatic_and_go_around_keep_manual_gestures(tmp_path):
+def test_pause_reconnect_correction_and_go_around_keep_manual_gestures(tmp_path):
     clock = Clock()
     bridge = offline(tmp_path, clock)
     service = bridge.sessions
     service.start()
     service.force_phase('arrival')
     service.set_step('gear_down', False)
-    # Seed a resumed airborne phase, then use only numeric/bool telemetry as evidence.
-    service.documents['demo'].sessions[-1].phase_state = PhaseState(
-        phase='arrival', confirmed=True, cruise_seen=True, airborne_seen=True)
     store = TelemetryStore('scenario', clock)
     bridge.store = lambda: store
-    def feed(paused=False, connected=True):
-        data = {**values(1390), 'vertical_speed': 1500.}
+    def feed(paused=False, connected=True, vertical=1500.):
+        data = {**values(1390), 'vertical_speed': vertical}
         store.update({'connected':connected, 'paused':paused,
                       'telemetry':{k:(v,clock.now) for k,v in data.items()}})
-    feed(); service.force_phase(None)
-    for _ in range(12):
+    for _ in range(8):
         clock.now += 1; feed(); view = service.view()
     assert view['phase']['effective']['value'] == 'arrival'
-    assert view['phase']['substate'] == 'go_around'
-    service.declare(DeclarationInput(kind='event', field='event.go_around', value=True,
-        reference='Remise des gaz fictive', context={'stage':'arrival'}))
-    assert service.view()['flight']['radio'][0]['id'] == 'radio_go_around'
+    assert view['phase']['stage'] == 'go_around'
+    assert [r['id'] for r in view['cockpit']['radio']][0] == 'radio_go_around'
     clock.now += 1; feed(paused=True)
-    assert service.view()['phase']['suspended']
+    view = service.view()
+    assert view['phase']['live'] is False and view['cockpit']['header']['status'] == 'demo'
     assert not shown(service, 'gear_down')['detection_current']
     clock.now += 20; feed(connected=False)
     assert not shown(service, 'gear_down')['checked']
-    clock.now += 1; feed()
+    for _ in range(16):
+        clock.now += 1; feed(vertical=-800.); view = service.view()
+    assert view['phase']['stage'] in ('approach', 'final')
     assert shown(service, 'gear_down')['provenance'] == 'manual'
     assert not shown(service, 'gear_down')['checked']
     assert shown(service, 'gear_down')['conflict']

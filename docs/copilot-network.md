@@ -11,9 +11,10 @@ Le contrat #11 et la session #13 sont réutilisés ; les phases viennent de #14.
 `AIBridge.flight_network` est l’unique adaptateur métier (`NetworkContext`).
 `SessionService.view()` l’appelle avec la phase effective et les déclarations de
 la session. `GET /api/ai/session` expose cette vue dans `network`, schéma
-`glareshield.copilot_network/1`. Vol lit cette section. Les moteurs de rappels #18
-et de radio #19 consomment la même section, ou appellent ce même service
-avec les mêmes phase et session, sans client réseau ni copie persistante du cache.
+`glareshield.copilot_network/1`. Vol lit cette section, sans client réseau ni
+copie persistante du cache. L’écran ne montre que l’aérodrome utile à la phase
+et les centres situés dans le rayon de route ; une station rapprochée seulement
+par sa portée publiée n’est pas affichée.
 Ces moteurs ne sont pas encore livrés ; ce lot établit leur point d’accès commun.
 Les exports `glareshield.flight_context/3` et la page Réseau IVAO restent compatibles.
 
@@ -104,7 +105,7 @@ Les textes et anciennes valeurs restent lisibles avec leur état ; une pérempti
 n’est jamais masquée par l’heure de rendu. La météo OFP et les conditions observées
 MSFS restent dans leurs sources existantes ; aucune fusion ni comparaison implicite.
 
-## Événements pour les rappels
+## Événements réseau
 
 `IVAOService.event_view(after=0)` expose le flux commun. Les événements sont
 produits pendant la collecte par les mécanismes existants `track_presence` et
@@ -114,7 +115,7 @@ rafale de connexions. Un échec de téléchargement ne crée pas de déconnexion
 Un contrôleur déjà en ligne qui entre seulement dans le rayon n’est pas annoncé
 comme nouvellement connecté. Présence : positions suivies par le mécanisme
 existant, y compris les centres sur la route ; ATIS : changements du cache global.
-Les rappels filtrent par position/contexte et vérifient la fraîcheur.
+Vol signale un changement d’ATIS récent (moins de 15 min) de l’aérodrome concerné.
 
 Chaque événement porte une séquence et une date de détection. `stream_id` change
 au redémarrage ; `latest_sequence`, `oldest_sequence` et `gap` permettent à chaque
@@ -122,7 +123,7 @@ consommateur de gérer son propre curseur et une interruption. Le tampon conserv
 au plus 256 événements en mémoire et est vidé à la désactivation. Il ne garantit
 pas le rejeu après redémarrage ou débordement. Changer de flux ou rencontrer `gap`
 impose de repartir de l’état courant, sans supposer que tous les événements ont
-été observés. Les rappels persistants restent du ressort de #18 et de la session.
+été observés.
 
 La lecture ne consomme rien et renvoie des copies. Elle ne déclenche aucune
 notification. L’overlay existant garde ses préférences et reste l’unique mécanisme

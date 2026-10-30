@@ -12,19 +12,19 @@ recette. Les tags existants restent inchangés.
 | Initialisation / Vol / Réglages et éclairage accessible | `test_preparation.py`, parcours `test_preparation_ui.cjs --browser` : toutes les catégories et pages existantes | Navigation, clavier et identité des ressources vérifiés |
 | Initialisation : simulateur, éclairage, IVAO, SimBrief, export | `test_preparation.py`, `test_aibridge_web.py`, assertions de statut JS | États manquants, erreur, démonstration et exports distingués |
 | Vol actualisé, cases, valeurs sourcées et radio copiable | `test_copilot_flight.py`, `test_copilot_observations.py`, `test_copilot_radio.py`, copie réelle du parcours Edge | Rafraîchissement sans perte de focus/cible, origine/heure et copie exacte vérifiés ; copier n’émet rien |
-| Phase déduite et corrigeable | `test_copilot_phases.py`, `test_copilot_acceptance.py` | Six phases, forçage/retour automatique, pause et remise des gaz vérifiés |
+| Phase déduite et corrigeable | `test_copilot_phases.py`, `test_copilot_acceptance.py` | Treize étapes dans l’ordre, démarrage en vol, correction pilote, pause et remise des gaz vérifiés |
 | Lisibilité second écran, clair/sombre | Parcours Edge aux résolutions ci-dessous, captures locales, taille agrandie | Mise en page et absence de débordement vérifiées ; distance physique et confort individuel non mesurés |
-| Démonstration et pilotes fictifs sans réseau ni matériel | `test_copilot_acceptance.py` : 1 560 s rejouées avec horloge contrôlée ; transport qui refuse toute requête | Vol complet, messages, rappels, validations et parking final vérifiés |
+| Démonstration et pilotes fictifs sans réseau ni matériel | `test_copilot_acceptance.py` : 1 560 s rejouées avec horloge contrôlée ; transport qui refuse toute requête | Vol complet, Maintenant par étape, messages, validations et parking final vérifiés |
 | Aucune donnée personnelle dans Git | `test_privacy.py`, audit d’un index temporaire par `scripts/check_public.py` | Chemins publics explicites, données/tests fictifs et racines privées isolées |
 
 ## Scénarios transversaux
 
-- Le vol nominal atteint successivement prévol, départ, montée, croisière,
-  descente et arrivée. Le rappel de préparation arrivée apparaît avant la
-  descente du scénario à 1 000 s. Les seuils montant/descendant MSL sont observés
-  des deux côtés. Le parking est confirmé dans la minute finale.
-- Les tests rejouent décochage manuel face à une détection, phase forcée puis
-  automatique, fin/reprise, redémarrage, même OFP, OFP corrigé et nouveau vol.
+- Le vol nominal traverse les treize étapes sauf la remise des gaz, dans l’ordre.
+  « Préparer l’arrivée avant le TOD » est l’action affichée en croisière, avant
+  la descente du scénario à 1 000 s. Le parking est confirmé dans la minute finale.
+- Les tests rejouent décochage manuel face à une détection, correction de phase
+  suivie de la reprise automatique, fin/reprise, redémarrage, même OFP, OFP
+  corrigé et nouveau vol.
   Les preuves persistées n’autorisent jamais seules une détection actuelle.
 - Pause, déconnexion/reconnexion, données absentes/périmées, horloge inversée
   et trous de télémétrie remettent les temporisations à zéro. Une remise des gaz

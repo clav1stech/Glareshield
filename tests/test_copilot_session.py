@@ -39,7 +39,7 @@ def declaration(kind='selection', **overrides):
     return DeclarationInput(kind=kind, reference='Référence fictive', **{**examples[kind], **overrides})
 
 
-def test_restart_keeps_manual_steps_phase_declarations_and_reminders(tmp_path):
+def test_restart_keeps_manual_steps_phase_declarations_and_pilot_values(tmp_path):
     bridge = demo(tmp_path)
     service = bridge.sessions
     session_id = service.start()['session']['id']
@@ -48,19 +48,61 @@ def test_restart_keeps_manual_steps_phase_declarations_and_reminders(tmp_path):
     service.force_phase('cruise')
     for kind in ('selection', 'clearance', 'atis', 'performance'):
         service.declare(declaration(kind))
-    service.remember('arrival_notice', 'fictional-reference')
+    service.set_value('stand', 'B12')
     bridge.set_notes('Clairance FL999 : texte libre fictif, sans effet structuré.')
     restarted = AIBridge(tmp_path)
     restarted.set_scenario(True)
     view = restarted.sessions.view()
     assert view['session']['id'] == session_id
     assert shown(restarted.sessions, step)['checked'] is True
-    assert view['session']['forced_phase'] == 'cruise'
+    assert view['session']['phase_state']['phase'] == 'cruise'
+    assert view['session']['phase_state']['manual'] is True
     assert len(view['session']['declarations']) == 4
     assert view['session']['declarations'][1]['value'] == 5000
-    assert view['session']['reminders']['arrival_notice']['checked']
+    assert view['session']['pilot_values']['stand']['value'] == 'B12'
+    assert view['flight']['values']['stand']['value'] == 'B12'
     assert restarted.notes == bridge.notes
     assert restarted.sessions.start()['session']['id'] == session_id
+
+
+def test_pilot_value_overrides_plan_and_can_be_cleared(tmp_path):
+    bridge = demo(tmp_path)
+    service = bridge.sessions
+    service.start()
+    planned = service.view()['flight']['values']['departure_runway']
+    assert planned['nature'] == 'planned'
+    view = service.set_value('departure_runway', '06L')
+    assert view['flight']['values']['departure_runway']['value'] == '06L'
+    assert view['flight']['values']['departure_runway']['nature'] == 'declared'
+    assert service.set_value('cleared_altitude', '5000')['flight']['values']['cleared_altitude']['value'] == 5000
+    assert service.set_value('squawk', '0421')['flight']['values']['squawk']['value'] == '0421'
+    view = service.set_value('departure_runway', None)
+    assert view['flight']['values']['departure_runway']['value'] == planned['value']
+    with pytest.raises(ValueError):
+        service.set_value('completed', 'oui')
+    with pytest.raises(ValueError):
+        service.set_value('unknown_value', 'x')
+    with pytest.raises(ValueError):
+        service.set_value('stand', 'x'*81)
+
+
+def test_legacy_session_file_is_read_with_its_last_phase(tmp_path):
+    bridge = demo(tmp_path)
+    service = bridge.sessions
+    service.start()
+    path = service.path('demo')
+    raw = json.loads(path.read_text(encoding='utf-8'))
+    session = raw['sessions'][-1]
+    session.update({'forced_phase': None, 'reminders': {}, 'reminder_state': {'events': {}},
+                    'phase_state': {'phase': 'cruise', 'confirmed': True, 'cruise_seen': True,
+                                    'airborne_seen': True, 'substate': None, 'changed_at': 1.0, 'evidence': []}})
+    session.pop('pilot_values')
+    path.write_text(json.dumps(raw), encoding='utf-8')
+    restarted = AIBridge(tmp_path)
+    restarted.set_scenario(True)
+    state = restarted.sessions.documents['demo'].sessions[-1].phase_state
+    assert (state.stage, state.phase, state.airborne_seen) == ('cruise', 'cruise', True)
+    assert not restarted.sessions.view()['storage_blocked']
 
 
 def test_same_corrected_and_new_plan_have_deterministic_progress(tmp_path):
@@ -193,15 +235,19 @@ def test_invalid_or_old_file_is_preserved_until_explicit_reset(tmp_path, raw):
     assert len(backups) == 1 and backups[0].read_text(encoding='utf-8') == raw
 
 
-def test_reset_archives_and_profile_revision_never_silently_migrates(tmp_path):
+def test_reset_archives_and_profile_revision_keeps_known_steps(tmp_path):
     bridge = demo(tmp_path)
     service = bridge.sessions
     old_id = service.start()['session']['id']
-    service.set_step(first_step(service), True)
+    step = first_step(service)
+    service.set_step(step, True)
     service.profile = service.profile.model_copy(update={'revision': service.profile.revision+1})
-    assert service.view()['warnings']
+    view = service.set_step(first_step(service, observed=True), True)
+    assert view['session']['profile_revision'] == service.profile.revision
+    assert shown(service, step)['checked'] is True
+    service.profile = service.profile.model_copy(update={'id': 'other_aircraft'})
     with pytest.raises(ValueError):
-        service.set_step(first_step(service), False)
+        service.set_step(step, False)
     view = service.reset()
     assert view['session']['id'] != old_id and view['session']['steps'] == {}
     assert service.documents['demo'].sessions[0].steps

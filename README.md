@@ -31,10 +31,10 @@ Le module **Assistant IA** constitue un état de vol qualifié (valeur, unité, 
 Le copilote intégré est cadré par le [contrat A320](docs/copilot-contract.md)
 et la [référence des écrans](docs/copilot-mockup.md). Le profil embarqué et son
 chargeur sont disponibles. Le [suivi de session](docs/copilot-session.md) conserve
-les cases, déclarations et phases forcées. Le [moteur des six phases](docs/copilot-phases.md)
-affiche les indices, incertitudes et prochains déclencheurs ; une correction
-manuelle reste active jusqu’au retour explicite en automatique. Les validations
-automatiques des checklists relèvent des prochaines étapes.
+les cases, valeurs saisies et l’étape du vol. La [détection d’étape](docs/copilot-phases.md)
+place l’appareil parmi treize étapes (au poste, roulage, montée, croisière,
+approche, finale…), même si le suivi démarre en vol ; un clic sur le parcours
+corrige la phase, puis la détection reprend.
 
 Installer [uv](https://docs.astral.sh/uv/getting-started/installation/), puis depuis la racine du projet :
 
@@ -62,14 +62,14 @@ Python 3.13, l’environnement, les relevés, les fichiers audio et les journaux
 
 ## Configuration
 
-L’application s’ouvre sur **Initialisation** : états du simulateur, d’AI Bridge, de SimBrief, d’IVAO et de l’éclairage, import manuel de l’OFP, résumé et route, notes pilote et export IA. Les manques pour le suivi réel sont séparés des avertissements facultatifs : l’OFP, IVAO et l’éclairage ne sont pas des prérequis à la télémétrie. Les données de démonstration, erreurs et données périmées sont signalées. **Démarrer le suivi du vol** ouvre **Vol** : cases persistantes, phase forcée et déclarations explicites de clairance, piste/approche, ATIS consulté et performances manuelles. Le même OFP conserve les cases ; un nouveau plan archive le suivi précédent et ouvre un suivi vide. Démonstration et SimConnect sont séparés. Voir les [règles de reprise et de réinitialisation](docs/copilot-session.md).
+L’application s’ouvre sur **Initialisation** : états du simulateur, d’AI Bridge, de SimBrief, d’IVAO et de l’éclairage, import manuel de l’OFP, résumé et route, notes pilote et export IA. Les manques pour le suivi réel sont séparés des avertissements facultatifs : l’OFP, IVAO et l’éclairage ne sont pas des prérequis à la télémétrie. Les données de démonstration, erreurs et données périmées sont signalées. **Démarrer le suivi du vol** ouvre **Vol** : l’action à faire maintenant selon l’étape détectée, les cases MCDU, FCU et checklists de la phase, les valeurs de l’OFP complétables d’un clic et les messages radio de l’étape. Le même OFP conserve les cases ; un nouveau plan archive le suivi précédent et ouvre un suivi vide. Démonstration et SimConnect sont séparés. Voir les [règles de reprise et de réinitialisation](docs/copilot-session.md).
 
 **Réglages** regroupe toutes les pages existantes : Copilote, Affichage, Intégrations (Plan de vol / SimBrief, Réseau IVAO, Variables IA), Éclairage et matériel, Application. Le thème automatique, clair ou sombre et trois tailles de texte sont conservés dans `local/display.json`. Changer de mode ou d’affichage ne reconfigure pas le moteur et ne reconnecte pas SimConnect. Les notes non enregistrées restent en mémoire pendant les changements de page.
 
 Les pages d’éclairage permettent de gérer appareils, contrôleurs, groupes, portées, sources, effets, règles et paramètres. Les modifications sont validées puis appliquées sans relancer l’application. Le tableau de bord affiche connexions, pause, variables, niveaux audio, règles actives et erreurs. Les tests de source sont temporaires et ne modifient aucune commande du simulateur.
 
-Le [guide Copilote](docs/copilot-guide.md) décrit le parcours complet, les
-[rappels](docs/copilot-reminders.md), les [messages radio copiables](docs/copilot-radio.md)
+Le [guide Copilote](docs/copilot-guide.md) décrit l’écran Vol (Maintenant,
+checklists, saisie des valeurs, messages radio copiables, situation, ATC et ATIS)
 et la démonstration hors réseau avec IVAO fictif. La [matrice de recette](docs/copilot-acceptance.md)
 relie les critères du suivi de vol aux vérifications et précise leurs limites.
 

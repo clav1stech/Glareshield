@@ -13,7 +13,7 @@ Chaque suivi possède un identifiant local aléatoire, un univers (`demo` ou
 également affichée dans Initialisation :
 
 - Avec `ofp_id`, cet identifiant définit le plan. Un nouvel import identique
-  conserve toutes les cases, déclarations, phases et informations de rappel.
+  conserve toutes les cases, déclarations, valeurs saisies et l’étape.
 - Un contenu différent pour le même identifiant est une correction : les cases
   restent cochées ou décochées, la révision du plan augmente et les déclarations
   sont marquées à vérifier. Leurs valeurs et leur provenance restent visibles.
@@ -42,9 +42,14 @@ consulter ou compléter les gestes manuels ; les observations ne sont pas actuel
 Les cases sont indexées par identifiant stable d’étape. Cocher **ou décocher**
 est un geste manuel durable, prioritaire sur toute validation détectée. La
 provenance, la mesure détectée et une contradiction éventuelle restent visibles.
-Une phase forcée ne modifie aucune case. Depuis la version 1.2.3,
-« Revenir en automatique » retire explicitement ce choix et reprend le
-[moteur de phases](copilot-phases.md), avec de nouvelles temporisations.
+Une correction de phase ne modifie aucune case : elle place le
+[suivi d’étape](copilot-phases.md) au début de la phase choisie, puis la
+détection automatique reprend à partir de là. Une valeur saisie sur Vol
+(`PUT /api/ai/session/values/{clé}`) est conservée dans `pilot_values` et prime
+sur l’OFP ; une saisie vide la retire. Les valeurs fixes de procédure ne se
+saisissent pas. Les champs `forced_phase` et rappels des sessions 1.2 sont
+ignorés à la lecture. Une nouvelle révision du même profil conserve les cases
+dont l’identifiant existe encore.
 
 Les formulaires proposent des saisies distinctes :
 
@@ -103,7 +108,7 @@ Le service évalue les règles `observed` du profil depuis la version 1.2.6 ;
 voir les [conditions de validation par appareil](copilot-contract.md#validation-des-étapes).
 L’ancien point d’injection interne `record_detection` est remplacé par cette
 évaluation des données qualifiées. Aucune API publique ne permet de fabriquer
-une détection. `remember` conserve les références et horodatages des rappels.
+une détection.
 Les preuves persistent comme historique ; elles exigent une reconfirmation
 après redémarrage, une connexion récente hors pause et un âge inférieur ou
 égal à 8 s (ou le délai plus court du champ) pour être présentées comme actuelles.
@@ -116,6 +121,6 @@ cockpit et aucune reconfiguration des ressources d’éclairage. Les exports
 
 Les tests `test_copilot_session.py` utilisent des racines temporaires et des
 plans fictifs. Le parcours Edge de `test_preparation_ui.cjs --browser` vérifie
-les cases, déclarations, navigation, rechargement, phase forcée, fin/reprise et
+les cases, valeurs saisies, aperçu et correction de phase, rechargement, fin/reprise et
 la conservation de l’identité des ressources du moteur sur le serveur simulé
 décrit dans le README.

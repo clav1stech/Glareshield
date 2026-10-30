@@ -41,8 +41,9 @@ de production ont des identifiants stables indépendants de leur position.
 
 ## Arbitrages qui priment sur les exemples de la maquette
 
-- Le clic de phase est une correction déclarée ; les valeurs vivantes proviennent
-  des adaptateurs, pas de tableaux liés à un pourcentage fixe.
+- Le clic de phase ouvre un aperçu ; « Je suis en … » est la correction déclarée,
+  après laquelle la détection automatique reprend. Les valeurs vivantes
+  proviennent des adaptateurs, pas de tableaux liés à un pourcentage fixe.
 - Toute case reste modifiable à la main, y compris une case automatiquement
   détectée ; décocher reste prioritaire. Avancer la phase ne termine rien.
 - La piste active du MCDU n’est pas observable actuellement : confirmation
@@ -57,22 +58,17 @@ de production ont des identifiants stables indépendants de leur position.
   pas le suivi. Les vrais prérequis et avertissements seront définis dans #12/#13.
 - « Copier » prépare un message ; le pilote choisit quand et où l’émettre.
 
-## Points restant à éprouver
+## État livré
 
-La navigation Initialisation / Vol / Réglages est livrée par #12. Initialisation
-réutilise les imports, notes et exports ; Vol reste un écran d’attente du service
-de session. La lecture SimConnect active, connectée et récente et une télémétrie
-AI Bridge récente sont les prérequis affichés pour le suivi réel ; OFP, IVAO et
-éclairage sont facultatifs. Le bouton de démarrage demeure désactivé tant que
-le service n’est pas livré. Le mode démonstration ne confirme aucun vol réel.
+Vol reproduit la maquette : bandeau, parcours des six phases avec l’étape en
+cours, bloc Maintenant piloté par l’[étape détectée](copilot-phases.md), groupes
+MCDU / FCU / checklists de la seule phase affichée, valeurs avec leur source
+courte et saisie en place des inconnues, au plus trois messages radio, puis
+situation, ATC, ATIS et repères à venir. Les rappels à acquitter et les
+provenances détaillées de la version 1.2 ont été retirés de l’écran.
 
-Le parcours des pages, l’import, les exports, les notes, le focus clavier après
-rafraîchissement, les thèmes et les grandes polices sont testés avec une racine
-jetable et des pilotes simulés (`tests/test_preparation.py`,
-`tests/test_preparation_ui.cjs`). Les préférences persistent dans
-`local/display.json` sans reconfiguration du moteur. Les états d’erreur,
-périmés, désactivés et de démonstration ont des tests distincts. Le comportement
-du futur bandeau Vol sur un second écran reste à éprouver lors de #16/#20.
-La source suffit à identifier le dessin et ses interactions ; elle ne constitue
-pas un test d’intégration de l’application. Le [contrat de données](copilot-contract.md)
-fixe les règles de procédure qui remplacent ses simulations visuelles.
+Le parcours navigateur (`tests/test_preparation_ui.cjs --browser`) vérifie sur
+racine jetable et pilotes simulés : cases, saisie en place, copie radio, aperçu
+et correction de phase, thèmes, 1 920 px, 780 px sans débordement, focus clavier
+conservé au rafraîchissement. Le confort de lecture à distance d’un second écran
+réel n’est pas mesuré par ces contrôles.

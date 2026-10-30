@@ -68,11 +68,12 @@ n’utilise jamais les index de tableau pour persister une case.
 Un déclencheur est un OU de clauses ET (`any_of`), composées de comparaisons
 `eq`, `lt`, `lte`, `gt`, `gte`, et d’un maintien continu `hold_s`. Une entrée
 inconnue ou périmée ne satisfait aucune comparaison, y compris `eq false`.
-Dans la version 1.2.9, le moteur choisit l’action « Maintenant » parmi les
-étapes non terminées de la phase courante : priorité décroissante, puis ordre
-du profil. Les déclencheurs d’étape restent du contexte à confirmer ; les
-validations observables, rappels et messages radio évaluent leurs règles
-prises en charge. Un rappel admissible peut prendre la priorité dans Maintenant.
+Depuis la refonte de Vol, « Maintenant » dépend de l’étape détectée
+([phases](copilot-phases.md)) : `copilot/cockpit.py` associe à chaque étape une
+liste ordonnée de groupes ou d’étapes du profil, et affiche le premier qui
+contient une case non cochée. Les messages radio proposés sont aussi choisis
+par étape. Les déclencheurs d’étape du profil restent du contexte ; seules les
+validations observables évaluent leurs règles.
 Une valeur manquante garde l’étape visible avec son emplacement, sans question.
 Le prochain déclencheur est affiché avec son libellé, sans inventer d’échéance.
 
@@ -89,8 +90,9 @@ arbitraire à un objet ou HTML issu d’un profil n’est autorisé.
 Le [contexte réseau livré en 1.2.4](copilot-network.md) raccorde désormais les
 publications METAR structurées, les positions candidates et les événements IVAO
 à la session. Il précise les limites et remplace les mentions prospectives de
-#15 ci-dessous. Les moteurs de [rappels #18](copilot-reminders.md) et de
-[radio #19](copilot-radio.md) consomment désormais cette même section.
+#15 ci-dessous. L’écran Vol et ses messages radio consomment cette même section.
+Les règles `reminders` d’un profil restent acceptées pour compatibilité mais
+ne sont plus évaluées.
 
 Une source décrit un chemin d’adaptateur, sa nature, son type (`number`, `bool`,
 `string`), l’unité **normalisée** et
@@ -213,8 +215,8 @@ point d’arrêt, piste dégagée, transfert reçu…), jamais une clairance dé
 fraîche cohérente avec sa référence altimétrique ; sinon ils restent inconnus.
 `before_tod` n’est calculable qu’avec un TOD fourni et actuel ; pas depuis le
 simple « 42 NM » de la maquette. Les événements sont réévalués et dédupliqués par
-le moteur/rappels (#14/#18), pas par le profil ni le rendu. Les seuils de rappel
-80/60/40 NM de la maquette ne sont pas une estimation du TOD.
+le moteur, pas par le profil ni le rendu. Le TOD affiché vient uniquement du
+point `TOD` du journal de navigation de l’OFP.
 
 ## Validation des étapes
 
@@ -338,8 +340,8 @@ distinct du TOD fourni. Aucun FMA/ECAM ou autre état de système absent n’est
 
 ## État livré et limites
 
-Les interfaces, sessions, phases, adaptation IVAO, observations, rappels et radio
-sont raccordés. Le [guide](copilot-guide.md) et la [matrice de recette](copilot-acceptance.md)
+Les interfaces, sessions, étapes, adaptation IVAO, observations et radio
+sont raccordées. Le [guide](copilot-guide.md) et la [matrice de recette](copilot-acceptance.md)
 décrivent leur vérification de bout en bout sur fixtures hors réseau.
 Les correspondances réelles de calage/volets restent à valider par appareil.
 TOD MCDU, FCU sélectionné et performances restent absents de la télémétrie
