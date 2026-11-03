@@ -262,6 +262,9 @@ class Runtime:
             candidate.rules.append(rule)
             candidate=Configuration.model_validate(candidate.model_dump(mode='json'))
             if render(candidate.effects[rule.effect],0,value) is None:
+                effect=candidate.effects[rule.effect]
+                if getattr(effect,'type',None)=='level_map' and str(value) in effect.map:
+                    raise ValueError('Ce palier conserve l’éclairage de la pièce : rien à tester.')
                 raise ValueError('Palier inconnu : choisir une valeur définie dans cet effet.')
             devices=candidate.select(rule.targets)
             kind='audio' if candidate.effects[rule.effect].type=='sound' else 'light'

@@ -31,7 +31,7 @@ effects:
   dome_light:
     type: level_map
     map:
-      "0": {on: false}
+      "0": null  # OFF : conserver l’éclairage de la pièce
       "1": {on: true, brightness: 15, kelvin: 2700}
       "2": {on: true, brightness: 80, kelvin: 3000}
   warning_audio: {type: sound, file: warning.wav, volume: 0.5, repeat_s: 10}

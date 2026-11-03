@@ -107,7 +107,8 @@ class BlinkEffect(StrictModel):
 
 class LevelMapEffect(StrictModel):
     type: Literal["level_map"]
-    map: dict[str, LightState]
+    # None keeps the room's own lighting: the rule releases the lamp.
+    map: dict[str, LightState | None]
 
 
 class SoundEffect(StrictModel):

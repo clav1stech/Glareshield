@@ -138,7 +138,9 @@ async def test_preview_expires_to_current_cockpit_without_saving_or_reconnecting
         engine.values['dome']=0
         await asyncio.sleep(3.2)
         assert runtime.preview is None and engine.config==config
-        assert engine.drivers['mock'].states['light_a']['on'] is False
+        # DOME OFF keeps the room's lighting captured before the preview.
+        assert engine.drivers['mock'].states['light_a']['brightness']==42
+        assert engine.drivers['mock'].states['light_a']['on'] is True
         assert load(path)==config and runtime.tasks==tasks
     finally:
         await runtime.stop()

@@ -530,6 +530,8 @@ const FIELD_HELP = {
     'Code de la touche à surveiller : 163 = Ctrl droit. La touche est seulement lue, sans interception.',
   'Source pour table de niveaux': 'Source qui choisit le palier, par exemple 0, 1 ou 2 pour DOME.',
   'Valeur de source': 'Valeur qui sélectionne ce palier. Pour DOME : 0 = OFF, 1 = DIM, 2 = BRT.',
+  'Conserver l’éclairage de la pièce':
+    'Ce palier ne pilote pas la lampe : elle garde le réglage qu’elle avait avant Glareshield. Les alertes et l’ATC restent affichés par-dessus.',
 };
 function help(parent, text) {
   parent.append(el('p', text, { className: 'muted' }));
@@ -603,9 +605,9 @@ function describeEffect(parent, v) {
           'p',
           'Palier ' +
             key +
-            (key === '0' && !state.on ? ' · OFF' : { 1: ' · DIM', 2: ' · BRT' }[key] || '') +
+            (key === '0' && (!state || !state.on) ? ' · OFF' : { 1: ' · DIM', 2: ' · BRT' }[key] || '') +
             ' : ' +
-            lightText(state),
+            (state ? lightText(state) : 'éclairage de la pièce conservé'),
         ),
       );
   } else
@@ -1025,7 +1027,14 @@ function edit(section, id = null) {
           let box = el('div', null, { className: 'card' });
           body.append(box);
           let key = field(box, 'Valeur de source', k),
-            l = light(box, v);
+            keep = field(box, 'Conserver l’éclairage de la pièce', v === null, 'checkbox'),
+            settings = el('div', null);
+          box.append(settings);
+          let state = light(settings, v || {}),
+            l = () => (keep() ? null : state());
+          let keepInput = box.querySelector('input[aria-label="Conserver l’éclairage de la pièce"]');
+          settings.hidden = keep();
+          keepInput.onchange = () => (settings.hidden = keep());
           let record = { enabled: true, key, l };
           rows.push(record);
           action(

@@ -2,6 +2,10 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.12] - 2026-11-03
+
+- DOME OFF conserve l’éclairage de la pièce : les animations Glareshield s’affichent par-dessus le réglage choisi avant le démarrage.
+
 ## [1.2.11] - 2026-10-30
 
 - Ouverture automatique dans une fenêtre dédiée avec icône Glareshield et profil navigateur privé.

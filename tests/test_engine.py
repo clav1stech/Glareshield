@@ -149,7 +149,7 @@ async def test_pause_suspends_dome_but_preserves_alert(setup):
     assert engine.winners['light_a'] == 'warning'
 
 
-@pytest.mark.parametrize('value,brightness,on',[(0,100,False),(1,15,True),(2,80,True),(9,42,True),(None,42,True)])
+@pytest.mark.parametrize('value,brightness,on',[(0,42,True),(1,15,True),(2,80,True),(9,42,True),(None,42,True)])
 async def test_dome_values_and_missing_value(setup,value,brightness,on):
     _,driver,engine,_ = setup
     engine.connected = True
@@ -378,3 +378,24 @@ async def test_warning_over_caution_with_atc_background_then_dome(setup):
     engine.values['caution']=0
     await engine.step()
     assert engine.winners['light_a']=='dome'
+
+
+async def test_dome_off_keeps_room_lighting_and_alerts_overlay_it(setup):
+    _,driver,engine,_ = setup
+    engine.connected = True
+    engine.values['dome'] = 0
+    await engine.step()
+    assert 'light_a' not in engine.snapshots and driver.states['light_a']['brightness'] == 42
+    engine.values['warning'] = 1
+    await engine.step()
+    assert engine.winners['light_a'] == 'warning'
+    engine.values['warning'] = 0
+    await engine.step()
+    assert driver.states['light_a']['on'] is True and driver.states['light_a']['brightness'] == 42
+    assert 'light_a' not in engine.snapshots
+
+
+def test_level_map_accepts_keep_entry():
+    config = load(ROOT/'examples/demo.yaml')
+    assert config.effects['dome_light'].map['0'] is None
+    assert render(config.effects['dome_light'],0,0) is None
