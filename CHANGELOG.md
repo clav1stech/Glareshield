@@ -2,6 +2,10 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.13] - 2026-11-03
+
+- Maintien de 1,5 s après la fin d’une fonction : le clignotement des voyants MW/MC du cockpit ne coupe plus celui de Glareshield et la scène de la pièce n’est remise qu’une fois, à la fin.
+
 ## [1.2.12] - 2026-11-03
 
 - DOME OFF conserve l’éclairage de la pièce : les animations Glareshield s’affichent par-dessus le réglage choisi avant le démarrage.

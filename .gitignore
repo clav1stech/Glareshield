@@ -107,6 +107,7 @@
 !/tests/test_web.py
 !/tests/test_runtime.py
 !/tests/test_desktop.py
+!/tests/conftest.py
 !/tests/test_version.py
 !/tests/test_aibridge.py
 !/tests/test_aibridge_web.py

@@ -36,6 +36,7 @@ class Engine:
         self.paused = False
         self.values: dict[str,float|bool|None] = {}
         self.active: dict[str,float] = {}
+        self.last_matched: dict[str,float] = {}
         self.snapshots = {}
         self.last: dict[str,LightState] = {}
         self.sent = {}
@@ -176,7 +177,10 @@ class Engine:
             for rule in sorted(self.config.rules,key=lambda r:(-r.priority,r.id)):
                 if not rule.enabled or (rule.requires_simulator and not self.connected) or (rule.suspend_when_paused and self.paused):
                     continue
-                if not condition_matches(rule.condition,self.values):
+                if condition_matches(rule.condition,self.values):
+                    self.last_matched[rule.id] = now
+                elif (rule.id not in self.active
+                      or now-self.last_matched.get(rule.id,float("-inf")) >= self.config.settings.release_hold_s):
                     continue
                 matched.add(rule.id)
                 start = self.active.setdefault(rule.id,now)
@@ -203,6 +207,7 @@ class Engine:
                 desired[identifier]=(rule,state if high or background is None else background[1])
             for rule_id in set(self.active)-matched:
                 self.active.pop(rule_id,None)
+                self.last_matched.pop(rule_id,None)
                 for key in list(self.sound_sent):
                     if key[0] == rule_id:
                         self.sound_sent.pop(key,None)
@@ -264,5 +269,6 @@ class Engine:
                 raise RuntimeError("Restauration incomplète ; conserver la configuration actuelle.")
             self.config = configuration
             self.active.clear()
+            self.last_matched.clear()
             self.sound_sent.clear()
             self.buckets = {name:Bucket(configuration.settings.driver_rates.get(name,10),self.clock()) for name in self.drivers}

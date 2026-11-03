@@ -468,6 +468,7 @@ const SETTING_LABELS = {
   discovery_interval_s: 'Actualisation des adresses (s)',
   ui_refresh_ms: 'Actualisation de l’interface (ms)',
   test_duration_s: 'Durée des tests de source (s)',
+  release_hold_s: 'Maintien après la fin d’une fonction (s)',
 };
 const SETTING_HELP = {
   render_hz:
@@ -490,6 +491,8 @@ const SETTING_HELP = {
     'Fréquence de rafraîchissement des indicateurs. 1 500 ms = 1,5 seconde ; cela ne change pas la vitesse des lampes.',
   test_duration_s:
     'Durée par défaut des tests de source à durée personnalisée. Les boutons « Tester 3 s » durent toujours trois secondes.',
+  release_hold_s:
+    'Une fonction reste active ce temps après la fin de sa condition. Les voyants MW et MC du cockpit clignotent eux-mêmes : 1,5 s garde le clignotement Glareshield continu et remet l’éclairage de la pièce une seule fois, à la fin. 0 relâche immédiatement.',
 };
 const FIELD_HELP = {
   Identifiant:

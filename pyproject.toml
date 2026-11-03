@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glareshield"
-version = "1.2.12"
+version = "1.2.13"
 description = "Local flight simulator lighting and audio integration"
 requires-python = ">=3.13,<3.14"
 dependencies = [
@@ -32,3 +32,4 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
 cache_dir = "local/test-cache"
+markers = ["release_hold: keep the default rule release hold"]

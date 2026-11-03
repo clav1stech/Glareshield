@@ -399,3 +399,41 @@ def test_level_map_accepts_keep_entry():
     config = load(ROOT/'examples/demo.yaml')
     assert config.effects['dome_light'].map['0'] is None
     assert render(config.effects['dome_light'],0,0) is None
+
+
+@pytest.mark.release_hold
+async def test_blinking_annunciator_keeps_glareshield_blink_and_restores_once(setup):
+    config,driver,engine,clock = setup
+    assert config.settings.release_hold_s == 1.5
+    engine.connected = True
+    engine.values['dome'] = 0
+    restores = []
+    original = driver.restore
+    async def counted(*args):
+        restores.append(args[0])
+        return await original(*args)
+    driver.restore = counted
+    # Fenix MW lvar blinks 1/0 every 0.5 s: the rule must not release in the dark phases.
+    for tick in range(8):
+        clock[0] = tick*.5
+        engine.values['warning'] = 1 if tick % 2 == 0 else 0
+        await engine.step()
+        assert engine.winners.get('light_a') == 'warning'
+        assert 'light_a' in engine.snapshots
+    assert restores == []
+    engine.values['warning'] = 0
+    clock[0] = 3.5+1.5
+    await engine.step()
+    assert restores.count('light_a') == 1 and 'light_a' not in engine.snapshots
+    assert driver.states['light_a']['brightness'] == 42
+
+
+@pytest.mark.release_hold
+async def test_release_hold_does_not_outlive_simulator_disconnection(setup):
+    _,driver,engine,clock = setup
+    engine.connected = True
+    engine.values.update(warning=1,dome=0)
+    await engine.step()
+    engine.connected = False
+    await engine.step()
+    assert 'light_a' not in engine.snapshots

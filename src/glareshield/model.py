@@ -148,6 +148,9 @@ class Settings(StrictModel):
     discovery_interval_s: float = Field(default=60, ge=5, le=3600)
     ui_refresh_ms: int = Field(default=1500, ge=250, le=60000)
     test_duration_s: float = Field(default=5, ge=1, le=30)
+    # Cockpit annunciators blink by themselves: keep a rule alive across their dark phases
+    # so the lamp keeps Glareshield's own blink and the room lighting is restored once.
+    release_hold_s: float = Field(default=1.5, ge=0, le=10)
 
     @model_validator(mode="after")
     def rates_valid(self):
