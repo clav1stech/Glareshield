@@ -2,16 +2,22 @@ import argparse
 import asyncio
 import socket
 import sys
-import webbrowser
 from pathlib import Path
 
 import uvicorn
 
 from .runtime import Runtime
 from .web import create_app
+from .desktop import application_icon,open_window
 
 
-async def serve(root,path,port,tray=True):
+async def open_when_ready(server,root,port):
+    while not server.started:
+        await asyncio.sleep(.05)
+    await asyncio.to_thread(open_window,root,port)
+
+
+async def serve(root,path,port,tray=True,window=False):
     # Reserve the port before connecting to any hardware.
     listener=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     try:
@@ -28,23 +34,24 @@ async def serve(root,path,port,tray=True):
     icon=None
     if tray:
         import pystray
-        from PIL import Image,ImageDraw
-        image=Image.new('RGBA',(64,64),(16,21,31,255))
-        draw=ImageDraw.Draw(image)
-        draw.line([(10,42),(24,20),(32,34),(40,20),(54,42)],fill=(116,191,255,255),width=5)
+        image=application_icon()
         def toggle(icon,item):
             runtime.suspended=not runtime.suspended
         def quit_app(icon,item):
             server.should_exit=True
             icon.stop()
         icon=pystray.Icon('glareshield',image,'Glareshield',pystray.Menu(
-            pystray.MenuItem('Ouvrir Glareshield',lambda: webbrowser.open(f'http://127.0.0.1:{port}'),default=True),
+            pystray.MenuItem('Ouvrir Glareshield',lambda: open_window(root,port),default=True),
             pystray.MenuItem('Suspendre / reprendre les règles',toggle),
             pystray.MenuItem('Quitter et restaurer les lampes',quit_app)))
         icon.run_detached()
+    opening=asyncio.create_task(open_when_ready(server,root,port)) if window else None
     try:
         await server.serve(sockets=[listener])
     finally:
+        if opening:
+            opening.cancel()
+            await asyncio.gather(opening,return_exceptions=True)
         if icon:
             icon.stop()
         listener.close()
@@ -56,6 +63,7 @@ def main():
     parser.add_argument('--config',type=Path)
     parser.add_argument('--port',type=int,default=8777)
     parser.add_argument('--no-tray',action='store_true')
+    parser.add_argument('--window',action='store_true',help='Ouvrir une fenêtre dédiée après le démarrage')
     args=parser.parse_args()
     root=args.root.resolve()
     stream=None
@@ -66,7 +74,7 @@ def main():
         sys.stdout=sys.stdout or stream
         sys.stderr=sys.stderr or stream
     try:
-        asyncio.run(serve(root,args.config or root/'local/config.yaml',args.port,not args.no_tray))
+        asyncio.run(serve(root,args.config or root/'local/config.yaml',args.port,not args.no_tray,args.window))
     except KeyboardInterrupt:
         pass
     finally:

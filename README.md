@@ -49,9 +49,17 @@ Si une instance reste active sans icône dans la zone de notification (lancement
 
 Conserver une configuration locale déjà existante. La copie de démonstration utilise uniquement des appareils et sources simulés.
 
-Ouvrir **http://127.0.0.1:8777** depuis le navigateur ou l’icône système. Le lancement n’ouvre pas automatiquement de fenêtre. Le menu « Quitter et restaurer les lampes » termine proprement l’application. Un second lancement sur le même port est refusé avant connexion au matériel.
+`scripts/start.cmd` ouvre automatiquement Glareshield dans une fenêtre dédiée, sans onglets,
+barre d’adresse ni favoris, avec son icône dans la barre des tâches. Edge est utilisé en priorité,
+puis Chrome ; en leur absence, le navigateur par défaut s’ouvre. Le profil de cette fenêtre
+reste dans `local/browser/`, séparé du profil personnel du navigateur.
 
-Pour lancer avec une console :
+Fermer la fenêtre laisse le moteur actif dans la zone de notification ; « Ouvrir Glareshield »
+rouvre une fenêtre dédiée. **http://127.0.0.1:8777** reste accessible depuis un navigateur.
+Le menu « Quitter et restaurer les lampes » termine proprement l’application. Un second
+lancement sur le même port est refusé avant connexion au matériel.
+
+Pour lancer avec une console (ajouter `--window` pour ouvrir aussi la fenêtre dédiée) :
 
 ```powershell
 $env:PYTHONPATH='src'

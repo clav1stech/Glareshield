@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from io import BytesIO
 import secrets
 import time
 from contextlib import asynccontextmanager
@@ -8,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI,HTTPException,Request
-from fastapi.responses import FileResponse,HTMLResponse,JSONResponse
+from fastapi.responses import FileResponse,HTMLResponse,JSONResponse,Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import Configuration,atomic_write
@@ -16,6 +17,7 @@ from .model import LightState,StrictModel
 from .setup import command,import_devices
 from .aibridge.web import create_router
 from .copilot.web import create_session_router
+from .desktop import application_icon
 
 STATIC=Path(__file__).parent/'static'
 ASSETS={'app.css':'text/css','app.js':'text/javascript','ai.js':'text/javascript','copilot.js':'text/javascript'}
@@ -66,6 +68,12 @@ def create_app(runtime):
         if name not in ASSETS:
             raise HTTPException(404,'Ressource inconnue.')
         return FileResponse(STATIC/name,media_type=ASSETS[name])
+
+    @app.get('/favicon.ico')
+    async def favicon():
+        data=BytesIO()
+        application_icon().save(data,format='ICO',sizes=[(16,16),(32,32),(48,48),(64,64)])
+        return Response(data.getvalue(),media_type='image/vnd.microsoft.icon')
 
     async def ai_changed():
         async with runtime.configuration_lock:

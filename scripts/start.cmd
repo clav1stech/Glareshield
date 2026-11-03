@@ -7,7 +7,7 @@ if not exist "local\.venv\Scripts\pythonw.exe" (
     if errorlevel 1 goto :failed
 )
 set "PYTHONPATH=%CD%\src"
-start "" "local\.venv\Scripts\pythonw.exe" -m glareshield.app
+start "" "local\.venv\Scripts\pythonw.exe" -m glareshield.app --window
 popd
 exit /b 0
 :failed

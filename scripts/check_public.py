@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED = {'src/glareshield/copilot/network.py','tests/test_copilot_network.py','docs/copilot-network.md',
+           'src/glareshield/desktop.py','tests/test_desktop.py',
            'src/glareshield/copilot/flight.py','tests/test_copilot_flight.py',
            'src/glareshield/copilot/observations.py','tests/test_copilot_observations.py',
            'src/glareshield/copilot/cockpit.py',

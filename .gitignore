@@ -23,6 +23,7 @@
 !/src/glareshield/engine.py
 !/src/glareshield/cli.py
 !/src/glareshield/app.py
+!/src/glareshield/desktop.py
 !/src/glareshield/runtime.py
 !/src/glareshield/web.py
 !/src/glareshield/setup.py
@@ -105,6 +106,7 @@
 !/tests/test_keyboard.py
 !/tests/test_web.py
 !/tests/test_runtime.py
+!/tests/test_desktop.py
 !/tests/test_version.py
 !/tests/test_aibridge.py
 !/tests/test_aibridge_web.py

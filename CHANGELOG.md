@@ -2,6 +2,10 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.11] - 2026-10-30
+
+- Ouverture automatique dans une fenêtre dédiée avec icône Glareshield et profil navigateur privé.
+
 ## [1.2.10] - 2026-10-30
 
 - Refonte du mode Copilote : détection d’étape robuste et écran Vol conforme à la maquette.
