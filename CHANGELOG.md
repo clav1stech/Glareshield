@@ -2,6 +2,10 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.14] - 2026-11-05
+
+- Lancement automatique avec MSFS 2024 : scripts/msfs_autostart.py ajoute ou retire Glareshield du fichier exe.xml.
+
 ## [1.2.13] - 2026-11-03
 
 - Maintien de 1,5 s après la fin d’une fonction : le clignotement des voyants MW/MC du cockpit ne coupe plus celui de Glareshield et la scène de la pièce n’est remise qu’une fois, à la fin.

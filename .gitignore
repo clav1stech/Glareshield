@@ -94,6 +94,8 @@
 !/scripts/test_hue.py
 !/scripts/test_nanoleaf.py
 !/scripts/start.cmd
+!/scripts/launch.pyw
+!/scripts/msfs_autostart.py
 !/scripts/stop.cmd
 !/tests/
 /tests/*
@@ -109,6 +111,7 @@
 !/tests/test_desktop.py
 !/tests/conftest.py
 !/tests/test_version.py
+!/tests/test_msfs_autostart.py
 !/tests/test_aibridge.py
 !/tests/test_aibridge_web.py
 !/tests/test_telemetry_source.py

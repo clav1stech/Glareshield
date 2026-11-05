@@ -11,7 +11,7 @@ import tomllib
 ROOT=Path(__file__).resolve().parents[1]
 VERSION=re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\Z')
 APP_SCRIPTS={'scripts/setup.cmd','scripts/start.cmd','scripts/stop.cmd','scripts/discover.py',
-             'scripts/pair_lights.py','scripts/probe_audio.py','scripts/probe_simulator.py'}
+             'scripts/pair_lights.py','scripts/launch.pyw','scripts/msfs_autostart.py','scripts/probe_audio.py','scripts/probe_simulator.py'}
 
 
 def parse(value):

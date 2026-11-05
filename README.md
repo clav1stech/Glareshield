@@ -59,6 +59,14 @@ rouvre une fenêtre dédiée. **http://127.0.0.1:8777** reste accessible depuis 
 Le menu « Quitter et restaurer les lampes » termine proprement l’application. Un second
 lancement sur le même port est refusé avant connexion au matériel.
 
+Pour lancer Glareshield automatiquement avec MSFS 2024 (entrée ajoutée à `exe.xml`, avec sauvegarde `.glareshield.bak`) :
+
+```powershell
+local/.venv/Scripts/python.exe scripts/msfs_autostart.py install   # ou remove / status ; --window ouvre aussi la fenêtre
+```
+
+Glareshield démarre alors dans la zone de notification, sans fenêtre au-dessus du simulateur.
+
 Pour lancer avec une console (ajouter `--window` pour ouvrir aussi la fenêtre dédiée) :
 
 ```powershell
