@@ -171,8 +171,10 @@ class HueDriver:
         failures = {}
         for identifier,(device,snapshot,future) in entries.items():
             try:
+                # The bridge rejects an empty gradient point list (also in snapshots saved earlier).
                 await self.restore_request('light/'+device.resource_id,
-                    {key:value for key,value in snapshot.items() if not key.startswith('__')})
+                    {key:value for key,value in snapshot.items() if not key.startswith('__')
+                     and not (key=='gradient' and not value.get('points'))})
                 scene = snapshot.get('__dynamic_scene')
                 if scene:
                     scenes[scene['id']] = scene

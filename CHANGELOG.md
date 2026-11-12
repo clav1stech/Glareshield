@@ -2,6 +2,11 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.17] - 2026-11-12
+
+- Restaurer le Strip Bureau après MC/MW.
+- Hue : une sauvegarde de strip dégradé avec une liste de points vide, refusée par le pont à la restauration, laissait le strip en erreur et bloqué sur son dernier état. La restauration ignore désormais cette liste vide, y compris pour les sauvegardes déjà enregistrées.
+
 ## [1.2.16] - 2026-11-12
 
 - Adapter la langue radio aux stations ATC et ajouter un répertoire bilingue complet avec collationnements.
