@@ -132,6 +132,13 @@
       "unit": null,
       "max_age_s": null
     },
+    "pilot_arrival_stand": {
+      "path": "pilot.radio.arrival_stand",
+      "nature": "declared",
+      "kind": "string",
+      "unit": null,
+      "max_age_s": null
+    },
     "pilot_zfwcg": {
       "path": "pilot.zfwcg",
       "nature": "declared",
@@ -797,6 +804,16 @@
       "purpose": "reference",
       "sources": [
         "pilot_stand"
+      ],
+      "literal": null
+    },
+    "arrival_stand": {
+      "label": "poste d’arrivée",
+      "unit": null,
+      "placeholder": "<poste d’arrivée>",
+      "purpose": "reference",
+      "sources": [
+        "pilot_arrival_stand"
       ],
       "literal": null
     },

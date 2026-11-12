@@ -280,3 +280,26 @@ async def test_first_launch_without_configuration_starts_empty(tmp_path):
         assert runtime.status()['scope']=='default'
     finally:
         await runtime.stop()
+
+
+async def test_reload_from_disk_applies_hand_edit_and_rejects_invalid_file(tmp_path):
+    path=tmp_path/'local/config.yaml'
+    save(path,load(Path(__file__).resolve().parents[1]/'examples/demo.yaml'))
+    runtime=Runtime(tmp_path,path)
+    await runtime.start()
+    try:
+        assert await runtime.reload_from_disk() is False
+        edited=path.read_text(encoding='utf-8').replace('active_scope: primary','active_scope: extended')
+        assert edited!=path.read_text(encoding='utf-8')
+        path.write_text(edited,encoding='utf-8')
+        assert await runtime.reload_from_disk() is True
+        assert runtime.config.active_scope=='extended'
+        path.write_text(edited.replace('active_scope: extended','active_scope: missing'),encoding='utf-8')
+        try:
+            await runtime.reload_from_disk()
+            raise AssertionError('fichier invalide accepté')
+        except ValueError:
+            pass
+        assert runtime.config.active_scope=='extended' and runtime.engine.connected
+    finally:
+        await runtime.stop()

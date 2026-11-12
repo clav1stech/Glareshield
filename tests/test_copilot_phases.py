@@ -260,3 +260,25 @@ def test_correction_keeps_steps_and_api_requires_token(tmp_path):
     bad = client.put('/api/ai/session/values/completed', headers=headers,
                      json={'session_id': session['id'], 'universe': 'demo', 'value': 'x'})
     assert bad.status_code == 400
+
+
+def test_atc_choice_route_persists_and_the_ai_export_carries_gates_and_controllers(tmp_path):
+    runtime, client, headers = client_and_headers(tmp_path)
+    runtime.ai.set_scenario(True)
+    runtime.ai.load_demo_plan()
+    service = runtime.ai.sessions
+    session = service.start()['session']
+    base = {'session_id': session['id'], 'universe': 'demo'}
+    assert 'pilot_context' not in runtime.ai.snapshot('flight')
+    assert client.put('/api/ai/session/atc/XXNEAR_CTR', json={**base, 'selected': True}).status_code == 403
+    done = client.put('/api/ai/session/atc/XXNEAR_CTR', headers=headers, json={**base, 'selected': True})
+    assert done.status_code == 200 and done.json()['session']['atc_choices'] == {'XXNEAR_CTR': True}
+    assert client.put('/api/ai/session/atc/bad%20name', headers=headers, json={**base, 'selected': True}).status_code == 400
+    assert client.put('/api/ai/session/atc/XXNEAR_CTR', headers=headers, json={**base, 'selected': None}).json()[
+        'session']['atc_choices'] == {}
+    client.put('/api/ai/session/values/stand', headers=headers, json={**base, 'value': 'B12'})
+    context = runtime.ai.snapshot('flight')['pilot_context']
+    assert context['nature'] == 'declared_by_pilot' and context['departure_stand'] == 'B12'
+    assert 'arrival_stand' not in context
+    service.view()  # The Vol screen refresh records which controllers are ticked.
+    assert isinstance(runtime.ai.snapshot('flight')['pilot_context'].get('controllers_selected', []), list)

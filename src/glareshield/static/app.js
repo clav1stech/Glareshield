@@ -1379,7 +1379,11 @@ function controllerSetup(view) {
     async () => {
       let r = await api('setup/import', 'POST', {});
       config = await api('config');
-      message(r.devices + ' appareils importés. Vérifier les groupes et les portées.');
+      message(
+        r.devices +
+          ' appareils importés. Vérifier les groupes et les portées.' +
+          (r.errors && r.errors.length ? ' Contrôleurs ignorés : ' + r.errors.join(' ; ') + '.' : ''),
+      );
       render();
     },
     bar,

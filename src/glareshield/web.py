@@ -113,6 +113,16 @@ def create_app(runtime):
                 message+=' ; '+', '.join('.'.join(str(part) for part in item['loc']) for item in error.errors())
             raise HTTPException(400,message) from None
 
+    @app.post('/api/config/reload')
+    async def reload_configuration():
+        try:
+            return {'ok':True,'changed':await runtime.reload_from_disk()}
+        except Exception as error:
+            message='Rechargement refusé, configuration actuelle conservée : '+type(error).__name__
+            if hasattr(error,'errors'):
+                message+=' ; '+', '.join('.'.join(str(part) for part in item['loc']) for item in error.errors())
+            raise HTTPException(400,message) from None
+
     @app.post('/api/suspend')
     async def suspend(payload:dict):
         runtime.suspended=bool(payload.get('suspended'))
@@ -145,6 +155,12 @@ def create_app(runtime):
     @app.post('/api/shutdown')
     async def shutdown():
         runtime.request_exit()
+        return {'ok':True}
+
+    @app.post('/api/restart')
+    async def restart():
+        # Même processus de sortie que « Quitter » (lampes restaurées), puis nouvelle instance.
+        runtime.request_restart()
         return {'ok':True}
 
     @app.post('/api/test/source')
@@ -213,7 +229,9 @@ def create_app(runtime):
     @app.post('/api/setup/import')
     async def import_paired():
         try:
-            return {'devices':await import_devices(runtime)}
+            return await import_devices(runtime)
+        except RuntimeError as error:
+            raise HTTPException(503,str(error)) from None
         except Exception:
             raise HTTPException(503,'Import indisponible ; configuration précédente conservée si la validation échoue.') from None
 

@@ -213,7 +213,7 @@ class AIBridge:
         level, now = self.resolve(level), self.clock()
         return build_context(level, self.entries(), self.store(), self.plan.plan,
                              self.plan.describe(self.settings.ofp_max_age_h), now, self.notes,
-                             self.network(level, now))
+                             self.network(level, now), self.sessions.pilot_context())
 
     def flight_plan(self) -> dict:
         """get_flight_plan"""

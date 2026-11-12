@@ -367,6 +367,15 @@ class Runtime:
         async with self.configuration_lock:
             await self.configure_locked(configuration)
 
+    async def reload_from_disk(self):
+        """Apply an edited config file without restarting; an invalid file changes nothing."""
+        async with self.configuration_lock:
+            loaded=load(self.path)
+            if loaded==self.config:
+                return False
+            await self.configure_locked(loaded)
+            return True
+
     async def change_scope(self,scope):
         async with self.configuration_lock:
             await self.end_preview()

@@ -23,3 +23,8 @@ class AutostartTests(unittest.TestCase):
             self.assertEqual(m.entries(tree),[])
             self.assertEqual(len(tree.getroot().findall('Launch.Addon')),1)
             self.assertTrue((root/'exe.xml.glareshield.bak').exists())
+
+    def test_launcher_is_guarded_for_spawned_workers(self):
+        source=(Path(m.__file__).with_name('launch.pyw')).read_text(encoding='utf-8')
+        self.assertIn("if __name__=='__main__':",source)
+        self.assertLess(source.index("if __name__=='__main__':"),source.index('    main()'))

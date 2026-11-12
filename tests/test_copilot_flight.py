@@ -1,4 +1,5 @@
 """Vol screen model against fictional plans, simulated telemetry and isolated roots."""
+import pytest
 from glareshield.copilot.cockpit import GUIDANCE, IDLE, RADIO, Cockpit, show, spoken_altitude
 from glareshield.copilot.phases import STAGE_IDS
 from test_copilot_session import demo, declaration
@@ -73,7 +74,7 @@ def test_track_marks_done_current_and_live_altitude(tmp_path):
     assert track[0]['progress'] == 100 and 0 < track[4]['progress'] < 100
 
 
-def test_atc_keeps_stage_airport_and_nearby_centres_only(tmp_path):
+def test_atc_lists_route_stations_and_centres_with_route_stations_ticked_by_default(tmp_path):
     service = demo(tmp_path).sessions
     service.start()
     origin, destination = service.current_plan()['origin']['icao'], service.current_plan()['destination']['icao']
@@ -81,17 +82,41 @@ def test_atc_keeps_stage_airport_and_nearby_centres_only(tmp_path):
         station(origin+'_GND', 'GND', origin, frequency=121.8),
         station(origin+'_TWR', 'TWR', origin),
         station(destination+'_APP', 'APP', destination, frequency=134.475),
-        station('XXFAR_CTR', 'CTR', distance=420, basis='published_range'),
+        station('XXFAR_CTR', 'CTR'),
         station('XXNEAR_CTR', 'CTR', distance=40, basis='distance_to_aircraft', frequency=127.85),
+        station('XXRNG_CTR', 'CTR', distance=200, basis='published_range', frequency=125.5),
     ]}
-    assert [a['callsign'] for a in cockpit(service, 'parked', network)['atc']] == [origin+'_GND', origin+'_TWR']
-    cruise = [a['callsign'] for a in cockpit(service, 'cruise', network)['atc']]
-    assert cruise == [destination+'_APP', 'XXNEAR_CTR']
-    assert 'XXFAR_CTR' not in cruise
-    assert cockpit(service, 'cruise', network)['atc'][0]['frequency'] == '134.475'
+    rows = {a['callsign']: a for a in cockpit(service, 'parked', network)['atc']}
+    assert list(rows) == [origin+'_GND', origin+'_TWR', destination+'_APP', 'XXNEAR_CTR', 'XXRNG_CTR']
+    assert [rows[c]['selected'] for c in rows] == [True, True, True, False, False]
+    assert rows[destination+'_APP']['frequency'] == '134.475' and rows[origin+'_GND']['airport'] == origin
+    assert 'XXFAR_CTR' not in rows
 
 
-def test_radio_names_the_station_fills_known_values_and_offers_unicom(tmp_path):
+def test_ticking_a_centre_or_unticking_a_station_changes_the_messages(tmp_path):
+    service = demo(tmp_path).sessions
+    service.start()
+    origin = service.current_plan()['origin']['icao']
+    network = {'state': 'current', 'atis': [], 'weather': [], 'positions': [
+        station(origin+'_GND', 'GND', origin, frequency=121.8),
+        station('XXNEAR_CTR', 'CTR', distance=40, basis='distance_to_aircraft', frequency=127.85)]}
+    assert cockpit(service, 'cruise', network)['radio'][0]['station'] == 'UNICOM'
+    service.set_atc('XXNEAR_CTR', True)
+    view = cockpit(service, 'cruise', network)
+    assert view['radio'][0]['station'] == 'XXNEAR_CTR' and view['radio'][0]['frequency'] == '127.850'
+    assert [a['selected'] for a in view['atc']] == [True, True] and [a['auto'] for a in view['atc']] == [True, False]
+    service.set_atc('XXNEAR_CTR', None)
+    service.set_atc(origin+'_GND', False)
+    radio = cockpit(service, 'parked', network)['radio']
+    assert all(r['station'] == 'UNICOM' for r in radio)
+    assert cockpit(service, 'parked', network)['now']['pills'][-1]['text'].startswith('Aucun ATC coché')
+    service.set_atc(origin+'_GND', None)
+    assert cockpit(service, 'parked', network)['radio'][0]['station'] == origin+'_GND'
+    with pytest.raises(ValueError):
+        service.set_atc('bad callsign', True)
+
+
+def test_radio_names_the_station_fills_known_values_and_falls_back_to_english_unicom(tmp_path):
     service = demo(tmp_path).sessions
     service.start()
     plan = service.current_plan()
@@ -106,10 +131,33 @@ def test_radio_names_the_station_fills_known_values_and_offers_unicom(tmp_path):
     assert 'B12' in radio[0]['text'] and 'Kilo' in radio[0]['text'] and '<station>' not in radio[0]['text']
     empty = {'state': 'current', 'weather': [], 'positions': [], 'atis': []}
     radio = cockpit(service, 'parked', empty)['radio']
-    assert radio[-1]['station'] == 'UNICOM' and radio[-1]['frequency'] == '122.800'
+    assert [r['id'] for r in radio] == ['radio_clearance_unicom', 'radio_pushback_unicom']
+    assert all(r['station'] == 'UNICOM' and r['frequency'] == '122.800' and r['language'] == 'en' for r in radio)
+    callsign = service.view()['flight']['values']['callsign']['value']
+    assert callsign and all(callsign not in r['text'] for r in radio)  # Already shown on IVAO.
+    assert radio[1]['text'].endswith(f'pushing back stand B12') and f'{origin} traffic' in radio[1]['text']
     assert cockpit(service, 'parked', empty)['now']['pills'][-1]['text'].startswith('Aucun ATC')
+    # Without network data the ATC message stays (the pilot may have a controller) and UNICOM follows it.
     disabled = {'state': 'disabled', 'weather': [], 'positions': None, 'atis': []}
-    assert all(r['station'] is None for r in cockpit(service, 'parked', disabled)['radio'])
+    radio = cockpit(service, 'parked', disabled)['radio']
+    assert [r['station'] for r in radio] == [None, 'UNICOM', None, 'UNICOM']
+
+
+def test_gate_is_typed_per_aerodrome_and_reaches_messages_and_the_ai_export(tmp_path):
+    service = demo(tmp_path).sessions
+    service.start()
+    origin, destination = service.current_plan()['origin']['icao'], service.current_plan()['destination']['icao']
+    empty = {'state': 'current', 'weather': [], 'positions': [], 'atis': []}
+    stand = cockpit(service, 'parked', empty)['stand']
+    assert stand['key'] == 'stand' and stand['open'] and stand['label'] == 'porte de départ'
+    service.set_value('stand', 'A1')
+    service.set_value('arrival_stand', 'C42')
+    assert cockpit(service, 'parked', empty)['stand']['text'] == 'A1'
+    arrival = cockpit(service, 'parked_in', empty)
+    assert arrival['stand'] == {**arrival['stand'], 'key': 'arrival_stand', 'text': 'C42', 'source': 'Pilote'}
+    assert 'stand C42' in arrival['radio'][-1]['text'] and 'A1' not in arrival['radio'][-1]['text']
+    context = service.pilot_context()
+    assert context['departure_stand'] == 'A1' and context['arrival_stand'] == 'C42'
 
 
 def test_climb_message_reads_current_and_declared_altitude(tmp_path):
@@ -181,3 +229,29 @@ def test_display_formats_levels_masses_and_codes():
     assert show('temperature', {'value': 14, 'unit': '°C'}) == '14°C'
     assert show('squawk', {'value': '0421', 'unit': None}) == '0421'
     assert show('v1', {'value': None, 'unit': 'kt', 'status': 'unavailable'}) is None
+
+
+def test_unicom_departure_messages_give_the_sid(tmp_path):
+    service = demo(tmp_path).sessions
+    service.start()
+    service.set_value('cleared_sid', 'MOKA2A')
+    empty = {'state': 'current', 'weather': [], 'positions': [], 'atis': []}
+    takeoff = {r['id']: r['text'] for r in cockpit(service, 'taxi_out', empty)['radio']}['radio_takeoff_unicom']
+    assert takeoff.endswith(', MOKA2A departure') and 'departing runway' in takeoff
+    climb = cockpit(service, 'climb', empty)['radio'][0]
+    assert climb['station'] == 'UNICOM' and 'airborne runway' in climb['text'] and 'MOKA2A' in climb['text']
+
+
+def test_descent_without_a_ticked_centre_is_announced_on_unicom(tmp_path):
+    service = demo(tmp_path).sessions
+    service.start()
+    destination = service.current_plan()['destination']['icao']
+    network = {'state': 'current', 'atis': [], 'weather': [], 'positions': [
+        station(destination+'_TWR', 'TWR', destination), station('XXNEAR_CTR', 'CTR', distance=40, basis='distance_to_aircraft')]}
+    radio = cockpit(service, 'cruise', network)['radio']
+    assert [r['id'] for r in radio] == ['radio_descent_request_unicom'] and '<station>' not in radio[0]['text']
+    assert radio[0]['text'].startswith(f'{destination} traffic, descending') and radio[0]['station'] == 'UNICOM'
+    service.set_value('cleared_altitude', 'FL120')
+    assert 'descending to flight level 120, inbound' in cockpit(service, 'cruise', network)['radio'][0]['text']
+    service.set_atc('XXNEAR_CTR', True)
+    assert cockpit(service, 'cruise', network)['radio'][0]['station'] == 'XXNEAR_CTR'

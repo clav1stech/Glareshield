@@ -44,11 +44,11 @@ def test_complete_flight_visits_every_stage_with_guidance_radio_and_network(tmp_
         if phase and (not phases or phases[-1] != phase): phases.append(phase)
         if cockpit['stage'] and (not stages or stages[-1] != cockpit['stage']): stages.append(cockpit['stage'])
         titles.setdefault(cockpit['stage'], cockpit['now']['title'])
-        radio_ids.update(r['id'] for r in cockpit['radio'])
+        radio_ids.update(r['id'].removesuffix('_unicom') for r in cockpit['radio'])
         pills.update(p['text'] for p in cockpit['now']['pills'])
         network_kinds.update(e['kind'] for e in state['network']['events']['events'])
         assert state['network']['simulation'] is True
-        assert len(cockpit['radio']) <= 3 and len(cockpit['atc']) <= 5 and len(cockpit['upcoming']) <= 4
+        assert len(cockpit['radio']) <= 4 and len(cockpit['atc']) <= 12 and len(cockpit['upcoming']) <= 4
     assert tuple(phases) == PHASE_IDS
     assert stages == [s for s in STAGE_IDS if s != 'go_around']
     assert titles['cruise'] == 'Préparer l’arrivée avant le TOD'

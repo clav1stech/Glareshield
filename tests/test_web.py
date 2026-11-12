@@ -21,6 +21,10 @@ class FixtureRuntime:
         self.stopped=True
     async def configure(self,config):
         self.config=config
+    async def reload_from_disk(self):
+        if getattr(self,'invalid_file',False):
+            raise ValueError('invalid')
+        return True
     def status(self):
         return {'connected':True}
     async def start_preview(self,config,rule,targets,effect,value):
@@ -51,6 +55,18 @@ def test_session_token_required_for_mutations_and_config_validated():
         assert client.put('/api/config',json=good,headers=headers).status_code==200
         assert runtime.config.active_scope=='extended'
     assert runtime.stopped
+
+
+def test_config_reload_needs_token_and_reports_invalid_file():
+    runtime=FixtureRuntime()
+    with TestClient(create_app(runtime)) as client:
+        assert client.post('/api/config/reload',json={}).status_code==403
+        token=re.search("const TOKEN='([^']+)'",client.get('/').text).group(1)
+        headers={'x-glareshield-token':token}
+        assert client.post('/api/config/reload',json={},headers=headers).json()=={'ok':True,'changed':True}
+        runtime.invalid_file=True
+        refused=client.post('/api/config/reload',json={},headers=headers)
+        assert refused.status_code==400 and 'conservée' in refused.json()['detail']
 
 
 def test_foreign_host_rejected_and_source_test_bounded():

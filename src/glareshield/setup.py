@@ -34,6 +34,7 @@ async def import_devices(runtime):
     addresses=await network(cache_path=runtime.root/'local/discovery/inventory.json')
     config=runtime.config.model_dump(mode='json')
     count=0
+    errors=[]
     for kind in ('hue','nanoleaf'):
         path=runtime.root/'local/secrets'/f'{kind}.json'
         if not path.exists():
@@ -45,24 +46,33 @@ async def import_devices(runtime):
                 continue
             identifier=next((name for name,value in config['controllers'].items() if value['stable_id']==stable),
                 'controller_'+hashlib.sha256(stable.encode()).hexdigest()[:8])
-            config['controllers'][identifier]={'type':kind,'stable_id':stable}
-            if kind=='hue':
-                driver=HueDriver(endpoint['host'],key['username'],runtime.root/'local/secrets'/f'hue-{stable}.pem')
-            else:
-                driver=NanoleafDriver(endpoint['host'],key['auth_token'],endpoint['port'])
+            # Un contrôleur injoignable ne doit pas empêcher l'import des autres :
+            # ses changements ne sont appliqués qu'après une découverte réussie.
+            driver=None
             try:
+                if kind=='hue':
+                    driver=HueDriver(endpoint['host'],key['username'],runtime.root/'local/secrets'/f'hue-{stable}.pem')
+                else:
+                    driver=NanoleafDriver(endpoint['host'],key['auth_token'],endpoint['port'])
                 devices=await driver.discover()
-                members=[]
-                for device in devices:
-                    existing=next((name for name,value in config['devices'].items() if value.get('controller')==identifier
-                        and (value.get('resource_id')==device.resource_id or kind=='nanoleaf')),None)
-                    name=existing or 'device_'+hashlib.sha256((stable+str(device.resource_id)).encode()).hexdigest()[:10]
-                    device.controller=identifier
-                    config['devices'][name]=device.model_dump(mode='json')
-                    members.append(name)
-                    count+=1
-                config['groups'].setdefault('group_'+identifier,members)
+            except Exception as error:
+                errors.append(f'{identifier} ({kind}) : {type(error).__name__}')
+                continue
             finally:
-                await driver.close()
+                if driver is not None:
+                    await driver.close()
+            config['controllers'][identifier]={'type':kind,'stable_id':stable}
+            members=[]
+            for device in devices:
+                existing=next((name for name,value in config['devices'].items() if value.get('controller')==identifier
+                    and (value.get('resource_id')==device.resource_id or kind=='nanoleaf')),None)
+                name=existing or 'device_'+hashlib.sha256((stable+str(device.resource_id)).encode()).hexdigest()[:10]
+                device.controller=identifier
+                config['devices'][name]=device.model_dump(mode='json')
+                members.append(name)
+                count+=1
+            config['groups'].setdefault('group_'+identifier,members)
+    if errors and not count:
+        raise RuntimeError('Aucun contrôleur joignable : '+' ; '.join(errors))
     await runtime.configure(Configuration.model_validate(config))
-    return count
+    return {'devices':count,'errors':errors}

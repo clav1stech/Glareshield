@@ -167,8 +167,7 @@ class Cockpit:
 
     def airport(self, phase=None):
         phase = phase or self.current
-        role = 'origin' if phase in (None, 'preflight', 'departure', 'climb') else 'destination'
-        return self.plan.get(role) or {}
+        return self.plan.get(self.airport_role(phase)) or {}
 
     def positions(self):
         if self.network.get('state') not in ('current', 'stale', 'empty'):
@@ -296,11 +295,11 @@ class Cockpit:
                 pills.append({'tone': 'ivao', 'text': 'ATIS '+airport+' : '+(
                     'nouvelle lettre '+atis['revision'] if change['kind'] == 'revision' and atis.get('revision')
                     else 'texte modifié')})
-        atc = self.atc()
-        if atc:
-            pills.append({'tone': 'ok', 'text': atc[0]['callsign']+' en ligne'})
-        elif self.network.get('state') in ('current', 'empty') and self.current in ('preflight', 'departure', 'arrival'):
-            pills.append({'tone': 'warn', 'text': 'Aucun ATC sur '+(airport or 'l’aérodrome')+' : UNICOM 122.800'})
+        chosen = [a['callsign'] for a in self.atc() if a['selected']]
+        if chosen:
+            pills.append({'tone': 'ok', 'text': ' · '.join(chosen[:3])+' coché'+('s' if len(chosen) > 1 else '')})
+        elif self.network_known() and self.current in ('preflight', 'departure', 'arrival'):
+            pills.append({'tone': 'warn', 'text': 'Aucun ATC coché sur '+(airport or 'l’aérodrome')+' : UNICOM 122.800'})
         return pills
 
     def items(self):
@@ -327,44 +326,69 @@ class Cockpit:
                                'steps': rows})
         return result
 
-    def wanted(self, role, local, nearby):
-        """Stations that can matter now: the stage airport, plus nearby centres en route."""
-        phase = self.current
-        if phase == 'climb':
-            return local and role in ('DEP', 'APP') or nearby
-        if phase == 'cruise':
-            return nearby or local and role == 'APP'
-        if phase == 'descent':
-            return local and role in ('APP', 'TWR') or nearby
-        return local
+    def network_known(self):
+        return self.network.get('state') in ('current', 'stale', 'empty')
+
+    def route_airports(self):
+        return {a.get('icao') for a in (self.plan.get('origin'), self.plan.get('destination')) if a and a.get('icao')}
+
+    def choice(self, callsign):
+        return (getattr(self.session, 'atc_choices', None) or {}).get(callsign)
+
+    def selected(self, position):
+        """Pilot's tick, else the default: stations of the departure and arrival aerodromes (not centres)."""
+        choice = self.choice(position['callsign'])
+        if choice is not None:
+            return choice
+        airports = self.route_airports()
+        matches = position.get('matched_by', [])
+        if position.get('position') in ('CTR', 'FSS'):
+            # En-route control belongs to no aerodrome; it takes over only where no GND/TWR/APP is online.
+            return bool(matches) and not any(
+                p.get('position') not in ('CTR', 'FSS', 'ATIS') and any(m.get('airport') in airports for m in p.get('matched_by', []))
+                for p in self.positions())
+        return any(m.get('airport') in airports for m in matches)
 
     def atc(self):
-        airport = self.airport().get('icao')
-        rows, centres = [], 0
-        ordered = sorted(self.positions(), key=lambda p: (
-            ROLE_ORDER.index(p['position']) if p.get('position') in ROLE_ORDER else len(ROLE_ORDER),
-            p.get('distance_to_aircraft_nm') or 0))
-        for position in ordered:
-            role = position.get('position')
-            local = any(m.get('airport') == airport for m in position.get('matched_by', []))
-            nearby = role in ('CTR', 'FSS') and any(m.get('basis') == 'distance_to_aircraft'
-                                                     for m in position.get('matched_by', []))
-            if not self.wanted(role, local, nearby) or (nearby and not local and centres >= 2):
+        """Online controllers the pilot can tick: departure and arrival stations, plus the centres around."""
+        airports, stage_airport = self.route_airports(), self.airport().get('icao')
+        local, centres = [], []
+        for position in self.positions():
+            role, callsign = position.get('position'), position['callsign']
+            if role == 'ATIS':
                 continue
-            centres += nearby and not local
-            rows.append(position)
+            matched = [m['airport'] for m in position.get('matched_by', []) if m.get('airport') in airports]
+            distance = position.get('distance_to_aircraft_nm') or 0
+            if role in ('CTR', 'FSS'):
+                near = any(m.get('basis') in ('distance_to_aircraft', 'published_range')
+                           for m in position.get('matched_by', []))
+                if near or matched or self.choice(callsign):
+                    centres.append((distance, position, matched))
+            elif matched or self.choice(callsign):
+                rank = (0 if (matched or [None])[0] == stage_airport else 1,
+                        ROLE_ORDER.index(role) if role in ROLE_ORDER else len(ROLE_ORDER), distance)
+                local.append((rank, position, matched))
+        local.sort(key=lambda item: item[0])
+        centres.sort(key=lambda item: item[0])
         result = []
-        for position in rows[:5]:
-            role = position.get('position')
-            atis = next((a for a in self.network.get('atis') or [] if a['station'] == position['callsign']), None)
+        for _, position, matched in local[:8] + centres[:4]:
+            role, callsign = position.get('position'), position['callsign']
+            atis = next((a for a in self.network.get('atis') or [] if a['station'] == callsign), None)
             note = ROLE_NAMES.get(role, (role or 'Position',))[0]
+            # The station's own aerodrome is the ICAO code of its callsign, not the one a neighbouring approach covers.
+            code = callsign.split('_', 1)[0]
+            own = code if role not in ('CTR', 'FSS') and len(code) == 4 and code.isalpha() else None
+            airport = own or (None if role in ('CTR', 'FSS') else matched[0] if matched else None)
+            if airport:
+                note += ' '+airport
             if atis and atis.get('revision'):
                 note += ' · ATIS '+atis['revision']
             if position.get('distance_to_aircraft_nm') is not None and role in ('CTR', 'FSS'):
                 note += f" · {position['distance_to_aircraft_nm']} NM"
             frequency = position.get('frequency_mhz')
-            result.append({'callsign': position['callsign'], 'role': role, 'note': note,
-                           'frequency': f'{frequency:.3f}' if type(frequency) in (int, float) else None})
+            result.append({'callsign': callsign, 'role': role, 'airport': airport, 'note': note,
+                           'frequency': f'{frequency:.3f}' if type(frequency) in (int, float) else None,
+                           'selected': bool(self.selected(position)), 'auto': self.choice(callsign) is None})
         return result
 
     def atis(self):
@@ -451,12 +475,15 @@ class Cockpit:
         return result[:4]
 
     def radio(self):
-        """At most three ready-to-read messages for this stage; copying never transmits."""
+        """At most four ready-to-read messages for this stage; copying never transmits.
+
+        Without a ticked controller for a message, its English UNICOM version takes its place
+        (or follows it when the network state is unknown)."""
         if self.stage is None:
             return []
         by_id = {r.id: r for p in self.profile.phases for r in p.radio}
         stage_airport = self.airport().get('icao')
-        result = []
+        known, result = self.network_known(), []
         for radio_id in RADIO.get(self.stage, []):
             radio = by_id.get(radio_id)
             if radio is None:
@@ -466,23 +493,24 @@ class Cockpit:
             french = (callsign or stage_airport or '').startswith(FRENCH)
             text = self.fill(radio.voice_fr.pilot if french else radio.voice_en.pilot, station, french)
             frequency = station.get('frequency_mhz') if station else None
-            result.append({'id': radio.id, 'trigger': radio.trigger.label, 'station': callsign,
-                           'frequency': f'{frequency:.3f}' if type(frequency) in (int, float) else None,
-                           'language': 'fr' if french else 'en', 'text': text})
-        if not result:
-            return result
-        if not any(r['station'] for r in result) and self.network.get('state') in ('current', 'empty'):
-            first = result[0]
-            result.append({'id': first['id']+'_unicom', 'trigger': 'Sans contrôle en ligne', 'station': 'UNICOM',
-                           'frequency': '122.800', 'language': 'en', 'mode': 'texte',
-                           'text': self.unicom(first['id'])})
-        return result[:3]
+            message = {'id': radio.id, 'trigger': radio.trigger.label, 'station': callsign,
+                       'frequency': f'{frequency:.3f}' if type(frequency) in (int, float) else None,
+                       'language': 'fr' if french else 'en', 'text': text}
+            unicom = None if station else self.unicom(radio_id)
+            if unicom is not None:
+                unicom = {'id': radio_id+'_unicom', 'trigger': 'Sans contrôle coché', 'station': 'UNICOM',
+                          'frequency': '122.800', 'language': 'en', 'mode': 'texte', 'text': unicom}
+            if unicom is None or not known:
+                result.append(message)
+            if unicom is not None:
+                result.append(unicom)
+        return result[:4]
 
     def station_for(self, roles, airport):
         candidates = []
         for position in self.positions():
             role = position.get('position')
-            if role not in roles:
+            if role not in roles or not self.selected(position):
                 continue
             local = any(m.get('airport') == airport for m in position.get('matched_by', []))
             if local or role in ('CTR', 'FSS'):
@@ -515,6 +543,8 @@ class Cockpit:
                     atis = self.atis_for(self.airport().get('icao'))
                     text = (atis or {}).get('revision')
                 return ALPHABET.get(text, text) if text else '<ATIS>'
+            if key == 'stand':
+                return self.value(self.stand_key()) or self.profile.values[self.stand_key()].placeholder
             if key == 'cleared_runway':
                 return self.value('cleared_runway') or self.value('departure_runway') or '<piste>'
             if key == 'cleared_altitude':
@@ -528,21 +558,48 @@ class Cockpit:
             text = text.replace('<altitude actuelle>', altitude).replace('<current altitude>', altitude)
         return text
 
+    def airport_role(self, phase=None):
+        return 'origin' if (phase or self.current) in (None, 'preflight', 'departure', 'climb') else 'destination'
+
+    def stand_key(self):
+        return 'stand' if self.airport_role() == 'origin' else 'arrival_stand'
+
+    def stand_item(self):
+        """The gate the pilot types once per aerodrome; it feeds the messages and the AI export."""
+        key = self.stand_key()
+        item = self.flight['values'][key]
+        text = show(key, item)
+        return {'key': key, 'label': 'porte de départ' if key == 'stand' else 'porte d’arrivée',
+                'text': text or 'Saisir la porte', 'open': text is None,
+                'source': SOURCE_LABELS.get(item.get('nature')) if text else None}
+
     def unicom(self, radio_id):
+        """English self-announce for 122.800, or None when the message has no UNICOM equivalent."""
         airport = self.airport().get('icao') or '<aérodrome>'
-        callsign = self.value('callsign') or '<indicatif>'
-        runway = self.value('departure_runway' if self.current in ('preflight', 'departure') else 'arrival_runway') or '<piste>'
-        action = {'radio_clearance': 'IFR to '+(self.value('destination') or '<destination>')+', starting up',
-                  'radio_pushback': 'pushing back', 'radio_taxi': 'taxiing to runway '+runway,
-                  'radio_takeoff': 'taking off runway '+runway, 'radio_landing': 'final runway '+runway,
-                  'radio_vacated': 'runway '+runway+' vacated', 'radio_parked': 'parked'}.get(radio_id, 'position report')
-        return f'{airport} traffic, {callsign}, {action}, {airport}'
+        departing = self.current in ('preflight', 'departure', 'climb')
+        runway = self.value('departure_runway' if departing else 'arrival_runway') or '<piste>'
+        stand = self.value(self.stand_key())
+        sid = self.value('cleared_sid') or self.value('sid')
+        via = f', {sid} departure' if sid else ''
+        level = spoken_altitude(self.flight['values']['cleared_altitude'].get('value'), False)
+        action = {'radio_clearance': 'IFR to '+(self.value('destination') or '<destination>')+', starting up'
+                                     + (f', stand {stand}' if stand else ''),
+                  'radio_pushback': 'pushing back'+(f' stand {stand}' if stand else ''),
+                  'radio_taxi': 'taxiing to holding point runway '+runway,
+                  'radio_takeoff': 'departing runway '+runway+via,
+                  'radio_departure_contact': 'airborne runway '+runway+via,
+                  'radio_descent_request': 'descending'+(f' to {level}' if level else '')+', inbound',
+                  'radio_approach_contact': 'inbound for runway '+runway,
+                  'radio_landing': 'final runway '+runway, 'radio_go_around': 'going around runway '+runway,
+                  'radio_vacated': 'runway '+runway+' vacated',
+                  'radio_parked': 'parked'+(f' stand {stand}' if stand else '')}.get(radio_id)
+        return None if action is None else f'{airport} traffic, {action}'
 
     def build(self):
         return {'stage': self.stage, 'stage_label': STAGE_LABEL.get(self.stage),
                 'phase': self.current, 'mode': self.phase.get('mode', 'automatic'), 'live': self.phase.get('live', False),
                 'header': self.header(), 'track': self.track(), 'now': self.now_block(), 'groups': self.items(),
-                'radio': self.radio(), 'situation': self.situation(), 'atc': self.atc(), 'atis': self.atis(),
+                'radio': self.radio(), 'stand': self.stand_item(), 'situation': self.situation(), 'atc': self.atc(), 'atis': self.atis(),
                 'upcoming': self.upcoming()}
 
 

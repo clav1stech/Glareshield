@@ -28,6 +28,10 @@ class ValueAction(SessionAction):
     value: str | None
 
 
+class AtcAction(SessionAction):
+    selected: StrictBool | None
+
+
 def create_session_router(bridge):
     router = APIRouter(prefix='/api/ai/session')
 
@@ -74,5 +78,9 @@ def create_session_router(bridge):
     @router.put('/values/{key}')
     async def value(key: str, payload: ValueAction):
         return execute(payload, lambda service: service.set_value(key, payload.value))
+
+    @router.put('/atc/{callsign}')
+    async def atc(callsign: str, payload: AtcAction):
+        return execute(payload, lambda service: service.set_atc(callsign, payload.selected))
 
     return router

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from datetime import datetime
 from uuid import uuid4
@@ -141,6 +142,8 @@ class FlightSession(StrictModel):
     steps: dict[Identifier, Progress] = Field(default_factory=dict)
     declarations: list[Declaration] = Field(default_factory=list)
     pilot_values: dict[Identifier, PilotValue] = Field(default_factory=dict)
+    # Controllers the pilot ticked (True) or unticked (False) on Vol; absent means the automatic default.
+    atc_choices: dict[Annotated[str, Field(pattern=r'^[A-Z0-9][A-Z0-9_-]{1,23}$')], bool] = Field(default_factory=dict)
     phase_state: PhaseState = Field(default_factory=PhaseState)
     history: list[dict] = Field(default_factory=list)
 
@@ -180,6 +183,7 @@ class SessionService:
         self.errors = {}
         self.phase_engines = {}
         self.phase_error = None
+        self.atc_cache = {}
         for universe in ('simconnect', 'demo'):
             try:
                 path = self.path(universe)
@@ -399,6 +403,31 @@ class SessionService:
             session.history.append({'event': 'pilot_value', 'key': key, 'value': text or None, 'at': self.clock()})
         return self.change(apply)
 
+    def pilot_context(self):
+        """Gates and ticked controllers for the AI export; cheap, so it can ride on every snapshot."""
+        sessions = self.documents[self.universe].sessions
+        session = sessions[-1] if sessions and sessions[-1].status == 'active' else None
+        if session is None:
+            return None
+        result = {label: session.pilot_values[key].value for label, key in (
+            ('departure_stand', 'stand'), ('arrival_stand', 'arrival_stand')) if key in session.pilot_values}
+        if session.id in self.atc_cache:
+            result['controllers_selected'] = self.atc_cache[session.id]
+        return result or None
+
+    def set_atc(self, callsign, selected):
+        """Tick or untick one online controller; None restores the automatic default."""
+        if not re.fullmatch(r'[A-Z0-9][A-Z0-9_-]{1,23}', callsign or ''):
+            raise ValueError('Indicatif de station invalide.')
+
+        def apply(session):
+            if selected is None:
+                session.atc_choices.pop(callsign, None)
+            else:
+                session.atc_choices[callsign] = selected
+            session.history.append({'event': 'atc_choice', 'callsign': callsign, 'selected': selected, 'at': self.clock()})
+        return self.change(apply)
+
     def refresh_phase(self, persist=True):
         """Use the existing store only. Persist stage changes, never polling timers."""
         if persist:
@@ -525,6 +554,13 @@ class SessionService:
         flight['checked'] = {s['id']: s['checked'] for g in groups for s in g['steps']}
         flight['progress'] = {s['id']: {'provenance': s['provenance']} for g in groups for s in g['steps']}
         cockpit = cockpit_view(self.profile, session, phase_view, flight, network, self.clock()) if session else None
+        if cockpit and network.get('state') in ('current', 'stale', 'empty'):
+            self.atc_cache[session.id] = [
+                {'callsign': a['callsign'], 'position': a['role'], 'airport': a['airport'],
+                 'frequency_mhz': float(a['frequency']) if a['frequency'] else None,
+                 'choice': 'auto' if a['auto'] else 'pilot'} for a in cockpit['atc'] if a['selected']]
+        elif session:
+            self.atc_cache.pop(session.id, None)
         return {'universe': self.universe, 'session': session.model_dump() if session else None,
                 'phase': phase_view, 'cockpit': cockpit, 'network': network,
                 'flight': {k: v for k, v in flight.items() if k != 'plan'},

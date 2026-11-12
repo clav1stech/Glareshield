@@ -2,6 +2,18 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.15] - 2026-11-12
+
+- Porte saisissable, contrôles ATC cochables, messages UNICOM en anglais et redémarrage sans fermer la fenêtre
+
+- Vol : saisie de la porte de départ puis d’arrivée (panneau Radio). Elle remplit les messages ATC et UNICOM et part dans l’export IA (`pilot_context`).
+- Vol : cases à cocher sur les contrôleurs IVAO. Les positions des aérodromes de départ et d’arrivée sont présélectionnées ; les CTR sont présélectionnés en l’absence de contrôle local sur les aérodromes du vol ; leur sélection reste modifiable. Les messages et l’export IA suivent les contrôles cochés.
+- Vol : sans contrôle coché, chaque message est remplacé par sa version UNICOM 122.800 en anglais (la version ATC reste aussi affichée si le réseau IVAO est inconnu).
+- Application : bouton « Redémarrer Glareshield » (Réglages > Application). Les lampes sont restaurées, une nouvelle instance démarre et la fenêtre se reconnecte sans fermer.
+- Contrôleurs : l’import des appareils appairés ignore un contrôleur injoignable (ex. Nanoleaf hors ligne) au lieu d’échouer en entier, signale les contrôleurs ignorés et affiche la cause quand aucun n’est joignable.
+- Application : bouton « Recharger la configuration » (Réglages > Application). Applique `local/config.yaml` modifié à la main sans redémarrer ; un fichier invalide est refusé et la configuration actuelle conservée.
+- Le lanceur sans console protège désormais le démarrage contre le worker SimConnect (garde `__main__`), et les avertissements « Nouveau plan » s’acquittent une fois par suivi.
+
 ## [1.2.14] - 2026-11-05
 
 - Lancement automatique avec MSFS 2024 : scripts/msfs_autostart.py ajoute ou retire Glareshield du fichier exe.xml.

@@ -125,7 +125,7 @@ function preparationView(view) {
     }
   }
   readiness.append(el('p', 'Même identifiant OFP : cases conservées, corrections signalées. Nouvel identifiant : suivi précédent archivé et nouvelles cases vides. Sans identifiant, le vol, les aérodromes et l’heure de départ prévue définissent le suivi. Démonstration et SimConnect restent séparés.', { id: 'startExplanation', className: 'muted' }));
-  for (let text of ai.session?.warnings || []) readiness.append(el('p', text, { className: 'banner warn' }));
+  if (ai.session) sessionWarnings(ai.session, readiness);
   let start = action(ai.session?.session ? 'Ouvrir le suivi du vol' : 'Démarrer le suivi du vol', async () => {
     if (!ai.session?.session) await sessionAction('start');
     navigate('Vol');
@@ -270,11 +270,16 @@ function flightGroup(group) {
 function flightRadio(cockpit) {
   let section = flightNode('section', 'fl-group'), head = flightNode('div', 'fl-ghead'), items = flightNode('div', 'fl-items');
   head.append(flightNode('h2', 'fl-h2', 'Radio'), flightNode('span', 'fl-when', 'Messages prêts · copier n’émet rien'));
+  // La porte se saisit une fois par aérodrome ; elle alimente les messages et l’export IA.
+  let stand = flightNode('div', 'fl-stand');
+  stand.append(flightNode('span', null, 'Porte / poste'), flightNode('small', null, cockpit.stand.label), flightValue(cockpit.stand));
+  items.append(stand);
+  if (!cockpit.radio.length) items.append(flightNode('div', 'fl-note', 'Aucun message radio pour cette phase.'));
   for (let r of cockpit.radio) {
     let box = flightNode('div', 'fl-radio'), top = flightNode('div', 'fl-radiotop');
     top.append(flightNode('span', 'fl-trg', r.trigger));
     if (r.station) top.append(flightPill(r.station + (r.frequency ? ' · ' + r.frequency : ''), 'ivao'));
-    if (r.mode === 'texte') top.append(flightPill('texte'));
+    if (r.mode === 'texte') top.append(flightPill('anglais · sans contrôle'));
     top.append(flightNode('span', 'fl-spacer'));
     let copy = flightKey(el('button', 'Copier', { type: 'button', className: 'small' }), 'copy-' + r.id);
     copy.onclick = async () => {
@@ -313,9 +318,18 @@ function flightSituation(cockpit) {
   panel.append(tele);
   if (cockpit.atc.length) {
     let atc = flightPanel(col, 'ATC en ligne');
+    atc.append(flightNode('div', 'fl-note', 'Cocher les contrôles à utiliser : les messages radio s’y adaptent. Sans case cochée : UNICOM.'));
     for (let a of cockpit.atc) {
-      let row = flightNode('div', 'fl-atcrow');
-      row.append(flightNode('span', 'fl-atccs', a.callsign), flightNode('span', 'fl-freq', a.frequency || '—'), flightNode('span', 'fl-note', a.note));
+      let row = flightNode('label', 'fl-atcrow'), box = flightKey(el('input', null, { type: 'checkbox', checked: a.selected }), 'atc-' + a.callsign);
+      box.setAttribute('aria-label', 'Utiliser ' + a.callsign);
+      box.onchange = async () => {
+        box.disabled = true;
+        try { await sessionAction('atc/' + encodeURIComponent(a.callsign), 'PUT', { selected: box.checked }); }
+        catch (e) { box.checked = a.selected; box.disabled = false; message(e.message, true); }
+      };
+      let name = flightNode('span', 'fl-atccs', a.callsign);
+      if (a.auto && a.selected) name.append(flightNode('small', null, 'présélectionné'));
+      row.append(box, name, flightNode('span', 'fl-freq', a.frequency || '—'), flightNode('span', 'fl-note', a.note));
       atc.append(row);
     }
   }
@@ -339,11 +353,36 @@ function flightSituation(cockpit) {
   return col;
 }
 
+// Les messages « Nouveau plan » s’acquittent une fois par suivi ; les autres avertissements restent affichés.
+const dismissedNotices = new Set();
+function noticeKey(text, data) { return 'glareshield.notice.' + (data?.session?.id || '') + '.' + text; }
+function noticeDismissed(text, data) {
+  if (dismissedNotices.has(noticeKey(text, data))) return true;
+  try { return localStorage.getItem(noticeKey(text, data)) === '1'; } catch (e) { return false; }
+}
+function sessionWarnings(data, parent) {
+  for (let text of data?.warnings || []) {
+    if (!text.startsWith('Nouveau plan')) { parent.append(el('p', text, { className: 'banner warn' })); continue; }
+    if (noticeDismissed(text, data)) continue;
+    let box = el('div', null, { className: 'banner warn' });
+    box.append(el('span', text));
+    let ok = el('button', 'Compris', { type: 'button', className: 'small ghost', title: 'Acquitter et masquer ce message' });
+    ok.style.marginLeft = 'auto';
+    ok.onclick = () => {
+      dismissedNotices.add(noticeKey(text, data));
+      try { localStorage.setItem(noticeKey(text, data), '1'); } catch (e) { /* mémoire seule */ }
+      box.remove();
+    };
+    box.append(ok);
+    parent.append(box);
+  }
+}
+
 function flightDashboard(data) {
   let cockpit = data.cockpit, root = flightNode('div', 'fl');
   root.id = 'flightDashboard';
   root.dataset.session = data.session.id;
-  for (let text of data.warnings || []) root.append(el('p', text, { className: 'banner warn' }));
+  sessionWarnings(data, root);
   root.append(flightBar(cockpit), flightTrack(cockpit));
   let shown = flightPreview || cockpit.phase || 'preflight', label = data.phases.find(p => p.id === shown)?.label;
   if (flightPreview) {
@@ -358,7 +397,7 @@ function flightDashboard(data) {
   let grid = flightNode('div', 'fl-grid'), left = flightNode('div', 'fl-col');
   left.append(flightNow(cockpit));
   cockpit.groups.filter(g => g.phase === shown).forEach(g => left.append(flightGroup(g)));
-  if (!flightPreview && cockpit.radio.length) left.append(flightRadio(cockpit));
+  if (!flightPreview) left.append(flightRadio(cockpit));
   grid.append(left, flightSituation(cockpit));
   root.append(grid);
   let foot = flightNode('div', 'fl-foot');
@@ -378,7 +417,7 @@ function flightPendingView(view) {
     return;
   }
   let c = card(view, 'Suivi du vol', data?.universe === 'demo' ? 'Démonstration' : 'SimConnect · lecture seule du cockpit');
-  for (let text of data?.warnings || []) c.append(el('p', text, { className: 'banner warn' }));
+  sessionWarnings(data, c);
   c.append(el('p', session ? 'Suivi terminé. Les cases cochées et les valeurs saisies sont conservées.'
     : 'Aucun suivi démarré. La phase sera détectée automatiquement, même si le vol est déjà en cours.'));
   let bar = cardActions(c);
@@ -454,12 +493,39 @@ function copilotSettingsView(view) {
   c.append(el('p', 'La phase est détectée en continu depuis le simulateur ; un clic sur le parcours la corrige. Cases cochées et valeurs saisies restent sous local/copilot/.'));
   action('Variables et démonstration', () => navigate('Variables IA'), cardActions(c));
 }
+// Redémarre le processus sans fermer la fenêtre : le nouveau jeton signale que la nouvelle instance répond.
+async function restartApplication() {
+  message('Redémarrage en cours…');
+  await api('restart', 'POST', {});
+  for (let attempt = 0; attempt < 120; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      let page = await fetch('/', { cache: 'no-store' }), token = (await page.text()).match(/const TOKEN='([^']+)'/);
+      if (page.ok && token && token[1] !== sessionToken) { location.reload(); return; }
+    } catch (e) { /* arrêt de l’ancienne instance ou démarrage de la nouvelle */ }
+  }
+  message('Redémarrage trop long : actualiser la page (F5) ou relancer Glareshield.', true);
+}
 function applicationView(view) {
   let c = card(view, 'Application locale', 'Les configurations, plans, notes et exports restent sous local/.');
   c.append(el('p', 'Les journaux et les réglages du moteur restent accessibles dans leurs pages dédiées.'));
   let bar = cardActions(c);
   action('Journal', () => navigate('Journal'), bar);
   action('Moteur d’éclairage', () => navigate('Moteur d’éclairage'), bar);
+  let reload = card(view, 'Recharger la configuration', 'Applique local/config.yaml après une modification à la main, sans redémarrer. Un fichier invalide est refusé et la configuration actuelle est conservée.');
+  action('Recharger la configuration', async () => {
+    try {
+      let r = await api('config/reload', 'POST', {});
+      config = await api('config');
+      message(r.changed ? 'Configuration rechargée depuis local/config.yaml.' : 'Aucun changement dans local/config.yaml.');
+    } catch (e) { message(e.message, true); }
+  }, cardActions(reload), '', 'refresh');
+  let restart = card(view, 'Redémarrer', 'Relance Glareshield (lampes restaurées, règles rechargées) sans fermer cette fenêtre.');
+  action('Redémarrer Glareshield', async () => {
+    if (confirm('Redémarrer Glareshield ? La fenêtre reste ouverte et se reconnecte.')) {
+      try { await restartApplication(); } catch (e) { message(e.message, true); }
+    }
+  }, cardActions(restart), 'danger', 'refresh');
 }
 for (let [name, renderer, iconName, subtitle] of [
   ['Initialisation', preparationView, 'plan', 'Sources et préparation du vol'],

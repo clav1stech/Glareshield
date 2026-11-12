@@ -21,6 +21,9 @@ NOTICE = ('Données de simulation (MSFS 2024, Fenix A320) relevées par Glareshi
           'derived = calculé par Glareshield, méthode indiquée. '
           'Le plan SimBrief est un plan prévu, pas la route active du MCDU. '
           'pilot_notes contient des déclarations du pilote, non vérifiées par le simulateur. '
+          'pilot_context donne les portes saisies et les contrôles IVAO cochés par le pilote '
+          '(ou présélectionnés sur les aérodromes de départ et d’arrivée) ; sans contrôle coché, '
+          'le pilote utilise UNICOM 122.800 en anglais. '
           'ivao contient des données publiées par le réseau IVAO, avec leur provenance (voir ivao.notice). '
           'Ne pas déduire de mode FMA, d’alerte ECAM ni de valeur absente. Usage limité à la simulation.')
 RULE = ('Appuie-toi uniquement sur les valeurs fournies, en tenant compte de leur statut et de leur âge ; '
@@ -166,7 +169,8 @@ def derived(fields: dict, plan: dict | None, level: str) -> dict:
 
 
 def build_context(level: str, entries: list[Entry], store: TelemetryStore, plan: dict | None,
-                  plan_status: dict, now: float, notes: dict | None = None, network: dict | None = None) -> dict:
+                  plan_status: dict, now: float, notes: dict | None = None, network: dict | None = None,
+                  pilot_context: dict | None = None) -> dict:
     if level not in LIMITS:
         raise ValueError('Niveau d’export inconnu.')
     selected = [entry for entry in entries if level == 'full' or entry.level == 'essential']
@@ -214,6 +218,8 @@ def build_context(level: str, entries: list[Entry], store: TelemetryStore, plan:
     if notes and notes.get('text'):
         document['pilot_notes'] = {'nature': 'declared_by_pilot', 'text': notes['text'],
                                    'updated_utc': notes.get('updated_utc')}
+    if pilot_context:
+        document['pilot_context'] = {'nature': 'declared_by_pilot', **pilot_context}
     document['flight_plan'] = None if plan is None else {
         'source': plan_status.get('source'), 'fetched_utc': plan_status.get('fetched_utc'),
         'warnings': plan_status.get('warnings', []), **plan_view(plan, level)}

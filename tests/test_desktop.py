@@ -109,3 +109,29 @@ async def test_failed_startup_does_not_open_window_or_leave_pending_task(tmp_pat
         async with asyncio.timeout(5):
             await app.serve(tmp_path, None, port, tray=False, window=True)
     assert asyncio.all_tasks() == before
+
+
+async def test_restart_request_stops_the_server_and_asks_the_caller_to_relaunch(tmp_path, monkeypatch):
+    runtime = LocalRuntime(tmp_path, None)
+    monkeypatch.setattr(app, 'Runtime', lambda *args: runtime)
+    with socket.socket() as reservation:
+        reservation.bind(('127.0.0.1', 0))
+        port = reservation.getsockname()[1]
+    async def ask():
+        while not runtime.started:
+            await asyncio.sleep(.05)
+        runtime.request_restart()
+    asking = asyncio.create_task(ask())
+    assert await asyncio.wait_for(app.serve(tmp_path, None, port, tray=False), 5) is True
+    await asking
+    assert runtime.stopped
+
+
+def test_relaunch_starts_a_detached_instance_on_the_same_port(tmp_path, monkeypatch):
+    started = []
+    monkeypatch.setattr(app.subprocess, 'Popen', lambda command, **options: started.append((command, options)))
+    app.relaunch(tmp_path, tmp_path / 'local/config.yaml', 8123, tray=False)
+    (command, options), = started
+    assert command[1:3] == ['-m', 'glareshield.app'] and command[command.index('--port') + 1] == '8123'
+    assert '--no-tray' in command and '--window' not in command
+    assert options['env'][app.RESTART_ENV] == '1' and options['cwd'] == tmp_path
