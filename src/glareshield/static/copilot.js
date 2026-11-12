@@ -138,6 +138,9 @@ function preparationView(view) {
 let flightPreview = null;
 let flightEditing = null;
 let flightPointerDown = false;
+let flightPhrasebookOpen = false;
+let flightPhraseSearch = '';
+let flightPhraseScope = 'current';
 if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', () => { flightPointerDown = true; });
   document.addEventListener('pointerup', () => { flightPointerDown = false; });
@@ -270,6 +273,20 @@ function flightGroup(group) {
 function flightRadio(cockpit) {
   let section = flightNode('section', 'fl-group'), head = flightNode('div', 'fl-ghead'), items = flightNode('div', 'fl-items');
   head.append(flightNode('h2', 'fl-h2', 'Radio'), flightNode('span', 'fl-when', 'Messages prêts · copier n’émet rien'));
+  let controls = flightNode('label', 'fl-radio-controls');
+  let language = flightKey(el('select', null, {}), 'radio-language');
+  language.setAttribute('aria-label', 'Langue des messages vocaux');
+  for (const [value, label] of [['auto', 'Automatique · selon la station'], ['en', 'Anglais'], ['fr', 'Français']]) {
+    language.append(el('option', label, { value, selected: cockpit.radio_language === value }));
+  }
+  language.onchange = async () => {
+    language.disabled = true;
+    try { await sessionAction('radio-language', 'PUT', { language: language.value }); }
+    catch (e) { language.disabled = false; message(e.message, true); }
+  };
+  controls.append(flightNode('span', null, 'Voix'), language);
+  items.append(controls, flightNode('div', 'fl-radio-help',
+    'Automatique : français pour les stations françaises et Genève LSGG, anglais ailleurs. Adapter à la langue du contrôleur. UNICOM reste en anglais.'));
   // La porte se saisit une fois par aérodrome ; elle alimente les messages et l’export IA.
   let stand = flightNode('div', 'fl-stand');
   stand.append(flightNode('span', null, 'Porte / poste'), flightNode('small', null, cockpit.stand.label), flightValue(cockpit.stand));
@@ -279,19 +296,82 @@ function flightRadio(cockpit) {
     let box = flightNode('div', 'fl-radio'), top = flightNode('div', 'fl-radiotop');
     top.append(flightNode('span', 'fl-trg', r.trigger));
     if (r.station) top.append(flightPill(r.station + (r.frequency ? ' · ' + r.frequency : ''), 'ivao'));
-    if (r.mode === 'texte') top.append(flightPill('anglais · sans contrôle'));
+    top.append(flightPill(r.mode === 'texte' ? 'anglais · sans contrôle' : (r.language === 'fr' ? 'français · voix' : 'anglais · voix')));
     top.append(flightNode('span', 'fl-spacer'));
-    let copy = flightKey(el('button', 'Copier', { type: 'button', className: 'small' }), 'copy-' + r.id);
-    copy.onclick = async () => {
-      try { await copyText(r.text); message('Copié.'); }
-      catch (e) { message('Sélectionnez le texte pour copier.', true); }
-    };
+    let copy = flightCopy(r.text, 'copy-' + r.id);
     top.append(copy);
     box.append(top, flightNode('pre', 'fl-msg' + (r.mode === 'texte' ? ' txt' : ''), r.text));
+    box.lastChild.lang = r.language;
+    if (r.readback) {
+      let reply = flightNode('div', 'fl-radiotop');
+      reply.append(flightNode('small', 'fl-note', 'Réponse possible · uniquement si cette instruction a été reçue'),
+        flightNode('span', 'fl-spacer'), flightCopy(r.readback, 'readback-' + r.id, 'Copier la réponse'));
+      let text = flightNode('pre', 'fl-msg', r.readback);
+      text.lang = r.language;
+      box.append(reply, text);
+    }
     items.append(box);
   }
+  items.append(flightPhrasebook(cockpit));
   section.append(head, items);
   return section;
+}
+
+function flightCopy(text, key, label = 'Copier') {
+  let button = flightKey(el('button', label, { type: 'button', className: 'small' }), key);
+  button.onclick = async () => {
+    try { await copyText(text); message('Copié.'); }
+    catch (e) { message('Sélectionnez le texte pour copier.', true); }
+  };
+  return button;
+}
+
+function flightPhraseMatches(phrase, query, scope) {
+  const plain = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return (scope === 'all' || phrase.current) && plain(phrase.category + ' ' + phrase.label + ' ' + phrase.text).includes(plain(query.trim()));
+}
+
+function flightPhrasebook(cockpit) {
+  let details = flightKey(el('details', null, { className: 'fl-phrasebook', open: flightPhrasebookOpen }), 'phrasebook');
+  details.append(el('summary', 'Répertoire radio · appels, réponses, incompréhensions et urgences'));
+  details.append(flightNode('p', 'fl-note', 'Modèles à adapter : compléter les chevrons et ne conserver que les éléments réellement reçus ou vérifiés. Une phrase affichée ne constitue pas une autorisation.'));
+  let tools = flightNode('div', 'fl-radio-controls');
+  let search = flightKey(el('input', null, { type: 'search', value: flightPhraseSearch,
+    placeholder: 'Rechercher : cap, répéter, ILS, urgence…', className: 'fl-phrase-search' }), 'phrase-search');
+  search.setAttribute('aria-label', 'Rechercher un message radio');
+  let scope = flightKey(el('select', null, {}), 'phrase-scope');
+  scope.setAttribute('aria-label', 'Messages de cette étape ou de tout le vol');
+  for (const [value, label] of [['current', 'Cette étape + messages généraux'], ['all', 'Tout le vol']]) {
+    scope.append(el('option', label, { value, selected: flightPhraseScope === value }));
+  }
+  let list = flightNode('div', 'fl-phrase-list');
+  const draw = () => {
+    list.replaceChildren();
+    const matches = (cockpit.phrasebook || []).filter(p => flightPhraseMatches(p, flightPhraseSearch, flightPhraseScope));
+    if (!matches.length) list.append(flightNode('p', 'fl-note', 'Aucun modèle trouvé. Essayer « Tout le vol » ou un autre mot.'));
+    let category = null;
+    for (const p of matches) {
+      if (p.category !== category) { category = p.category; list.append(flightNode('h3', 'fl-phrase-category', category)); }
+      let box = flightNode('div', 'fl-radio'), top = flightNode('div', 'fl-radiotop');
+      box.dataset.phrase = p.id;
+      top.append(flightNode('span', 'fl-trg', p.label), flightPill(p.language === 'fr' ? 'français' : 'anglais'));
+      if (p.station) top.append(flightPill(p.station, 'ivao'));
+      top.append(flightNode('span', 'fl-spacer'), flightCopy(p.text, 'phrase-copy-' + p.id));
+      let text = flightNode('pre', 'fl-msg', p.text);
+      text.lang = p.language;
+      box.append(top, text);
+      if (p.note) box.append(flightNode('small', 'fl-note', p.note));
+      list.append(box);
+    }
+  };
+  search.oninput = () => { flightPhraseSearch = search.value; draw(); };
+  scope.onchange = () => { flightPhraseScope = scope.value; draw(); };
+  tools.append(search, scope);
+  details.append(tools, list);
+  // Build only when open; polling a closed book should not create hundreds of nodes.
+  if (details.open) draw();
+  details.ontoggle = () => { flightPhrasebookOpen = details.open; if (details.open && !list.childNodes.length) draw(); };
+  return details;
 }
 
 function flightSituation(cockpit) {
@@ -438,15 +518,25 @@ function updateFlightView(force = false) {
     if (!force && isEditing() && !root) return;
     flightPreview = null;
     flightEditing = null;
+    flightPhrasebookOpen = false;
+    flightPhraseSearch = '';
+    flightPhraseScope = 'current';
     render();
     return;
   }
   // Rebuild, then put focus back on the same control so keyboard use survives each refresh.
   const key = document.activeElement?.closest?.('[data-key]')?.dataset.key;
+  const selection = key === 'phrase-search' ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
+  const phraseScroll = root.querySelector('.fl-phrase-list')?.scrollTop || 0;
   const next = flightDashboard(data);
   root.replaceWith(next);
+  const phraseList = next.querySelector('.fl-phrase-list');
+  if (phraseList) phraseList.scrollTop = phraseScroll;
   const target = key && next.querySelector('[data-key="' + key + '"]');
-  if (target) target.focus({ preventScroll: true });
+  if (target) {
+    target.focus({ preventScroll: true });
+    if (selection) target.setSelectionRange(...selection);
+  }
   if (flightEditing) {
     const input = next.querySelector('.fl-edit');
     if (input) { input.focus({ preventScroll: true }); input.select(); }

@@ -21,9 +21,9 @@ NOTICE = ('Données de simulation (MSFS 2024, Fenix A320) relevées par Glareshi
           'derived = calculé par Glareshield, méthode indiquée. '
           'Le plan SimBrief est un plan prévu, pas la route active du MCDU. '
           'pilot_notes contient des déclarations du pilote, non vérifiées par le simulateur. '
-          'pilot_context donne les portes saisies et les contrôles IVAO cochés par le pilote '
-          '(ou présélectionnés sur les aérodromes de départ et d’arrivée) ; sans contrôle coché, '
-          'le pilote utilise UNICOM 122.800 en anglais. '
+          'pilot_context : postes et ATC choisis (présélection selon les aérodromes). '
+          'Voix : radio_language prioritaire ; sinon français aux stations françaises/LSGG, anglais ailleurs. '
+          'Sans ATC coché : UNICOM 122.800 anglais. '
           'ivao contient des données publiées par le réseau IVAO, avec leur provenance (voir ivao.notice). '
           'Ne pas déduire de mode FMA, d’alerte ECAM ni de valeur absente. Usage limité à la simulation.')
 RULE = ('Appuie-toi uniquement sur les valeurs fournies, en tenant compte de leur statut et de leur âge ; '

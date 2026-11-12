@@ -1,4 +1,6 @@
 """Local session routes, under the existing AI Bridge token protection."""
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException
 from pydantic import StrictBool
 
@@ -30,6 +32,10 @@ class ValueAction(SessionAction):
 
 class AtcAction(SessionAction):
     selected: StrictBool | None
+
+
+class RadioLanguageAction(SessionAction):
+    language: Literal['auto', 'fr', 'en']
 
 
 def create_session_router(bridge):
@@ -82,5 +88,9 @@ def create_session_router(bridge):
     @router.put('/atc/{callsign}')
     async def atc(callsign: str, payload: AtcAction):
         return execute(payload, lambda service: service.set_atc(callsign, payload.selected))
+
+    @router.put('/radio-language')
+    async def language(payload: RadioLanguageAction):
+        return execute(payload, lambda service: service.set_radio_language(payload.language))
 
     return router

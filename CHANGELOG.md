@@ -2,6 +2,14 @@
 
 La politique est décrite dans [docs/versioning.md](docs/versioning.md).
 
+## [1.2.16] - 2026-11-12
+
+- Adapter la langue radio aux stations ATC et ajouter un répertoire bilingue complet avec collationnements.
+- Radio : choix automatique selon la station réellement contactée, français pour les préfixes français pris en charge et Genève LSGG, anglais ailleurs, notamment les autres stations suisses et le Maghreb. Choix manuel français/anglais conservé par suivi ; UNICOM reste en anglais.
+- Vol : affichage des collationnements et répertoire de 113 modèles bilingues avec intentions en français, recherche avec ou sans accents et filtre par étape ou pour tout le vol. Appels au sol, départ, transferts, en route, approche, arrivée, incompréhensions et principales urgences de simulation.
+- Les chevrons anglais restent en anglais. Une réponse ne reprend pas la piste prévue comme piste autorisée ni la piste de départ comme piste d’atterrissage reçue. L’affichage d’un modèle ne vaut pas autorisation ; adapter les réponses aux instructions effectivement reçues.
+- La recherche, le curseur et le défilement du répertoire restent stables pendant les rafraîchissements. Les choix de langue vocale explicites accompagnent l’export IA.
+
 ## [1.2.15] - 2026-11-12
 
 - Porte saisissable, contrôles ATC cochables, messages UNICOM en anglais et redémarrage sans fermer la fenêtre

@@ -282,3 +282,19 @@ def test_atc_choice_route_persists_and_the_ai_export_carries_gates_and_controlle
     assert 'arrival_stand' not in context
     service.view()  # The Vol screen refresh records which controllers are ticked.
     assert isinstance(runtime.ai.snapshot('flight')['pilot_context'].get('controllers_selected', []), list)
+
+
+def test_radio_language_route_is_protected_validated_and_rejects_a_stale_session(tmp_path):
+    runtime, client, headers = client_and_headers(tmp_path)
+    runtime.ai.set_scenario(True)
+    runtime.ai.load_demo_plan()
+    session = runtime.ai.sessions.start()['session']
+    payload = {'session_id': session['id'], 'universe': 'demo', 'language': 'en'}
+    route = '/api/ai/session/radio-language'
+    assert client.put(route, json=payload).status_code == 403
+    result = client.put(route, headers=headers, json=payload)
+    assert result.status_code == 200 and result.json()['session']['radio_language'] == 'en'
+    assert client.put(route, headers=headers, json={**payload, 'language': 'de'}).status_code == 422
+    assert client.put(route, headers=headers, json={**payload, 'session_id': 'old-session'}).status_code == 409
+    assert client.put(route, headers=headers, json={**payload, 'universe': 'simconnect'}).status_code == 409
+    assert client.put(route, headers=headers, json={**payload, 'language': 'auto'}).json()['session']['radio_language'] == 'auto'

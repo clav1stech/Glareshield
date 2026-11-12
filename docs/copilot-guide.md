@@ -16,9 +16,10 @@
    permet de la saisir (Entrée pour valider, Échap pour annuler). Une saisie
    prime sur l’OFP : piste changée, altitude autorisée, squawk, poste… Vider
    le champ revient à la valeur prévue.
-6. **Radio** propose au plus trois messages, ceux de l’étape, avec la station
-   en ligne et sa fréquence. **Copier** ne transmet rien. Sans contrôle en
-   ligne, un message UNICOM texte est ajouté.
+6. **Radio** propose les appels de l’étape, avec la station en ligne et sa
+   fréquence, puis un modèle de réponse à employer seulement si l’instruction
+   correspondante a été reçue. **Copier** ne transmet rien. Sans contrôle coché,
+   les annonces UNICOM texte en anglais remplacent les appels concernés.
 
 La colonne de droite résume la situation (altitude, vitesse sol, vario,
 carburant et écart au plan, distance parcourue avec le TOD de l’OFP), l’ATC
@@ -87,3 +88,55 @@ Les captures restent sous `local/ui-test/`, jamais dans Git.
   visuelle est documentée dans la [matrice de couverture](copilot-acceptance.md).
 
 Voir aussi les [règles de session](copilot-session.md).
+
+## Radio en anglais et répertoire complet
+
+Le choix **Voix / Automatique** suit l’indicatif du contrôleur contacté : français
+pour `LF`, les préfixes ultramarins français déjà pris en charge et Genève `LSGG` ;
+anglais ailleurs. Un centre étranger contrôlant un terrain français reste en
+anglais. Les autres stations suisses, dont Sion en IFR, et celles du Maghreb
+restent en anglais par défaut. Il s’agit d’une préférence prudente, pas d’une
+détection des langues effectivement parlées par une personne.
+
+Choisir **Anglais** ou **Français** pour adapter les modèles vocaux au contrôleur
+ou s’entraîner. Ce choix s’applique à tout le répertoire vocal du suivi ; repasser
+en **Automatique** lors d’un changement de pays si nécessaire. Il est conservé
+sous `local/copilot/`, séparément par suivi et par univers de démonstration ou
+SimConnect. Un nouveau suivi repart en automatique. UNICOM reste en anglais.
+
+Ouvrir **Répertoire radio** sous les appels de l’étape. Les intentions sont
+expliquées en français, les phrases sont dans la langue choisie. Rechercher en
+français ou en anglais, avec ou sans accents. **Cette étape + messages généraux**
+limite les suggestions ; **Tout le vol** donne accès à tous les modèles :
+
+- Compréhension : répétition entière ou partielle, débit plus lent, confirmation,
+  correction, impossibilité, demande d’instructions écrites sur IVAO, essai radio.
+- Sol : clairance IFR et collationnement, mise en route et repoussage séparés ou
+  combinés, roulage, maintien avant piste, traversée, remontée, guidage et poste.
+- Départ : point d’attente, alignement simple ou conditionnel, départ immédiat,
+  décollage, annulation, interruption, premier contact et changement de SID.
+- Transferts : contact ou veille, fréquence impossible à joindre, cap, vitesse,
+  Mach, taux vertical, niveau, QNH, code, direct et contraintes de passage.
+- En route : premier contact et position, niveau atteint, demandes de montée,
+  descente ou direct, météo, turbulence, givrage et acquisition du trafic.
+- Arrivée : STAR, approche ILS/RNP/autre, approche à vue, attente, besoin de temps,
+  localizer/ILS établi, finale, atterrissage, remise des gaz et retour au poste.
+- Situations inhabituelles : problème technique, retour ou déroutement, panne
+  radio/navigation, PAN PAN, MAYDAY, urgence médicale, carburant, TCAS et descente
+  d’urgence. Ces modèles restent accessibles à toutes les étapes.
+
+Compléter les `<chevrons>` avec les informations vérifiées et collationner
+l’instruction exacte, y compris ses restrictions. Les clairances ne sont pas
+déduites de l’OFP : la piste prévue ne remplit pas une piste autorisée dans une
+réponse. La piste de décollage ne remplit pas la piste reçue pour l’atterrissage.
+Les valeurs saisies restent à corriger lorsqu’une nouvelle clairance les remplace ;
+les champs libres du pilote ne sont pas traduits automatiquement. L’application
+n’écoute pas la radio et une phrase affichée ne prouve aucune autorisation.
+
+Références de phraséologie et de langue :
+[CAA CAP 413](https://www.caa.co.uk/data-and-publications/publications/documents/content/cap-413/),
+[IVAO Genève](https://generic.ch.ivao.aero/page/atcopslsgg),
+[AIP Sion, AD 2.18](https://www.sionaeroport.ch/wp-content/uploads/2016/12/AIP_Full.pdf).
+Le répertoire vise les échanges IFR A320 usuels et les principales situations
+inhabituelles en simulation ; les procédures locales et les instructions reçues
+peuvent nécessiter d’autres formulations.

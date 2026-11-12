@@ -51,6 +51,12 @@ result = prepare(live, runtime, settings, true);
 for (const key of ['simulator', 'bridge', 'simbrief', 'ivao', 'lighting']) assert.equal(result[key].label, 'Indisponible');
 assert.ok(result.blockers.length);
 console.log('Preparation state tests passed.');
+const matches = context.flightPhraseMatches;
+const phrase = { category: 'Départ', label: 'Faire répéter', text: 'Say again', current: true };
+assert.equal(matches(phrase, 'repeter', 'current'), true);
+assert.equal(matches(phrase, 'say again', 'current'), true);
+assert.equal(matches({ ...phrase, current: false }, '', 'current'), false);
+assert.equal(matches({ ...phrase, current: false }, '', 'all'), true);
 
 async function browserPass() {
   const { chromium } = require('playwright');
@@ -119,6 +125,45 @@ async function browserPass() {
     assert.equal(await page.evaluate(() => window.testCopiedText), await page.locator('.fl-msg').first().textContent());
     assert.deepEqual(await page.evaluate(async () => (await api('ai/session')).session.history), beforeCopy, 'Copy does not emit or check');
     await page.screenshot({path:'local/ui-test/radio-copy.png', animations:'disabled'});
+    // Voice language, complete phrasebook, search and copy all work during live polling.
+    await page.getByLabel('Langue des messages vocaux').selectOption('en');
+    await page.waitForFunction(() => ai.session?.session?.radio_language === 'en');
+    await page.locator('.fl-phrasebook summary').click();
+    const search = page.getByLabel('Rechercher un message radio');
+    await search.fill('repeter');
+    await page.locator('[data-phrase="say_again"]').waitFor();
+    assert.match(await page.locator('[data-phrase="say_again"] pre').textContent(), /say again/);
+    await page.evaluate(() => document.querySelector('[data-key="phrase-search"]').setSelectionRange(2, 2));
+    await page.evaluate(() => refresh());
+    assert.equal(await search.inputValue(), 'repeter');
+    assert.equal(await search.evaluate(el => el.selectionStart), 2);
+    assert.equal(await page.locator('.fl-phrasebook').evaluate(el => el.open), true);
+    await page.screenshot({path:'local/ui-test/atc-english.png', fullPage:true, animations:'disabled'});
+    const phraseHistory = await page.evaluate(() => ai.session.session.history);
+    await page.locator('[data-key="phrase-copy-say_again"]').click();
+    assert.equal(await page.evaluate(() => window.testCopiedText), await page.locator('[data-phrase="say_again"] pre').textContent());
+    assert.deepEqual(await page.evaluate(() => ai.session.session.history), phraseHistory);
+    await search.fill('');
+    await page.getByLabel('Messages de cette étape ou de tout le vol').selectOption('all');
+    await search.fill('atterrissage');
+    await page.locator('[data-phrase="landing_readback"]').waitFor();
+    assert.match(await page.locator('[data-phrase="landing_readback"] pre').textContent(), /cleared to land/);
+    await search.fill('');
+    await page.locator('.fl-phrase-list').evaluate(el => { el.scrollTop = 600; });
+    await page.evaluate(() => refresh());
+    await page.waitForTimeout(100);
+    assert.equal(await page.locator('.fl-phrase-list').evaluate(el => el.scrollTop), 600);
+    await page.getByLabel('Langue des messages vocaux').selectOption('fr');
+    await page.waitForFunction(() => ai.session?.session?.radio_language === 'fr');
+    await search.fill('parler moins vite');
+    assert.match(await page.locator('[data-phrase="speak_slower"] pre').textContent(), /parlez plus lentement/);
+    assert.ok((await page.locator('.fl-msg.txt').allTextContents()).every(text => !text.includes('pieds')));
+    await page.setViewportSize({ width: 780, height: 1000 });
+    await page.screenshot({path:'local/ui-test/atc-phrasebook.png', fullPage:true, animations:'disabled'});
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await page.setViewportSize({ width: 1440, height: 1080 });
+    await page.getByLabel('Langue des messages vocaux').selectOption('auto');
+    await page.locator('.fl-phrasebook summary').click();
     // Another phase is previewed first; the correction is an explicit second gesture.
     await page.locator('[data-key="leg-descent"]').click();
     await page.getByText('Aperçu de la phase Descente', { exact: false }).waitFor();
@@ -189,7 +234,7 @@ async function browserPass() {
     // Focus survives polling; Enter opens the mode and moves focus to its title.
     const flight = page.locator('#nav').getByRole('button', { name: 'Vol', exact: true });
     await flight.focus();
-    await page.waitForTimeout(1800);
+    await page.evaluate(() => refresh());
     assert.equal(await flight.evaluate(el => el === document.activeElement), true);
     await page.keyboard.press('Enter');
     await page.locator('#flightDashboard').waitFor();

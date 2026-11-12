@@ -65,6 +65,7 @@
 !/src/glareshield/copilot/flight.py
 !/src/glareshield/copilot/observations.py
 !/src/glareshield/copilot/cockpit.py
+!/src/glareshield/copilot/radio.py
 !/src/glareshield/copilot/web.py
 !/src/glareshield/copilot/a320.json
 !/src/glareshield/drivers/

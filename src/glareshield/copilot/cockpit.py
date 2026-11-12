@@ -8,6 +8,7 @@ from string import Formatter
 from ..aibridge.context import distance_nm
 from .contract import PHASE_IDS
 from .phases import STAGE_IDS, STAGE_LABEL, STAGE_PHASE
+from .radio import EN_PLACEHOLDERS, PHRASE_GROUPS, PHRASE_NOTES, radio_language
 
 # Ordered work per stage: profile group or step, and the sentence shown in "Maintenant".
 # The first one with an unchecked step wins; IDLE applies once everything is done.
@@ -64,7 +65,6 @@ ROLE_NAMES = {'DEL': ('Prévol', 'Delivery'), 'GND': ('Sol', 'Ground'), 'TWR': (
               'FSS': ('Information', 'Radio')}
 ROLE_ORDER = ('DEL', 'GND', 'TWR', 'DEP', 'APP', 'CTR', 'FSS')
 ATIS_ORDER = ('TWR', 'APP', 'DEP', 'GND', 'DEL')
-FRENCH = ('LF', 'TFF', 'FMEE', 'FMCZ', 'NWW', 'NT', 'SOCA')
 SOURCE_LABELS = {'planned': 'OFP', 'declared': 'Pilote', 'published': 'METAR', 'observed': 'Sim'}
 ALPHABET = dict(zip('ABCDEFGHIJKLMNOPQRSTUVWXYZ', (
     'Alpha Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliett Kilo Lima Mike November Oscar Papa '
@@ -490,12 +490,15 @@ class Cockpit:
                 continue
             station = self.station_for(radio.station_roles, stage_airport)
             callsign = station['callsign'] if station else None
-            french = (callsign or stage_airport or '').startswith(FRENCH)
-            text = self.fill(radio.voice_fr.pilot if french else radio.voice_en.pilot, station, french)
+            language = self.language(station)
+            french = language == 'fr'
+            voice = radio.voice_fr if french else radio.voice_en
+            text = self.fill(voice.pilot, station, french)
             frequency = station.get('frequency_mhz') if station else None
             message = {'id': radio.id, 'trigger': radio.trigger.label, 'station': callsign,
                        'frequency': f'{frequency:.3f}' if type(frequency) in (int, float) else None,
-                       'language': 'fr' if french else 'en', 'text': text}
+                       'language': language, 'text': text,
+                       'readback': self.fill(voice.readback, station, french, readback=True)}
             unicom = None if station else self.unicom(radio_id)
             if unicom is not None:
                 unicom = {'id': radio_id+'_unicom', 'trigger': 'Sans contrôle coché', 'station': 'UNICOM',
@@ -505,6 +508,28 @@ class Cockpit:
             if unicom is not None:
                 result.append(unicom)
         return result[:4]
+
+    def language(self, station=None):
+        return radio_language((station or {}).get('callsign'), self.airport().get('icao'),
+                              getattr(self.session, 'radio_language', 'auto'))
+
+    def phrasebook(self):
+        """All voice variants stay reachable, including off-stage and emergency exchanges."""
+        first = next((r for p in self.profile.phases for r in p.radio
+                      if r.id in RADIO.get(self.stage, [])), None)
+        default_roles = first.station_roles if first else ['CTR', 'APP', 'TWR', 'GND', 'DEL']
+        result = []
+        for category, stages, roles, phrases in PHRASE_GROUPS:
+            station = self.station_for(roles or default_roles, self.airport().get('icao'))
+            language = self.language(station)
+            for identifier, label, english, french in phrases:
+                result.append({'id': identifier, 'category': category, 'label': label,
+                               'current': not stages or self.stage in stages,
+                               'language': language, 'station': (station or {}).get('callsign'),
+                               'text': self.fill(french if language == 'fr' else english,
+                                                 station, language == 'fr', readback=True),
+                               'note': PHRASE_NOTES.get(identifier)})
+        return result
 
     def station_for(self, roles, airport):
         candidates = []
@@ -528,9 +553,13 @@ class Cockpit:
         names = ROLE_NAMES.get(role)
         return place+(' '+names[0 if french else 1] if names else '')
 
-    def fill(self, template, station, french):
+    def fill(self, template, station, french, readback=False):
         values = self.flight['values']
         altitude = altitude_text(self.altitude(), french)
+
+        def placeholder(key):
+            return (self.profile.values[key].placeholder if french else
+                    EN_PLACEHOLDERS.get(key, '<'+key.replace('_', ' ')+'>'))
 
         def parameter(key):
             if key == 'station':
@@ -544,13 +573,16 @@ class Cockpit:
                     text = (atis or {}).get('revision')
                 return ALPHABET.get(text, text) if text else '<ATIS>'
             if key == 'stand':
-                return self.value(self.stand_key()) or self.profile.values[self.stand_key()].placeholder
+                return self.value(self.stand_key()) or placeholder(self.stand_key())
             if key == 'cleared_runway':
-                return self.value('cleared_runway') or self.value('departure_runway') or '<piste>'
+                return (self.value('cleared_runway') or
+                        (None if readback else self.value('departure_runway')) or placeholder(key))
             if key == 'cleared_altitude':
-                return spoken_altitude(values['cleared_altitude'].get('value'), french) or '<altitude>'
+                return spoken_altitude(values['cleared_altitude'].get('value'), french) or placeholder(key)
             text = self.value(key)
-            return text or self.profile.values[key].placeholder
+            if not french and text and key == 'speed':
+                text = text.replace(' kt', ' knots')
+            return text or placeholder(key)
 
         keys = [key for _, key, _, _ in Formatter().parse(template) if key is not None]
         text = template.format_map({key: parameter(key) for key in keys})
@@ -600,6 +632,7 @@ class Cockpit:
                 'phase': self.current, 'mode': self.phase.get('mode', 'automatic'), 'live': self.phase.get('live', False),
                 'header': self.header(), 'track': self.track(), 'now': self.now_block(), 'groups': self.items(),
                 'radio': self.radio(), 'stand': self.stand_item(), 'situation': self.situation(), 'atc': self.atc(), 'atis': self.atis(),
+                'radio_language': getattr(self.session, 'radio_language', 'auto'), 'phrasebook': self.phrasebook(),
                 'upcoming': self.upcoming()}
 
 

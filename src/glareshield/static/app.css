@@ -136,6 +136,16 @@ label.fl-item { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; 
 .fl-trg { font-weight: 600; font-size: 15.5px; }
 .fl-msg { margin: 0; font-family: var(--fl-mono); font-size: 14px; line-height: 1.6; background: var(--surface-2); border: 1px solid var(--border); border-left: 3px solid var(--sim); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .fl-msg.txt { border-left-color: var(--warn); }
+.fl-radio-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 16px; }
+.fl-radio-controls select { width: auto; max-width: 100%; }
+.fl-radio-help { padding: 0 16px 12px; color: var(--muted); font-size: 13px; }
+.fl-phrasebook { padding: 14px 16px; border-top: 1px solid var(--border); }
+.fl-phrasebook > summary { font-weight: 600; font-size: 15px; }
+.fl-phrasebook > p { margin: 12px 0; }
+.fl-phrasebook .fl-radio-controls { padding: 8px 0; }
+.fl-phrase-search { flex: 1; min-width: min(230px, 100%); }
+.fl-phrase-list { max-height: 65vh; overflow: auto; }
+.fl-phrase-category { position: sticky; top: 0; margin: 0; padding: 12px 8px; background: var(--surface); font-size: 14px; }
 
 .fl-tele { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
 .fl-tele .fl-kv b { font-size: 21px; }

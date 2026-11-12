@@ -2,6 +2,7 @@
 import pytest
 from glareshield.copilot.cockpit import GUIDANCE, IDLE, RADIO, Cockpit, show, spoken_altitude
 from glareshield.copilot.phases import STAGE_IDS
+from glareshield.copilot.radio import PHRASE_GROUPS, radio_language
 from test_copilot_session import demo, declaration
 
 
@@ -255,3 +256,99 @@ def test_descent_without_a_ticked_centre_is_announced_on_unicom(tmp_path):
     assert 'descending to flight level 120, inbound' in cockpit(service, 'cruise', network)['radio'][0]['text']
     service.set_atc('XXNEAR_CTR', True)
     assert cockpit(service, 'cruise', network)['radio'][0]['station'] == 'XXNEAR_CTR'
+
+
+@pytest.mark.parametrize(('callsign', 'airport', 'language'), [
+    ('LFXX_TWR', 'LFXX', 'fr'), ('LFXX_N_CTR', 'EGXX', 'fr'),
+    ('LSGG_APP', 'LSGG', 'fr'), ('LSGG_A_GND', 'LSGG', 'fr'),
+    ('LSGS_TWR', 'LSGS', 'en'), ('LSZH_APP', 'LSZH', 'en'), ('LSAG_CTR', 'LSGG', 'en'),
+    ('GMMX_APP', 'GMMX', 'en'), ('DAAG_TWR', 'DAAG', 'en'), ('DTTA_TWR', 'DTTA', 'en'),
+    ('EDXX_CTR', 'LFXX', 'en'), (None, 'LSGG', 'fr'), (None, 'DTTA', 'en'), (None, None, 'en'),
+])
+def test_language_uses_the_contacted_controller_and_conservative_regional_defaults(callsign, airport, language):
+    assert radio_language(callsign, airport) == language
+    assert radio_language(callsign, airport, 'en') == 'en'
+    assert radio_language(callsign, airport, 'fr') == 'fr'
+
+
+@pytest.mark.parametrize('stage', STAGE_IDS)
+def test_every_stage_and_every_phrase_uses_english_with_a_foreign_centre(tmp_path, stage):
+    service = demo(tmp_path).sessions
+    service.start()
+    plan = service.current_plan()
+    # Fictional plan: a foreign centre can provide top-down control at a French airport.
+    from copy import deepcopy
+    plan = deepcopy(plan)
+    plan['origin'].update(icao='LFXX', name='Testfield')
+    plan['destination'].update(icao='LFYY', name='Testport')
+    network = {'state': 'current', 'weather': [], 'atis': [], 'positions': [
+        station('EGXX_CTR', 'CTR', 'LFXX', frequency=128.5)]}
+    view = cockpit(service, stage, network, plan)
+    voice = [r for r in view['radio'] if r['station'] != 'UNICOM']
+    assert voice and all(r['language'] == 'en' for r in voice)
+    assert all(p['language'] == 'en' for p in view['phrasebook'])
+    # Missing values in English transmissions must not turn into French placeholders.
+    import re
+    placeholders = re.findall(r'<[^>]+>', ' '.join(r['text'] + r['readback'] for r in voice) +
+                              ' '.join(p['text'] for p in view['phrasebook']))
+    assert not any(re.search(r'[éèàêç]|\bpiste\b|\bposte\b|\bautorisé', p) for p in placeholders)
+
+
+def test_phrasebook_keeps_all_exchanges_accessible_and_limits_current_suggestions(tmp_path):
+    service = demo(tmp_path).sessions
+    service.start()
+    view = cockpit(service, 'parked')
+    book = {p['id']: p for p in view['phrasebook']}
+    assert len(book) == sum(len(phrases) for _, _, _, phrases in PHRASE_GROUPS)
+    assert len(book) >= 100
+    # Acceptance matrix spans the complete flight, not only the initial calls.
+    assert {
+        'clearance_readback', 'startup_request', 'pushback_request', 'taxi_readback', 'hold_short',
+        'cross_readback', 'lineup', 'conditional_lineup', 'takeoff_readback', 'departure_contact',
+        'enroute_contact', 'position_report', 'contact_frequency', 'monitor_frequency', 'no_contact',
+        'climb_readback', 'descent_readback', 'heading_readback', 'speed_readback', 'qnh_readback',
+        'squawk_readback', 'direct_readback', 'restriction', 'weather_deviation', 'holding_readback',
+        'approach_clearance', 'ils_established', 'continue_approach', 'landing_readback',
+        'go_around_report', 'missed_approach', 'vacated', 'taxi_stand', 'parking',
+        'say_again', 'speak_slower', 'unable', 'request_text', 'pan', 'mayday', 'minimum_fuel',
+        'fuel_emergency', 'tcas', 'clear_conflict', 'emergency_descent', 'diversion', 'radio_failure',
+    } <= book.keys()
+    assert book['say_again']['current'] and book['mayday']['current'] and book['lineup']['current']
+    assert not book['landing_readback']['current']  # Still present under "Tout le vol".
+    arrival = {p['id']: p for p in cockpit(service, 'final')['phrasebook']}
+    assert arrival['landing_readback']['current'] and not arrival['lineup']['current']
+    assert len({p[0] for _, _, _, phrases in PHRASE_GROUPS for p in phrases}) == len(book)
+
+
+def test_readback_never_takes_a_planned_runway_and_landing_never_reuses_departure_clearance(tmp_path):
+    service = demo(tmp_path).sessions
+    service.start()
+    service.set_radio_language('en')
+    origin, destination = service.current_plan()['origin']['icao'], service.current_plan()['destination']['icao']
+    network = {'state': 'current', 'weather': [], 'atis': [], 'positions': [
+        station(origin+'_GND', 'GND', origin), station(destination+'_TWR', 'TWR', destination)]}
+    initial = cockpit(service, 'parked', network)['radio'][0]
+    assert '<cleared runway>' in initial['readback']
+    assert '<cleared SID>' in initial['readback'] and '<cleared level>' in initial['readback']
+    service.set_value('cleared_runway', '09R')
+    service.set_value('squawk', '0421')
+    service.set_value('cleared_altitude', 'FL120')
+    initial = cockpit(service, 'parked', network)['radio'][0]
+    assert '09R' in initial['readback'] and '0421' in initial['readback'] and 'flight level 120' in initial['readback']
+    landing = cockpit(service, 'final', network)['radio'][0]
+    assert '09R' not in landing['readback'] and '<received landing runway>' in landing['readback']
+    unicom = cockpit(service, 'parked', {**network, 'positions': []})['radio']
+    assert all('readback' not in r and r['language'] == 'en' for r in unicom)
+
+
+def test_voice_override_reaches_all_voice_models_and_never_changes_unicom(tmp_path):
+    service = demo(tmp_path).sessions
+    service.start()
+    origin = service.current_plan()['origin']['icao']
+    network = {'state': 'current', 'weather': [], 'atis': [], 'positions': [station('LFXX_CTR', 'CTR', origin)]}
+    for language in ('fr', 'en'):
+        service.set_radio_language(language)
+        view = cockpit(service, 'parked', network)
+        assert view['radio_language'] == language
+        assert all(r['language'] == language for r in view['radio'] + view['phrasebook'])
+        assert all(r['language'] == 'en' for r in cockpit(service, 'parked', {**network, 'positions': []})['radio'])

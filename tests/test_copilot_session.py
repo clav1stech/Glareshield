@@ -49,6 +49,7 @@ def test_restart_keeps_manual_steps_phase_declarations_and_pilot_values(tmp_path
     for kind in ('selection', 'clearance', 'atis', 'performance'):
         service.declare(declaration(kind))
     service.set_value('stand', 'B12')
+    service.set_radio_language('en')
     bridge.set_notes('Clairance FL999 : texte libre fictif, sans effet structuré.')
     restarted = AIBridge(tmp_path)
     restarted.set_scenario(True)
@@ -61,6 +62,8 @@ def test_restart_keeps_manual_steps_phase_declarations_and_pilot_values(tmp_path
     assert view['session']['declarations'][1]['value'] == 5000
     assert view['session']['pilot_values']['stand']['value'] == 'B12'
     assert view['flight']['values']['stand']['value'] == 'B12'
+    assert view['session']['radio_language'] == 'en'
+    assert restarted.sessions.pilot_context()['radio_language'] == 'en'
     assert restarted.notes == bridge.notes
     assert restarted.sessions.start()['session']['id'] == session_id
 
@@ -97,12 +100,34 @@ def test_legacy_session_file_is_read_with_its_last_phase(tmp_path):
                     'phase_state': {'phase': 'cruise', 'confirmed': True, 'cruise_seen': True,
                                     'airborne_seen': True, 'substate': None, 'changed_at': 1.0, 'evidence': []}})
     session.pop('pilot_values')
+    session.pop('radio_language')
     path.write_text(json.dumps(raw), encoding='utf-8')
     restarted = AIBridge(tmp_path)
     restarted.set_scenario(True)
     state = restarted.sessions.documents['demo'].sessions[-1].phase_state
     assert (state.stage, state.phase, state.airborne_seen) == ('cruise', 'cruise', True)
     assert not restarted.sessions.view()['storage_blocked']
+    assert restarted.sessions.view()['session']['radio_language'] == 'auto'
+
+
+def test_radio_language_is_local_to_each_session_and_universe(tmp_path):
+    bridge = demo(tmp_path)
+    service = bridge.sessions
+    service.start()
+    service.set_radio_language('fr')
+    assert service.pilot_context()['radio_language'] == 'fr'
+    service.set_radio_language('auto')
+    assert 'radio_language' not in (service.pilot_context() or {})
+    with pytest.raises(ValueError):
+        service.set_radio_language('de')
+    service.set_radio_language('en')
+    bridge.set_scenario(False)
+    bridge.settings.enabled = True
+    bridge.on_simulator_message({'connected': True, 'paused': False})
+    assert service.start()['session']['radio_language'] == 'auto'
+    bridge.set_scenario(True)
+    assert service.view()['session']['radio_language'] == 'en'
+    assert service.reset()['session']['radio_language'] == 'auto'
 
 
 def test_same_corrected_and_new_plan_have_deterministic_progress(tmp_path):

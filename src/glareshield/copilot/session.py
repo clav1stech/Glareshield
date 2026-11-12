@@ -144,6 +144,7 @@ class FlightSession(StrictModel):
     pilot_values: dict[Identifier, PilotValue] = Field(default_factory=dict)
     # Controllers the pilot ticked (True) or unticked (False) on Vol; absent means the automatic default.
     atc_choices: dict[Annotated[str, Field(pattern=r'^[A-Z0-9][A-Z0-9_-]{1,23}$')], bool] = Field(default_factory=dict)
+    radio_language: Literal['auto', 'fr', 'en'] = 'auto'
     phase_state: PhaseState = Field(default_factory=PhaseState)
     history: list[dict] = Field(default_factory=list)
 
@@ -413,6 +414,8 @@ class SessionService:
             ('departure_stand', 'stand'), ('arrival_stand', 'arrival_stand')) if key in session.pilot_values}
         if session.id in self.atc_cache:
             result['controllers_selected'] = self.atc_cache[session.id]
+        if session.radio_language != 'auto':
+            result['radio_language'] = session.radio_language
         return result or None
 
     def set_atc(self, callsign, selected):
@@ -426,6 +429,16 @@ class SessionService:
             else:
                 session.atc_choices[callsign] = selected
             session.history.append({'event': 'atc_choice', 'callsign': callsign, 'selected': selected, 'at': self.clock()})
+        return self.change(apply)
+
+    def set_radio_language(self, language):
+        """A flight-local override for controllers whose language differs from the default."""
+        if language not in ('auto', 'fr', 'en'):
+            raise ValueError('Langue radio invalide.')
+
+        def apply(session):
+            session.radio_language = language
+            session.history.append({'event': 'radio_language', 'language': language, 'at': self.clock()})
         return self.change(apply)
 
     def refresh_phase(self, persist=True):

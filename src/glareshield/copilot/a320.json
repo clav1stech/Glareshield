@@ -1,7 +1,7 @@
 {
   "schema_version": "glareshield.copilot_profile/1",
   "id": "a320_normal",
-  "revision": 2,
+  "revision": 3,
   "aircraft": "A320 / Fenix — procédures normales génériques de simulation",
   "scope": "simulation_only",
   "procedure_reference": "docs/SKILL.md sections 4, 5, 7 ; docs/copilot-contract.md",
@@ -1581,11 +1581,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, A320 au poste {stand}, demandons clairance IFR vers {destination}, information {atis_heard}.",
-            "readback": "Piste {cleared_runway}, SID {cleared_sid}, altitude {cleared_altitude}, code {squawk}, QNH {cleared_qnh}, {callsign}."
+            "readback": "Autorisé vers <destination autorisée>, piste {cleared_runway}, SID {cleared_sid}, montée vers {cleared_altitude}, code {squawk}, QNH {cleared_qnh}, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, A320 stand {stand}, request IFR clearance to {destination}, information {atis_heard}.",
-            "readback": "Runway {cleared_runway}, SID {cleared_sid}, altitude {cleared_altitude}, squawk {squawk}, QNH {cleared_qnh}, {callsign}."
+            "readback": "Cleared to <cleared destination>, runway {cleared_runway}, {cleared_sid} departure, climb to {cleared_altitude}, squawk {squawk}, QNH {cleared_qnh}, {callsign}."
           },
           "unicom_en": null
         }
@@ -1800,11 +1800,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, poste {stand}, demandons mise en route et repoussage.",
-            "readback": "<instruction effectivement reçue>, {callsign}."
+            "readback": "Mise en route et repoussage approuvés, face <direction reçue>, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, stand {stand}, request start-up and pushback.",
-            "readback": "<actual instruction received>, {callsign}."
+            "readback": "Start-up and pushback approved, facing <direction received>, {callsign}."
           },
           "unicom_en": "{origin} pushing back stand {stand} {origin}"
         },
@@ -1832,11 +1832,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, demandons roulage.",
-            "readback": "{taxi_route}, piste {cleared_runway}, {callsign}."
+            "readback": "Roulons point d’attente <point reçu>, piste {cleared_runway}, via {taxi_route}, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, request taxi.",
-            "readback": "{taxi_route}, runway {cleared_runway}, {callsign}."
+            "readback": "Taxi to holding point <holding point received>, runway {cleared_runway}, via {taxi_route}, {callsign}."
           },
           "unicom_en": "{origin} taxiing to holding point runway {departure_runway} {origin}"
         },
@@ -1863,11 +1863,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, prêt au départ piste {cleared_runway}.",
-            "readback": "<autorisation effectivement reçue>, piste {cleared_runway}, {callsign}."
+            "readback": "Piste {cleared_runway}, autorisé décollage, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, ready for departure runway {cleared_runway}.",
-            "readback": "<actual clearance received>, runway {cleared_runway}, {callsign}."
+            "readback": "Runway {cleared_runway}, cleared for take-off, {callsign}."
           },
           "unicom_en": "{origin} departing runway {departure_runway} {sid} {origin}"
         }
@@ -2038,11 +2038,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, <altitude actuelle>, en montée vers {cleared_altitude}.",
-            "readback": "{frequency}, {callsign}."
+            "readback": "<Station suivante> {frequency}, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, <current altitude>, climbing to {cleared_altitude}.",
-            "readback": "{frequency}, {callsign}."
+            "readback": "<Next station> {frequency}, {callsign}."
           },
           "unicom_en": null
         }
@@ -2296,11 +2296,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, demandons descente quand prêt.",
-            "readback": "<instruction effectivement reçue>, {callsign}."
+            "readback": "Descendons vers {cleared_altitude}, {callsign}."
           },
           "voice_en": {
-            "pilot": "{station}, {callsign}, request descent when ready.",
-            "readback": "<actual instruction received>, {callsign}."
+            "pilot": "{station}, {callsign}, ready for descent.",
+            "readback": "Descend to {cleared_altitude}, {callsign}."
           },
           "unicom_en": null
         },
@@ -2325,11 +2325,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, <position et niveau actuels>.",
-            "readback": "<instruction effectivement reçue>, {callsign}."
+            "readback": "Maintenons {cleared_altitude}, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, <current position and level>.",
-            "readback": "<actual instruction received>, {callsign}."
+            "readback": "Maintain {cleared_altitude}, {callsign}."
           },
           "unicom_en": "<area> <position, level and intention> <area>",
           "unicom_requires_trigger": true
@@ -2529,11 +2529,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, <altitude actuelle>, descente vers {cleared_altitude}, information {atis_heard}.",
-            "readback": "<instruction effectivement reçue>, {callsign}."
+            "readback": "Descendons vers {cleared_altitude}, QNH {cleared_qnh}, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, <current altitude>, descending to {cleared_altitude}, information {atis_heard}.",
-            "readback": "<actual instruction received>, {callsign}."
+            "readback": "Descend to {cleared_altitude}, QNH {cleared_qnh}, {callsign}."
           },
           "unicom_en": "{destination} <position> inbound runway {arrival_runway} {destination}"
         }
@@ -2799,11 +2799,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, {approach_position}, piste {arrival_runway}.",
-            "readback": "<autorisation effectivement reçue>, piste {cleared_runway}, {callsign}."
+            "readback": "Piste <piste d’atterrissage reçue>, autorisé atterrissage, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, {approach_position}, runway {arrival_runway}.",
-            "readback": "<actual clearance received>, runway {cleared_runway}, {callsign}."
+            "readback": "Runway <received landing runway>, cleared to land, {callsign}."
           },
           "unicom_en": "{destination} <distance> final runway {arrival_runway} {destination}"
         },
@@ -2830,11 +2830,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, remise des gaz.",
-            "readback": "<instruction effectivement reçue>, {callsign}."
+            "readback": "<Procédure publiée ou cap reçu>, montons vers {cleared_altitude}, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, going around.",
-            "readback": "<actual instruction received>, {callsign}."
+            "readback": "<Published missed approach or heading received>, climb to {cleared_altitude}, {callsign}."
           },
           "unicom_en": "{destination} going around runway {arrival_runway} {destination}"
         },
@@ -2862,11 +2862,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, piste dégagée par {exit}, demandons roulage au poste {stand}.",
-            "readback": "{taxi_route}, poste {stand}, {callsign}."
+            "readback": "Roulons poste <poste attribué>, via {taxi_route}, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, runway vacated via {exit}, request taxi to stand {stand}.",
-            "readback": "{taxi_route}, stand {stand}, {callsign}."
+            "readback": "Taxi to stand <assigned stand>, via {taxi_route}, {callsign}."
           },
           "unicom_en": "{destination} vacated runway {arrival_runway} {destination}"
         },
@@ -2894,11 +2894,11 @@
           ],
           "voice_fr": {
             "pilot": "{station}, {callsign}, au poste {stand}, demandons à quitter la fréquence.",
-            "readback": "<autorisation effectivement reçue>, {callsign}."
+            "readback": "Quittons la fréquence, {callsign}."
           },
           "voice_en": {
             "pilot": "{station}, {callsign}, parked stand {stand}, request frequency change.",
-            "readback": "<actual clearance received>, {callsign}."
+            "readback": "Changing frequency, {callsign}."
           },
           "unicom_en": "{destination} parked stand {stand} {destination}"
         }
